@@ -1,0 +1,42 @@
+# Manual workflow for releasing Go application
+# This workflow allows manual release creation by specifying a version.
+# It uses the reusable-cd-go-releaser workflow to build and publish releases.
+name: cd-wd-go-releaser
+
+on:
+  workflow_dispatch:
+    inputs:
+      create_tag:
+        description: "Create git tag if it doesn't exist"
+        required: false
+        type: boolean
+        default: true
+      draft:
+        description: "Create a draft release"
+        required: false
+        type: boolean
+        default: false
+      prerelease:
+        description: "Mark as prerelease"
+        required: false
+        type: boolean
+        default: false
+      version:
+        description: "Release version (e.g. v1.0.0, v1.0.0-beta.1). Must start with 'v' and follow semantic versioning."
+        required: true
+        type: string
+
+jobs:
+  release:
+    name: Release ABSC
+    uses: ./.github/workflows/reusable-cd-go-releaser.yaml
+    with:
+      component: absc
+      create_tag: ${{ inputs.create_tag }}
+      draft: ${{ inputs.draft }}
+      go_project_path: "."
+      prerelease: ${{ inputs.prerelease == true && 'true' || 'auto' }}
+      version: ${{ inputs.version }}
+    permissions:
+      contents: write
+      id-token: write

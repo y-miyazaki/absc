@@ -1,0 +1,67 @@
+{
+  "dockerFile": "../env/common/Dockerfile",
+  "remoteUser": "vscode",
+  "containerEnv": {
+    "LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}"
+  },
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "extensions.verifySignature": false
+      },
+      "extensions": [
+        "3w36zj6.textlint",
+        "davidanson.vscode-markdownlint",
+        "eamodio.gitlens",
+        "editorconfig.editorconfig",
+        "esbenp.prettier-vscode",
+        "fabiospampinato.vscode-diff",
+        "github.vscode-github-actions",
+        "github.vscode-pull-request-github",
+        "ibm.output-colorizer",
+        "qufiwefefwoyn.inline-sql-syntax",
+        "redhat.vscode-yaml",
+        "streetsidesoftware.code-spell-checker",
+        "usernamehw.errorlens",
+        "vscode-icons-team.vscode-icons",
+        "yzhang.markdown-all-in-one",
+        // for AI
+        "automatalabs.copilot-mcp",
+        "github.copilot",
+        "github.copilot-chat",
+        "amazonwebservices.amazon-q-vscode",
+        // for Shell Script environment
+        "foxundermoon.shell-format",
+        "timonwong.shellcheck",
+        "mads-hartmann.bash-ide-vscode",
+        "rogalmic.bash-debug",
+        // for Go environment
+        "golang.go",
+        "windmilleng.vscode-go-autotest",
+        "timvaneker.serverless-snippets",
+        "bufbuild.vscode-buf"
+      ]
+    }
+  },
+  "runArgs": [
+    "-v",
+    "${localWorkspaceFolder}:/workspace",
+    "-v",
+    "${localWorkspaceFolder}/env/common/.bashrc:/home/vscode/.bashrc",
+    "-v",
+    "${localWorkspaceFolder}/env/common/tmp/.gitconfig:/home/vscode/.gitconfig",
+    "-v",
+    "${localWorkspaceFolder}/env/common/tmp/gh:/home/vscode/.config/gh"
+  ],
+  "postCreateCommand": "/bin/bash env/common/scripts/init.sh",
+  "workspaceMount": "",
+  "workspaceFolder": "/workspace",
+  "overrideCommand": false,
+  "features": {
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
+      "version": "latest",
+      "moby": false,
+      "dockerDashComposeVersion": "v2"
+    }
+  }
+}

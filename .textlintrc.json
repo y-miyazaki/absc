@@ -1,0 +1,18 @@
+{
+  "plugins": {},
+  "filters": {
+    "allowlist": {
+      "allow": [".github/skills/**"]
+    }
+  },
+  "rules": {
+    "preset-ja-technical-writing": {
+      "sentence-length": false
+    },
+    "no-dead-link": {
+      "ignore": ["https://developer.hashicorp.com/*"],
+      "ignoreRedirects": false,
+      "checkRelative": true
+    }
+  }
+}

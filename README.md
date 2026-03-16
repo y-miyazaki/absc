@@ -1,0 +1,325 @@
+# ABSC - AWS Batch Schedule Collector
+
+![Go](https://custom-icon-badges.herokuapp.com/badge/Go-00ADD8.svg?logo=Go&logoColor=white)
+![Apache-2.0](https://custom-icon-badges.herokuapp.com/badge/license-Apache%202.0-8BB80A.svg?logo=law&logoColor=white)
+[![GitHub release](https://img.shields.io/github/release/y-miyazaki/arc.svg)](https://github.com/y-miyazaki/arc/releases/latest)
+[![cd-wd-go-releaser](https://github.com/y-miyazaki/arc/actions/workflows/cd-wd-go-releaser.yaml/badge.svg?branch=master)](https://github.com/y-miyazaki/arc/actions/workflows/cd-wd-go-releaser.yaml)
+
+ABSC is a command-line tool for collecting AWS cron-style schedules and rendering a timeline viewer as JSON and HTML.
+
+It focuses on scheduled workloads managed by EventBridge Rules and EventBridge Scheduler, then enriches each schedule with recent execution history when the target service supports it.
+
+## Features
+
+- EventBridge Rules and EventBridge Scheduler collection across multiple regions
+- Timeline-oriented HTML output for one-day schedule visibility
+- JSON output for automation or secondary processing
+- Target service detection for Lambda, ECS, Batch, Glue, Step Functions, and more
+- Recent run enrichment for Step Functions, Batch, ECS, Glue, and Lambda
+- Timezone-aware rendering for schedule windows and execution timestamps
+- Concurrent collection with configurable lookback range and result limits
+
+## Table of Contents
+
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Usage](#usage)
+- [Collected Data](#collected-data)
+- [Output Format](#output-format)
+- [Configuration](#configuration)
+- [Examples](#examples)
+- [Development](#development)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Installation
+
+### Using Go Install
+
+```bash
+go install github.com/y-miyazaki/arc/cmd/absc@v1.0.0
+```
+
+### Using Release tar.gz
+
+You can download a prebuilt release tarball from the Releases page and install it quickly. The examples below use the `v1.0.0` release.
+
+Available platforms:
+
+- Linux (amd64, arm64)
+- macOS (amd64, arm64)
+- Windows (amd64)
+
+Linux (AMD64) example:
+
+```bash
+VERSION=v1.0.0 && curl -L https://github.com/y-miyazaki/arc/releases/download/${VERSION}/absc-linux-amd64.tar.gz | tar -xzf - && sudo mv absc /usr/local/bin/ && sudo chmod +x /usr/local/bin/absc
+```
+
+macOS (ARM64) example:
+
+```bash
+VERSION=v1.0.0 && curl -L https://github.com/y-miyazaki/arc/releases/download/${VERSION}/absc-darwin-arm64.tar.gz | tar -xzf - && sudo mv absc /usr/local/bin/ && sudo chmod +x /usr/local/bin/absc
+```
+
+Notes:
+
+- The release typically ships an `absc-${VERSION}-checksums.txt` file. Verify the checksum before installing in production.
+- For Windows, download the `.zip` asset from the Releases page and extract the `absc.exe` binary.
+- `go install` is convenient for development. Release tarballs are preferable when you want a pinned binary such as `v1.0.0`.
+
+### Build from Source
+
+```bash
+git clone https://github.com/y-miyazaki/arc.git
+cd arc
+go build -o absc ./cmd/absc
+```
+
+### Verify Installation
+
+```bash
+absc --help
+```
+
+## Quick Start
+
+1. Configure AWS credentials.
+
+```bash
+aws configure
+```
+
+2. Generate a schedule timeline.
+
+```bash
+absc --timezone Asia/Tokyo
+```
+
+3. Open the generated output.
+
+```bash
+ls -lh ./output/*/cron/
+```
+
+The main artifacts are generated under `./output/{account-id}/cron/`.
+
+## Usage
+
+### Basic Commands
+
+```bash
+# Collect schedules in the default region
+absc
+
+# Collect schedules from multiple regions
+absc --region ap-northeast-1,us-east-1
+
+# Use a specific AWS profile
+absc --profile production
+
+# Render in a specific timezone
+absc --timezone Asia/Tokyo
+
+# Change the execution history window
+absc --lookback-hours 72
+
+# Increase collector concurrency
+absc --max-concurrency 10
+
+# Limit the number of collected runs per target
+absc --max-results 100
+
+# Write to a custom output base directory
+absc --output-dir /path/to/output
+```
+
+### Command-Line Options
+
+```text
+OPTIONS:
+   --profile value             AWS profile to use
+   --region value, -r value    AWS region(s) to use (comma-separated list accepted) (default: "ap-northeast-1")
+   --regions value             Deprecated alias of --region
+   --timezone value            IANA timezone (default: "UTC")
+   --output-dir value, -D      Output base directory (default: "./output")
+   --lookback-hours value      Execution history lookback hours (default: 24)
+   --max-concurrency value     Max concurrent resource collectors (default: 5)
+   --max-results value         Max executions/jobs per target (default: 50)
+   --help, -h                  show help
+```
+
+## Collected Data
+
+### Schedule Sources
+
+ABSC currently collects schedules from the following AWS sources:
+
+- EventBridge Rules with schedule expressions
+- EventBridge Scheduler schedules
+
+### Target Classification
+
+ABSC classifies targets for display in the HTML timeline. Common target services include:
+
+- Lambda
+- ECS
+- Batch
+- Glue
+- Step Functions
+- EC2
+- RDS
+- Redshift
+- EventBridge
+- Other
+
+### Execution History Enrichment
+
+Recent runs are collected only when the target type supports runtime lookup. Current enrichment coverage is:
+
+- Step Functions executions
+- AWS Batch jobs
+- ECS task runs
+- Glue job runs
+- Lambda invocations derived from CloudWatch Logs
+
+If a target type is not supported for run enrichment, the timeline still shows scheduled slots, but the run list remains empty.
+
+## Output Format
+
+### Directory Structure
+
+```text
+output/
+└── {account-id}/
+    └── cron/
+        ├── index.html
+        ├── schedules.json
+        └── assets/
+            └── icons/
+                └── *.svg
+```
+
+### JSON Output
+
+`schedules.json` contains:
+
+- Metadata such as account ID, timezone, generation time, and timeline window
+- Schedule definitions collected from EventBridge Rules and Scheduler
+- Recent run history for supported target services
+- Error records grouped by service and region
+
+### HTML Viewer
+
+`index.html` is a self-contained timeline viewer backed by the same JSON payload. It provides:
+
+- Service and region filters
+- Sticky schedule name column
+- 10-minute slots across a 24-hour window
+- Scheduled slot markers and actual run overlays
+- Disabled schedule highlighting
+- Maximum-result cap indicator when runs are truncated
+
+The HTML file can be opened directly in a browser because the payload is embedded into the document.
+
+## Configuration
+
+### Environment Variables
+
+- `AWS_PROFILE` - AWS profile name
+- `AWS_DEFAULT_PROFILE` - Alternate AWS profile environment variable
+- `AWS_DEFAULT_REGION` - Default AWS region
+- `AWS_ACCESS_KEY_ID` - AWS access key
+- `AWS_SECRET_ACCESS_KEY` - AWS secret key
+- `AWS_SESSION_TOKEN` - AWS session token for temporary credentials
+
+### AWS Permissions
+
+ABSC requires read-only access for the schedule sources and the target services whose execution history you want to inspect.
+
+At minimum, the tool needs access equivalent to:
+
+- `sts:GetCallerIdentity`
+- EventBridge schedule/rule read permissions
+- EventBridge Scheduler read permissions
+- Read permissions for Step Functions, Batch, ECS, Glue, and CloudWatch Logs when run enrichment is needed
+
+Exact IAM actions depend on which target services are present in your environment.
+
+## Examples
+
+### Multi-Region Timeline
+
+```bash
+absc --region ap-northeast-1,us-east-1 --timezone Asia/Tokyo
+```
+
+### Longer History Window
+
+```bash
+absc --lookback-hours 168 --max-results 200
+```
+
+### Separate Output by Profile
+
+```bash
+absc --profile production --output-dir ./output/production
+absc --profile staging --output-dir ./output/staging
+```
+
+### CI Execution
+
+```yaml
+name: Collect AWS schedules
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.4'
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::123456789012:role/GitHubActionsRole
+          aws-region: ap-northeast-1
+
+      - name: Install absc
+        run: go install github.com/y-miyazaki/arc/cmd/absc@v1.0.0
+
+      - name: Collect schedules
+        run: absc --timezone Asia/Tokyo
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: absc-output
+          path: output/
+```
+
+## Development
+
+```bash
+go test ./...
+go build ./cmd/absc
+```
+
+For repository-wide contribution guidance, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Contributing
+
+Contributions are welcome. Please review [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes.
+
+## License
+
+Apache License 2.0. See [LICENSE](LICENSE) for details.

@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2064%2064'><rect%20fill='%23ffffff'%20width='64'%20height='64'/><circle%20cx='32'%20cy='32'%20r='30'%20fill='%23FF9900'/><text%20x='32'%20y='42'%20font-family='Arial,Helvetica,sans-serif'%20font-size='36'%20font-weight='700'%20fill='%23ffffff'%20text-anchor='middle'>A</text></svg>" />
+  <title>@@INDEX_TITLE@@</title>
+  <style>
+    :root {
+      --bg: #f6f7f4;
+      --panel: #ffffff;
+      --text: #1d2730;
+      --sub: #5f6b76;
+      --accent: #006d77;
+      --grid: #dde3e7;
+      --run: #ff7f50;
+      --scheduled: #7db9b6;
+      --name-col-width: 260px;
+    }
+    body { margin: 0; font-family: "Noto Sans", "Segoe UI", sans-serif; color: var(--text); background: radial-gradient(circle at 10% 0%, #e4f4f3, var(--bg) 35%); }
+    header { padding: 16px 20px; border-bottom: 1px solid #d5dde3; background: #ffffffcc; backdrop-filter: blur(6px); position: sticky; top: 0; z-index: 10; }
+    .meta { color: var(--sub); font-size: 13px; }
+    .controls { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+    .controls input[type="range"] { width: 170px; vertical-align: middle; }
+    select { padding: 6px 10px; border: 1px solid #c9d2d9; border-radius: 8px; background: var(--panel); }
+    main { padding: 14px; }
+    .legend { display: flex; gap: 12px; margin: 10px 0; font-size: 12px; color: var(--sub); }
+    .dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+    .dot.sch { background: var(--scheduled); }
+    .dot.run { background: var(--run); }
+    .timeline { border: 1px solid #d7e0e7; background: var(--panel); border-radius: 12px; overflow: auto; max-height: calc(100vh - 180px); }
+    .row {
+      display: grid;
+      grid-template-columns: var(--name-col-width) repeat(144, 14px);
+      border-bottom: 1px solid #eef2f5;
+      min-height: 22px;
+      width: max-content;
+      min-width: max-content;
+    }
+    .row.head { position: sticky; top: 0; background: #f3f8f8; z-index: 5; box-shadow: 0 1px 0 #dde3e7; }
+    .name {
+      padding: 4px 8px;
+      font-size: 12px;
+      border-right: 1px solid #dde3e7;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      position: sticky;
+      left: 0;
+      background: var(--panel);
+      z-index: 2;
+    }
+    .row.head .name {
+      background: #f3f8f8;
+      z-index: 6;
+    }
+    .row.head .cell {
+      background: #f3f8f8;
+    }
+    .cell { border-right: 1px solid var(--grid); position: relative; }
+    .cell.sch::after { content: ""; position: absolute; inset: 4px; background: var(--scheduled); border-radius: 3px; }
+    .cell.run::before { content: ""; position: absolute; inset: 1px 0; background: var(--run); opacity: .85; }
+    .row.disabled .name { color: #5f6b76; background: #e9eef2; }
+    .row.disabled .cell { background: #e9eef2; opacity: .65; }
+    .badge { display: inline-block; margin-left: 6px; padding: 1px 6px; font-size: 10px; border-radius: 999px; background: #eef2f5; color: #60717f; vertical-align: middle; }
+    .badge.warn { background: #fff4e5; color: #9a5d1d; }
+    .hour { font-size: 10px; color: var(--sub); text-align: center; }
+    .tooltip { position: fixed; background: #1f2d34; color: #fff; padding: 8px; border-radius: 8px; font-size: 12px; pointer-events: none; transform: translate(8px, 8px); display: none; max-width: 360px; }
+    .svc-icon { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; vertical-align: middle; flex-shrink: 0; margin-right: 2px; }
+    .svc-icon img { width: 18px; height: 18px; display: block; }
+  </style>
+</head>
+<body>
+<header>
+  <h2 style="margin:0">@@INDEX_TITLE@@</h2>
+  <div class="meta" id="meta"></div>
+  <div class="controls">
+    <label>Service <select id="serviceFilter"></select></label>
+    <label>Region <select id="regionFilter"></select></label>
+    <label>Schedule Width <input id="nameWidth" type="range" min="220" max="520" step="10" value="260" /> <span id="nameWidthValue">260px</span></label>
+  </div>
+</header>
+<main>
+  <div class="legend">
+    <span><span class="dot sch"></span>Scheduled slot</span>
+    <span><span class="dot run"></span>Actual run (start-end)</span>
+    <span><span class="badge">disabled</span>Schedule disabled</span>
+    <span><span class="badge warn">max</span>Runs list capped by max-results</span>
+  </div>
+  <div class="timeline" id="timeline"></div>
+</main>
+<div id="tooltip" class="tooltip"></div>
+<script id="payload" type="application/json">@@PAYLOAD@@</script>
+<script>
+const DATA = JSON.parse(document.getElementById('payload').textContent);
+const timeline = document.getElementById('timeline');
+const tooltip = document.getElementById('tooltip');
+document.getElementById('meta').textContent =
+  'Account: ' + DATA.account_id +
+  ' | TZ: ' + DATA.timezone +
+  ' | Window: ' + DATA.window.start +
+  ' - ' + DATA.window.end;
+
+function unique(arr){ return [...new Set(arr)]; }
+
+function buildFilters() {
+  const service = document.getElementById('serviceFilter');
+  const region = document.getElementById('regionFilter');
+  const services = unique(DATA.schedules.map(s => s.service));
+  const regions = unique(DATA.schedules.map(s => s.region));
+  service.innerHTML = '<option value="">all</option>' + services.map(v => '<option>' + v + '</option>').join('');
+  region.innerHTML = '<option value="">all</option>' + regions.map(v => '<option>' + v + '</option>').join('');
+  service.onchange = render;
+  region.onchange = render;
+}
+
+function setupNameWidthControl() {
+  const slider = document.getElementById('nameWidth');
+  const value = document.getElementById('nameWidthValue');
+  const apply = () => {
+    const width = Number(slider.value) || 260;
+    document.documentElement.style.setProperty('--name-col-width', width + 'px');
+    value.textContent = width + 'px';
+  };
+  slider.oninput = apply;
+  apply();
+}
+
+function slotFor(ts){
+  if(!ts) return null;
+  const m = ts.match(/T(\d{2}):(\d{2})/);
+  if(!m) return null;
+  const hour = Number(m[1]);
+  const minute = Number(m[2]);
+  return (hour*6) + Math.floor(minute/10);
+}
+
+function compareSchedules(a, b) {
+  const servicePriority = {
+    eventbridge_rule: 0,
+    eventbridge_scheduler: 1,
+  };
+  const serviceDelta = (servicePriority[a.service] ?? 99) - (servicePriority[b.service] ?? 99);
+  if (serviceDelta !== 0) return serviceDelta;
+
+  const nameDelta = (a.schedule_name || '').localeCompare(b.schedule_name || '', undefined, {
+    numeric: true,
+    sensitivity: 'base',
+  });
+  if (nameDelta !== 0) return nameDelta;
+
+  return (a.region || '').localeCompare(b.region || '', undefined, {
+    numeric: true,
+    sensitivity: 'base',
+  });
+}
+
+function render() {
+  const sVal = document.getElementById('serviceFilter').value;
+  const rVal = document.getElementById('regionFilter').value;
+  const rows = DATA.schedules
+    .filter(s => (!sVal || s.service === sVal) && (!rVal || s.region === rVal))
+    .sort(compareSchedules);
+
+  const head = document.createElement('div');
+  head.className = 'row head';
+  const first = document.createElement('div');
+  first.className = 'name';
+  first.textContent = 'Schedule';
+  head.appendChild(first);
+  for(let i=0;i<144;i++) {
+    const c = document.createElement('div');
+    c.className = 'cell hour';
+    c.textContent = i%6===0 ? String(i/6).padStart(2,'0') : '';
+    head.appendChild(c);
+  }
+
+  timeline.innerHTML = '';
+  timeline.appendChild(head);
+
+  rows.forEach(s => {
+    const row = document.createElement('div');
+    row.className = 'row';
+    if (s.enabled === false) row.className += ' disabled';
+    const name = document.createElement('div');
+    name.className = 'name';
+    name.title = s.schedule_name;
+    name.appendChild(makeIcon(s.service));
+    name.appendChild(makeIcon(s.target_service || 'Other'));
+    const nameText = document.createElement('span');
+    nameText.style.marginLeft = '3px';
+    nameText.textContent = s.schedule_name;
+    name.appendChild(nameText);
+    const regionBadge = document.createElement('span');
+    regionBadge.className = 'badge';
+    regionBadge.textContent = s.region;
+    name.appendChild(regionBadge);
+    if (s.runs_capped) {
+      const cap = document.createElement('span');
+      cap.className = 'badge warn';
+      cap.textContent = 'max';
+      name.appendChild(cap);
+    }
+    row.appendChild(name);
+
+    const runSlots = new Set();
+    (s.runs || []).forEach(r => {
+      const st = slotFor(r.start_at);
+      let ed = slotFor(r.end_at);
+      if(st == null) return;
+      if(ed == null) ed = st;
+      for(let i=st; i<=Math.max(st,ed) && i<144; i++) runSlots.add(i);
+    });
+
+    for(let i=0;i<144;i++) {
+      const cell = document.createElement('div');
+      let cls = 'cell';
+      if((s.slots || [])[i] === 1) cls += ' sch';
+      if(runSlots.has(i)) cls += ' run';
+      cell.className = cls;
+      cell.onmousemove = (e) => {
+        tooltip.style.display = 'block';
+        tooltip.style.left = e.clientX + 'px';
+        tooltip.style.top = e.clientY + 'px';
+        const recentRuns = (s.runs || []).slice(0, 8);
+        const statusColor = st => st === 'SUCCEEDED' || st === 'COMPLETED' || st === 'STOPPED' ? '#4caf50' :
+                                   st === 'FAILED' || st === 'ABORTED' ? '#f44336' :
+                                   st === 'RUNNING' || st === 'EXECUTING' ? '#ff9800' : '#9e9e9e';
+        const fmtDur = sec => {
+          if (sec == null) return '-';
+          if (sec < 60) return sec + 's';
+          const m = Math.floor(sec / 60), s2 = sec % 60;
+          return m + 'm' + (s2 > 0 ? s2 + 's' : '');
+        };
+        const fmtTs = ts => {
+          if (!ts) return '-';
+          return ts.replace('T', ' ').replace(/(Z|[+-]\d{2}:\d{2})$/, '');
+        };
+        const runsHtml = recentRuns.length > 0
+          ? '<table style="width:100%;margin-top:6px;border-collapse:collapse;font-size:11px">' +
+            '<tr style="border-bottom:1px solid #444"><th style="text-align:left;padding:2px 4px">Status</th>' +
+            '<th style="text-align:left;padding:2px 4px">Start</th>' +
+            '<th style="text-align:left;padding:2px 4px">End</th>' +
+            '<th style="text-align:right;padding:2px 4px">Duration</th></tr>' +
+            recentRuns.map(r =>
+              '<tr>' +
+              '<td style="color:' + statusColor(r.status) + ';padding:2px 4px">' + r.status + '</td>' +
+              '<td style="padding:2px 4px">' + fmtTs(r.start_at) + '</td>' +
+              '<td style="padding:2px 4px">' + fmtTs(r.end_at) + '</td>' +
+              '<td style="text-align:right;padding:2px 4px">' + fmtDur(r.duration_sec) + '</td>' +
+              '</tr>'
+            ).join('') +
+            '</table>'
+          : '<div style="margin-top:6px;color:#aaa;font-size:11px">no recent runs</div>';
+        tooltip.innerHTML =
+          '<b>' + s.schedule_name + '</b><br/>' +
+          'state: ' + (s.enabled === false ? 'DISABLED' : 'ENABLED') + '<br/>' +
+          'service: ' + (s.target_service || 'Other') + '<br/>' +
+          'target: ' + (s.target_name || s.target_arn) + '<br/>' +
+          'expression: ' + s.schedule_expression + '<br/>' +
+          'next: ' + (s.next_invocation_at || '-') + '<br/>' +
+          'runs (shown): ' + (s.runs || []).length + (s.runs_capped ? ' (capped by max-results)' : '') +
+          runsHtml;
+      };
+      cell.onmouseleave = () => { tooltip.style.display = 'none'; };
+      row.appendChild(cell);
+    }
+
+    timeline.appendChild(row);
+  });
+}
+
+const AWS_ICONS = {
+  eventbridge_rule:      { label: 'Amazon EventBridge Rule', src: 'assets/icons/eventbridge_rule.svg' },
+  eventbridge_scheduler: { label: 'Amazon EventBridge Scheduler', src: 'assets/icons/eventbridge_scheduler.svg' },
+  'Lambda':              { label: 'AWS Lambda', src: 'assets/icons/lambda.svg' },
+  'Step Functions':      { label: 'AWS Step Functions', src: 'assets/icons/stepfunctions.svg' },
+  'Glue':                { label: 'AWS Glue', src: 'assets/icons/glue.svg' },
+  'RDS':                 { label: 'Amazon RDS', src: 'assets/icons/rds.svg' },
+  'ECS':                 { label: 'Amazon ECS', src: 'assets/icons/ecs.svg' },
+  'Batch':               { label: 'AWS Batch', src: 'assets/icons/batch.svg' },
+  'EC2':                 { label: 'Amazon EC2', src: 'assets/icons/ec2.svg' },
+  'EventBridge':         { label: 'Amazon EventBridge', src: 'assets/icons/eventbridge.svg' },
+  'Redshift':            { label: 'Amazon Redshift', src: 'assets/icons/redshift.svg' },
+  'Other':               { label: 'Other', src: 'assets/icons/eventbridge.svg' }
+};
+
+function makeIcon(key) {
+  const data = AWS_ICONS[key] || AWS_ICONS.Other;
+  const wrap = document.createElement('span');
+  wrap.className = 'svc-icon';
+  wrap.setAttribute('role', 'img');
+  wrap.setAttribute('aria-label', data.label);
+  wrap.title = data.label;
+  const img = document.createElement('img');
+  img.src = data.src;
+  img.alt = data.label;
+  img.loading = 'lazy';
+  wrap.appendChild(img);
+  return wrap;
+}
+
+buildFilters();
+setupNameWidthControl();
+render();
+</script>
+</body>
+</html>

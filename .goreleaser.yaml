@@ -1,0 +1,145 @@
+# GoReleaser configuration for ABSC (AWS Resource Collector)
+# This configuration defines how to build and release the ABSC CLI tool
+# for multiple platforms and architectures.
+
+# Configuration version
+version: 2
+
+# Project metadata
+project_name: arc
+
+# Report binary sizes in release notes
+report_sizes: true
+
+# Metadata for reproducible builds
+metadata:
+  mod_timestamp: "{{ .CommitTimestamp }}"
+
+# Build configuration
+builds:
+  - id: arc
+    # Entry point for the CLI tool
+    main: ./cmd/arc
+    # Binary name (without extension)
+    binary: arc
+    # Build flags
+    flags:
+      - -trimpath
+    # Linker flags for embedding version information
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.ShortCommit}}
+      - -X main.date={{.Date}}
+    # Environment variables for build
+    env:
+      - CGO_ENABLED=0
+    # Target platforms and architectures
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    # Exclude unsupported combinations
+    ignore:
+      - goos: windows
+        goarch: arm64
+
+# Archive configuration
+archives:
+  - id: default
+    # Archive name template
+    name_template: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"
+    # Formats: Use list format in v2 (tar.gz is the default)
+    formats:
+      - tar.gz
+    # Files to include in the archive
+    files:
+      - LICENSE
+      - README.md
+      - CONTRIBUTING.md
+      - docs/**/*
+
+# Checksum configuration
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+# SBOM (Software Bill of Materials) generation
+# sboms:
+#   - artifacts: archive
+
+# Snapshot configuration (for local builds)
+snapshot:
+  version_template: "{{ .Version }}-next"
+
+# Changelog configuration
+changelog:
+  use: github
+  sort: asc
+  abbrev: 7
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+      - "^refactor:"
+      - "^style:"
+      - Merge pull request
+      - Merge branch
+  groups:
+    - title: Features
+      regexp: "^feat:"
+      order: 0
+    - title: Bug Fixes
+      regexp: "^fix:"
+      order: 1
+    - title: Security Updates
+      regexp: "^security:"
+      order: 2
+    - title: Performance Improvements
+      regexp: "^perf:"
+      order: 3
+    - title: Others
+      order: 999
+
+# Release configuration
+release:
+  # GitHub/GitLab/Gitea release configuration
+  github:
+    owner: y-miyazaki
+    name: arc
+  # Draft release (set to false for automatic publishing)
+  draft: false
+  # Prerelease detection
+  prerelease: auto
+  # Release name template
+  name_template: "v{{.Version}}"
+  # Footer template for release notes
+  footer: |
+    **Full Changelog**: https://github.com/y-miyazaki/arc/compare/{{ .PreviousTag }}...{{ .Tag }}
+  # Discussion category (optional)
+  # discussion_category_name: General
+
+# Announce configuration (optional)
+# announce:
+#   slack:
+#     enabled: true
+#     message_template: 'ABSC {{.Tag}} is out! Check it out: {{ .ReleaseURL }}'
+#     channel: '#releases'
+
+# Signing configuration (optional)
+# sign:
+#   cmd: gpg
+#   args:
+#     - "--batch"
+#     - "-u"
+#     - "{{ .Env.GPG_FINGERPRINT }}"
+#     - "--output"
+#     - "${signature}"
+#     - "--detach-sign"
+#     - "${artifact}"
+#   artifacts: checksum
