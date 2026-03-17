@@ -1,4 +1,3 @@
-// TODO: Upgrade to Go 1.25.5 to fix vulnerabilities GO-2025-4175 and GO-2025-4155 in crypto/x509
 module github.com/y-miyazaki/arc
 
 go 1.25.4
@@ -13,8 +12,8 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/glue v1.138.0
 	github.com/aws/aws-sdk-go-v2/service/scheduler v1.17.21
 	github.com/aws/aws-sdk-go-v2/service/sfn v1.40.9
-	github.com/aws/aws-sdk-go-v2/service/sts v1.41.9
 	github.com/urfave/cli/v2 v2.27.7
+	github.com/y-miyazaki/go-common v0.7.0
 )
 
 require (
@@ -30,8 +29,15 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/signin v1.0.8 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.30.13 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.17 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.41.9 // indirect
 	github.com/aws/smithy-go v1.24.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
+	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/xrash/smetrics v0.0.0-20250705151800-55b8f293f342 // indirect
+	go.uber.org/multierr v1.11.0 // indirect
+	go.uber.org/zap v1.27.1 // indirect
+	golang.org/x/sys v0.42.0 // indirect
+	gorm.io/gorm v1.31.1 // indirect
 )
