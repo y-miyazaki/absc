@@ -38,11 +38,11 @@ This project adheres to a code of conduct. By participating, you are expected to
 
 ```bash
 # Clone your fork
-git clone https://github.com/YOUR_USERNAME/arc.git
-cd arc
+git clone https://github.com/YOUR_USERNAME/absc.git
+cd absc
 
 # Add upstream remote
-git remote add upstream https://github.com/y-miyazaki/arc.git
+git remote add upstream https://github.com/y-miyazaki/absc.git
 
 # Install dependencies
 go mod download
@@ -119,7 +119,7 @@ export AWS_PROFILE=your-test-profile
 export AWS_DEFAULT_REGION=ap-northeast-1
 
 # Run the tool
-go run cmd/arc/main.go -c ec2,s3 -v
+go run cmd/absc/main.go -c ec2,s3 -v
 ```
 
 ## Code Style
@@ -258,7 +258,7 @@ func (c *ServiceNameCollector) Collect(ctx context.Context, cfg *aws.Config, reg
 
 ```
 .
-├── cmd/arc/              # Main application entry point
+├── cmd/absc/              # Main application entry point
 ├── internal/
 │   ├── aws/             # AWS client and resource collectors
 │   │   ├── resources/   # Service-specific collectors
@@ -344,7 +344,7 @@ Examples:
 ## Questions?
 
 - 📖 Check the [Documentation](docs/)
-- 🐛 Open an [Issue](https://github.com/y-miyazaki/arc/issues)
-- 💬 Start a [Discussion](https://github.com/y-miyazaki/arc/discussions)
+- 🐛 Open an [Issue](https://github.com/y-miyazaki/absc/issues)
+- 💬 Start a [Discussion](https://github.com/y-miyazaki/absc/discussions)
 
 Thank you for contributing to ABSC!

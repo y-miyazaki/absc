@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/y-miyazaki/arc/internal/aws/resources"
+	"github.com/y-miyazaki/absc/internal/aws/resources"
 )
 
 const (

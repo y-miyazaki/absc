@@ -6,7 +6,7 @@
 version: 2
 
 # Project metadata
-project_name: arc
+project_name: absc
 
 # Report binary sizes in release notes
 report_sizes: true
@@ -17,11 +17,11 @@ metadata:
 
 # Build configuration
 builds:
-  - id: arc
+  - id: absc
     # Entry point for the CLI tool
-    main: ./cmd/arc
+    main: ./cmd/absc
     # Binary name (without extension)
-    binary: arc
+    binary: absc
     # Build flags
     flags:
       - -trimpath
@@ -111,7 +111,7 @@ release:
   # GitHub/GitLab/Gitea release configuration
   github:
     owner: y-miyazaki
-    name: arc
+    name: absc
   # Draft release (set to false for automatic publishing)
   draft: false
   # Prerelease detection
@@ -120,7 +120,7 @@ release:
   name_template: "v{{.Version}}"
   # Footer template for release notes
   footer: |
-    **Full Changelog**: https://github.com/y-miyazaki/arc/compare/{{ .PreviousTag }}...{{ .Tag }}
+    **Full Changelog**: https://github.com/y-miyazaki/absc/compare/{{ .PreviousTag }}...{{ .Tag }}
   # Discussion category (optional)
   # discussion_category_name: General
 

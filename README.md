@@ -2,8 +2,8 @@
 
 ![Go](https://custom-icon-badges.herokuapp.com/badge/Go-00ADD8.svg?logo=Go&logoColor=white)
 ![Apache-2.0](https://custom-icon-badges.herokuapp.com/badge/license-Apache%202.0-8BB80A.svg?logo=law&logoColor=white)
-[![GitHub release](https://img.shields.io/github/release/y-miyazaki/arc.svg)](https://github.com/y-miyazaki/arc/releases/latest)
-[![cd-wd-go-releaser](https://github.com/y-miyazaki/arc/actions/workflows/cd-wd-go-releaser.yaml/badge.svg?branch=master)](https://github.com/y-miyazaki/arc/actions/workflows/cd-wd-go-releaser.yaml)
+[![GitHub release](https://img.shields.io/github/release/y-miyazaki/absc.svg)](https://github.com/y-miyazaki/absc/releases/latest)
+[![cd-wd-go-releaser](https://github.com/y-miyazaki/absc/actions/workflows/cd-wd-go-releaser.yaml/badge.svg?branch=master)](https://github.com/y-miyazaki/absc/actions/workflows/cd-wd-go-releaser.yaml)
 
 ABSC is a command-line tool for collecting AWS cron-style schedules and rendering a timeline viewer as JSON and HTML.
 
@@ -37,7 +37,7 @@ It focuses on scheduled workloads managed by EventBridge Rules and EventBridge S
 ### Using Go Install
 
 ```bash
-go install github.com/y-miyazaki/arc/cmd/absc@v1.0.0
+go install github.com/y-miyazaki/absc/cmd/absc@v1.0.0
 ```
 
 ### Using Release tar.gz
@@ -53,13 +53,13 @@ Available platforms:
 Linux (AMD64) example:
 
 ```bash
-VERSION=v1.0.0 && curl -L https://github.com/y-miyazaki/arc/releases/download/${VERSION}/absc-linux-amd64.tar.gz | tar -xzf - && sudo mv absc /usr/local/bin/ && sudo chmod +x /usr/local/bin/absc
+VERSION=v1.0.0 && curl -L https://github.com/y-miyazaki/absc/releases/download/${VERSION}/absc-linux-amd64.tar.gz | tar -xzf - && sudo mv absc /usr/local/bin/ && sudo chmod +x /usr/local/bin/absc
 ```
 
 macOS (ARM64) example:
 
 ```bash
-VERSION=v1.0.0 && curl -L https://github.com/y-miyazaki/arc/releases/download/${VERSION}/absc-darwin-arm64.tar.gz | tar -xzf - && sudo mv absc /usr/local/bin/ && sudo chmod +x /usr/local/bin/absc
+VERSION=v1.0.0 && curl -L https://github.com/y-miyazaki/absc/releases/download/${VERSION}/absc-darwin-arm64.tar.gz | tar -xzf - && sudo mv absc /usr/local/bin/ && sudo chmod +x /usr/local/bin/absc
 ```
 
 Notes:
@@ -71,8 +71,8 @@ Notes:
 ### Build from Source
 
 ```bash
-git clone https://github.com/y-miyazaki/arc.git
-cd arc
+git clone https://github.com/y-miyazaki/absc.git
+cd absc
 go build -o absc ./cmd/absc
 ```
 
@@ -295,7 +295,7 @@ jobs:
           aws-region: ap-northeast-1
 
       - name: Install absc
-        run: go install github.com/y-miyazaki/arc/cmd/absc@v1.0.0
+        run: go install github.com/y-miyazaki/absc/cmd/absc@v1.0.0
 
       - name: Collect schedules
         run: absc --timezone Asia/Tokyo

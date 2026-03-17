@@ -1,4 +1,4 @@
-module github.com/y-miyazaki/arc
+module github.com/y-miyazaki/absc
 
 go 1.25.8
 

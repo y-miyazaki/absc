@@ -12,9 +12,9 @@ import (
 
 	"github.com/urfave/cli/v2"
 
-	awscfg "github.com/y-miyazaki/arc/internal/aws"
-	"github.com/y-miyazaki/arc/internal/aws/resources"
-	"github.com/y-miyazaki/arc/internal/exporter"
+	awscfg "github.com/y-miyazaki/absc/internal/aws"
+	"github.com/y-miyazaki/absc/internal/aws/resources"
+	"github.com/y-miyazaki/absc/internal/exporter"
 	"github.com/y-miyazaki/go-common/pkg/logger"
 	"github.com/y-miyazaki/go-common/pkg/utils/aws/validation"
 )

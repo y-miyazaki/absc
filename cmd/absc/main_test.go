@@ -13,8 +13,8 @@ import (
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/urfave/cli/v2"
 
-	"github.com/y-miyazaki/arc/internal/aws/resources"
-	"github.com/y-miyazaki/arc/internal/exporter"
+	"github.com/y-miyazaki/absc/internal/aws/resources"
+	"github.com/y-miyazaki/absc/internal/exporter"
 )
 
 type noopLogger struct{}
