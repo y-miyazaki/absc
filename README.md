@@ -19,11 +19,22 @@ It focuses on scheduled workloads managed by EventBridge Rules and EventBridge S
 - Timezone-aware rendering for schedule windows and execution timestamps
 - Concurrent collection with configurable lookback range and result limits
 
+## Screenshots
+
+### Interactive HTML Viewer
+
+ABSC generates an interactive HTML viewer that allows you to browse collected schedules with ease:
+
+![HTML Viewer Overview](docs/image/html-viewer-overview.png)
+
+*Interactive HTML viewer showing AWS cron schedules and recent executions*
+
 ## Table of Contents
 
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Usage](#usage)
+- [Screenshots](#screenshots)
 - [Collected Data](#collected-data)
 - [Output Format](#output-format)
 - [Configuration](#configuration)
