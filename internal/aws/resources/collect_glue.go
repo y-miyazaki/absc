@@ -12,15 +12,18 @@ import (
 
 // collectGlueRuns returns Glue job run history for the given job name or ARN.
 func collectGlueRuns(ctx context.Context, svc *glue.Client, jobNameOrARN string, since time.Time, maxResults int) ([]Run, error) {
+	// Normalize ARN inputs so the Glue API always receives a job name.
 	jobName := jobNameOrARN
 	if strings.Contains(jobNameOrARN, ":") {
 		jobName = resourceNameFromARN(jobNameOrARN)
 	}
 	if jobName == "" {
-		return []Run{}, nil
+		return make([]Run, 0), nil
 	}
 
-	maxRes := int32(maxResults)
+	// Limit the API request size to the Glue SDK's int32 field.
+	maxRes := safeInt32(maxResults)
+	// Glue returns newest job runs first, so filtering can remain linear.
 	out, err := svc.GetJobRuns(ctx, &glue.GetJobRunsInput{
 		JobName:    aws.String(jobName),
 		MaxResults: &maxRes,
@@ -30,7 +33,10 @@ func collectGlueRuns(ctx context.Context, svc *glue.Client, jobNameOrARN string,
 	}
 
 	runs := make([]Run, 0, len(out.JobRuns))
-	for _, r := range out.JobRuns {
+	// Filter out historical runs outside the caller's lookback window.
+	for jobRunIndex := range out.JobRuns {
+		// Preserve Glue-specific fields while normalizing timestamps to UTC strings.
+		r := out.JobRuns[jobRunIndex]
 		if r.StartedOn == nil {
 			continue
 		}

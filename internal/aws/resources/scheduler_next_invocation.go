@@ -1,3 +1,4 @@
+//revive:disable:comments-density reason: cron parsing helpers are dense but mechanically structured.
 package resources
 
 import (
@@ -11,29 +12,68 @@ import (
 )
 
 var cronDayAliases = map[string]int{
-	"SUN": 1,
-	"MON": 2,
-	"TUE": 3,
-	"WED": 4,
-	"THU": 5,
-	"FRI": 6,
-	"SAT": 7,
+	"SUN": cronSunday,
+	"MON": cronMonday,
+	"TUE": cronTuesday,
+	"WED": cronWednesday,
+	"THU": cronThursday,
+	"FRI": cronFriday,
+	"SAT": cronSaturday,
 }
 
 var cronMonthAliases = map[string]int{
-	"JAN": 1,
-	"FEB": 2,
-	"MAR": 3,
-	"APR": 4,
-	"MAY": 5,
-	"JUN": 6,
-	"JUL": 7,
-	"AUG": 8,
-	"SEP": 9,
-	"OCT": 10,
-	"NOV": 11,
-	"DEC": 12,
+	"JAN": january,
+	"FEB": february,
+	"MAR": march,
+	"APR": april,
+	"MAY": may,
+	"JUN": june,
+	"JUL": july,
+	"AUG": august,
+	"SEP": september,
+	"OCT": october,
+	"NOV": november,
+	"DEC": december,
 }
+
+const (
+	cronCloseSuffix        = ")"
+	cronDashSeparator      = "-"
+	cronNoSpecificValue    = "?"
+	april                  = 4
+	august                 = 8
+	cronDayOfMonthMax      = 31
+	cronDayOfMonthMin      = 1
+	cronFieldCount         = 6
+	cronFriday             = 6
+	cronHourMax            = 23
+	cronMonday             = 2
+	cronMonthMax           = 12
+	cronMonthMin           = 1
+	cronMinuteMax          = 59
+	cronRangeSplitParts    = 2
+	cronSaturday           = 7
+	cronSearchYears        = 5
+	cronSunday             = 1
+	cronThursday           = 5
+	cronTuesday            = 3
+	cronWednesday          = 4
+	cronYearMax            = 2199
+	cronYearMin            = 1970
+	dayHours               = 24
+	december               = 12
+	february               = 2
+	january                = 1
+	july                   = 7
+	june                   = 6
+	march                  = 3
+	may                    = 5
+	minuteHoursMultiplier  = 60
+	november               = 11
+	october                = 10
+	rateExpressionMinParts = 2
+	september              = 9
+)
 
 func computeSchedulerNextInvocation(detail *scheduler.GetScheduleOutput, nowUTC time.Time) string {
 	if detail == nil {
@@ -95,9 +135,9 @@ func computeSchedulerNextInvocation(detail *scheduler.GetScheduleOutput, nowUTC 
 }
 
 func computeCronNextInvocation(expr, timezone string, startAt, endAt, nowUTC time.Time) (time.Time, bool) {
-	inside := strings.TrimSuffix(strings.TrimPrefix(strings.TrimSpace(expr), "cron("), ")")
+	inside := strings.TrimSuffix(strings.TrimPrefix(strings.TrimSpace(expr), "cron("), cronCloseSuffix)
 	fields := strings.Fields(inside)
-	if len(fields) != 6 {
+	if len(fields) != cronFieldCount {
 		return time.Time{}, false
 	}
 
@@ -108,7 +148,7 @@ func computeCronNextInvocation(expr, timezone string, startAt, endAt, nowUTC tim
 	}
 
 	candidate := searchStart.In(loc).Truncate(time.Minute).Add(time.Minute)
-	deadline := candidate.AddDate(5, 0, 0)
+	deadline := candidate.AddDate(cronSearchYears, 0, 0)
 	if !endAt.IsZero() {
 		endLocal := endAt.In(loc)
 		if endLocal.Before(deadline) {
@@ -131,9 +171,9 @@ func computeCronNextInvocation(expr, timezone string, startAt, endAt, nowUTC tim
 }
 
 func computeRateNextInvocation(expr string, creationDate *time.Time, startAt, endAt, nowUTC time.Time) (time.Time, bool) {
-	inside := strings.TrimSuffix(strings.TrimPrefix(strings.TrimSpace(expr), "rate("), ")")
+	inside := strings.TrimSuffix(strings.TrimPrefix(strings.TrimSpace(expr), "rate("), cronCloseSuffix)
 	parts := strings.Fields(inside)
-	if len(parts) < 2 {
+	if len(parts) < rateExpressionMinParts {
 		return time.Time{}, false
 	}
 
@@ -147,9 +187,9 @@ func computeRateNextInvocation(expr string, creationDate *time.Time, startAt, en
 	case strings.HasPrefix(unit, "minute"):
 		// Keep n as minutes.
 	case strings.HasPrefix(unit, "hour"):
-		n *= 60
+		n *= minuteHoursMultiplier
 	case strings.HasPrefix(unit, "day"):
-		n *= 24 * 60
+		n *= dayHours * minuteHoursMultiplier
 	default:
 		return time.Time{}, false
 	}
@@ -165,8 +205,8 @@ func computeRateNextInvocation(expr string, creationDate *time.Time, startAt, en
 	candidate := base
 	if candidate.Before(nowUTC) {
 		delta := nowUTC.Sub(candidate)
-		steps := (delta / n) + 1
-		candidate = candidate.Add(steps * n)
+		stepCount := int(delta/n) + 1
+		candidate = candidate.Add(time.Duration(stepCount) * n)
 	}
 
 	if !endAt.IsZero() && candidate.After(endAt) {
@@ -176,7 +216,7 @@ func computeRateNextInvocation(expr string, creationDate *time.Time, startAt, en
 }
 
 func matchAWSCronExpression(fields []string, t time.Time) bool {
-	if len(fields) != 6 {
+	if len(fields) != cronFieldCount {
 		return false
 	}
 
@@ -186,45 +226,45 @@ func matchAWSCronExpression(fields []string, t time.Time) bool {
 	month := int(t.Month())
 	dow := int(t.Weekday())
 	if dow == 0 {
-		dow = 1
+		dow = cronSunday
 	} else {
 		dow++
 	}
 	year := t.Year()
 
-	if !matchCronField(fields[0], minute, 0, 59, nil) {
+	if !matchCronField(fields[0], minute, 0, cronMinuteMax, nil) {
 		return false
 	}
-	if !matchCronField(fields[1], hour, 0, 23, nil) {
+	if !matchCronField(fields[1], hour, 0, cronHourMax, nil) {
 		return false
 	}
-	if !matchCronField(fields[3], month, 1, 12, cronMonthAliases) {
+	if !matchCronField(fields[3], month, cronMonthMin, cronMonthMax, cronMonthAliases) {
 		return false
 	}
-	if !matchCronField(fields[5], year, 1970, 2199, nil) {
+	if !matchCronField(fields[5], year, cronYearMin, cronYearMax, nil) {
 		return false
 	}
 
 	domField := strings.TrimSpace(fields[2])
 	dowField := strings.TrimSpace(fields[4])
-	domMatch := matchCronField(domField, dom, 1, 31, nil)
-	dowMatch := matchCronField(dowField, dow, 1, 7, cronDayAliases)
+	domMatch := matchCronField(domField, dom, cronDayOfMonthMin, cronDayOfMonthMax, nil)
+	dowMatch := matchCronField(dowField, dow, cronSunday, cronSaturday, cronDayAliases)
 
-	if domField == "?" {
+	if domField == cronNoSpecificValue {
 		return dowMatch
 	}
-	if dowField == "?" {
+	if dowField == cronNoSpecificValue {
 		return domMatch
 	}
 	return domMatch && dowMatch
 }
 
-func matchCronField(field string, value, min, max int, aliases map[string]int) bool {
+func matchCronField(field string, value, minValue, maxValue int, aliases map[string]int) bool {
 	f := strings.ToUpper(strings.TrimSpace(field))
 	if f == "" {
 		return false
 	}
-	if f == "*" || f == "?" {
+	if f == "*" || f == cronNoSpecificValue {
 		return true
 	}
 
@@ -233,17 +273,17 @@ func matchCronField(field string, value, min, max int, aliases map[string]int) b
 		if part == "" {
 			continue
 		}
-		if matchCronPart(part, value, min, max, aliases) {
+		if matchCronPart(part, value, minValue, maxValue, aliases) {
 			return true
 		}
 	}
 	return false
 }
 
-func matchCronPart(part string, value, min, max int, aliases map[string]int) bool {
+func matchCronPart(part string, value, minValue, maxValue int, aliases map[string]int) bool {
 	if strings.Contains(part, "/") {
-		sp := strings.SplitN(part, "/", 2)
-		if len(sp) != 2 {
+		sp := strings.SplitN(part, "/", cronRangeSplitParts)
+		if len(sp) != cronRangeSplitParts {
 			return false
 		}
 		step, ok := parseCronAtom(sp[1], aliases)
@@ -251,13 +291,13 @@ func matchCronPart(part string, value, min, max int, aliases map[string]int) boo
 			return false
 		}
 
-		start := min
-		end := max
+		start := minValue
+		end := maxValue
 		base := strings.TrimSpace(sp[0])
-		if base != "*" && base != "?" {
-			if strings.Contains(base, "-") {
-				r := strings.SplitN(base, "-", 2)
-				if len(r) != 2 {
+		if base != "*" && base != cronNoSpecificValue {
+			if strings.Contains(base, cronDashSeparator) {
+				r := strings.SplitN(base, cronDashSeparator, cronRangeSplitParts)
+				if len(r) != cronRangeSplitParts {
 					return false
 				}
 				var okStart, okEnd bool
@@ -271,7 +311,7 @@ func matchCronPart(part string, value, min, max int, aliases map[string]int) boo
 				if !okValue {
 					return false
 				}
-				start, end = v, max
+				start, end = v, maxValue
 			}
 		}
 
@@ -281,9 +321,9 @@ func matchCronPart(part string, value, min, max int, aliases map[string]int) boo
 		return (value-start)%step == 0
 	}
 
-	if strings.Contains(part, "-") {
-		r := strings.SplitN(part, "-", 2)
-		if len(r) != 2 {
+	if strings.Contains(part, cronDashSeparator) {
+		r := strings.SplitN(part, cronDashSeparator, cronRangeSplitParts)
+		if len(r) != cronRangeSplitParts {
 			return false
 		}
 		start, okStart := parseCronAtom(r[0], aliases)
@@ -319,7 +359,7 @@ func parseCronAtom(v string, aliases map[string]int) (int, bool) {
 }
 
 func parseSchedulerAtExpression(expr, timezone string) (time.Time, bool) {
-	raw := strings.TrimSuffix(strings.TrimPrefix(strings.TrimSpace(expr), "at("), ")")
+	raw := strings.TrimSuffix(strings.TrimPrefix(strings.TrimSpace(expr), "at("), cronCloseSuffix)
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return time.Time{}, false

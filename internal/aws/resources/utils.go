@@ -1,3 +1,4 @@
+//revive:disable:comments-density reason: utility helpers are straightforward and extra comments would be repetitive.
 package resources
 
 import (
@@ -6,18 +7,33 @@ import (
 	"time"
 )
 
+const (
+	buildSlotsFieldCount = 2
+	closeSuffix          = ")"
+	buildSlotsDayHours   = 24
+	buildSlotsDayMinutes = buildSlotsDayHours * 60
+	cronHourLimit        = 23
+	cronMinuteLimit      = 59
+	maxInt32Value        = 1<<31 - 1
+	parseCronSplitParts  = 2
+	rateDayDefaultSlot   = 0
+	slotsPerHour         = 6
+	slotsPerRateMinute   = 10
+)
+
+// buildSlots maps cron or rate expressions into a fixed per-day slot timeline.
 func buildSlots(expr string) []int {
 	slots := make([]int, slotsPerDay)
 	e := strings.TrimSpace(expr)
 	if strings.HasPrefix(e, "cron(") && strings.HasSuffix(e, ")") {
-		inside := strings.TrimSuffix(strings.TrimPrefix(e, "cron("), ")")
+		inside := strings.TrimSuffix(strings.TrimPrefix(e, "cron("), closeSuffix)
 		fields := strings.Fields(inside)
-		if len(fields) >= 2 {
-			mins := parseCronField(fields[0], 0, 59)
-			hours := parseCronField(fields[1], 0, 23)
+		if len(fields) >= buildSlotsFieldCount {
+			mins := parseCronField(fields[0], 0, cronMinuteLimit)
+			hours := parseCronField(fields[1], 0, cronHourLimit)
 			for _, h := range hours {
 				for _, m := range mins {
-					idx := h*6 + (m / 10)
+					idx := h*slotsPerHour + (m / slotsPerRateMinute)
 					if idx >= 0 && idx < slotsPerDay {
 						slots[idx] = 1
 					}
@@ -27,23 +43,23 @@ func buildSlots(expr string) []int {
 		return slots
 	}
 	if strings.HasPrefix(e, "rate(") && strings.HasSuffix(e, ")") {
-		inside := strings.TrimSuffix(strings.TrimPrefix(e, "rate("), ")")
+		inside := strings.TrimSuffix(strings.TrimPrefix(e, "rate("), closeSuffix)
 		fields := strings.Fields(inside)
-		if len(fields) >= 2 {
+		if len(fields) >= buildSlotsFieldCount {
 			n, err := strconv.Atoi(fields[0])
 			if err == nil && n > 0 {
 				unit := strings.ToLower(fields[1])
 				switch {
 				case strings.HasPrefix(unit, "minute"):
-					for m := 0; m < 24*60; m += n {
-						slots[m/10] = 1
+					for m := 0; m < buildSlotsDayMinutes; m += n {
+						slots[m/slotsPerRateMinute] = 1
 					}
 				case strings.HasPrefix(unit, "hour"):
-					for h := 0; h < 24; h += n {
-						slots[h*6] = 1
+					for h := 0; h < buildSlotsDayHours; h += n {
+						slots[h*slotsPerHour] = 1
 					}
 				default:
-					slots[0] = 1
+					slots[rateDayDefaultSlot] = 1
 				}
 			}
 		}
@@ -51,11 +67,12 @@ func buildSlots(expr string) []int {
 	return slots
 }
 
-func parseCronField(field string, min, max int) []int {
+func parseCronField(field string, minValue, maxValue int) []int {
 	f := strings.TrimSpace(field)
+	// Expand all values when the field is a wildcard.
 	if f == "*" || f == "?" {
-		vals := make([]int, 0, max-min+1)
-		for i := min; i <= max; i++ {
+		vals := make([]int, 0, maxValue-minValue+1)
+		for i := minValue; i <= maxValue; i++ {
 			vals = append(vals, i)
 		}
 		return vals
@@ -71,23 +88,23 @@ func parseCronField(field string, min, max int) []int {
 			if err != nil || n <= 0 {
 				continue
 			}
-			for i := min; i <= max; i += n {
+			for i := minValue; i <= maxValue; i += n {
 				result[i] = struct{}{}
 			}
 			continue
 		}
 		if strings.Contains(p, "-") {
-			sp := strings.SplitN(p, "-", 2)
+			sp := strings.SplitN(p, "-", parseCronSplitParts)
 			start, e1 := strconv.Atoi(sp[0])
 			end, e2 := strconv.Atoi(sp[1])
 			if e1 != nil || e2 != nil {
 				continue
 			}
-			if start < min {
-				start = min
+			if start < minValue {
+				start = minValue
 			}
-			if end > max {
-				end = max
+			if end > maxValue {
+				end = maxValue
 			}
 			for i := start; i <= end; i++ {
 				result[i] = struct{}{}
@@ -98,7 +115,7 @@ func parseCronField(field string, min, max int) []int {
 		if err != nil {
 			continue
 		}
-		if v >= min && v <= max {
+		if v >= minValue && v <= maxValue {
 			result[v] = struct{}{}
 		}
 	}
@@ -106,15 +123,27 @@ func parseCronField(field string, min, max int) []int {
 	for v := range result {
 		vals = append(vals, v)
 	}
+	// Fall back to the full supported range when no explicit values were parsed.
 	if len(vals) == 0 {
-		for i := min; i <= max; i++ {
+		for i := minValue; i <= maxValue; i++ {
 			vals = append(vals, i)
 		}
 	}
 	return vals
 }
 
-func detectTargetKind(arn string, hasBatchParameters bool) string {
+func safeInt32(value int) int32 {
+	if value < 0 {
+		return 0
+	}
+	if value > maxInt32Value {
+		return maxInt32Value
+	}
+	return int32(value)
+}
+
+//revive:disable-next-line:flag-parameter reason: batch parameters are part of the target classification input.
+func detectTargetKind(arn string, batchParametersPresent bool) string {
 	s := strings.ToLower(arn)
 	if strings.Contains(s, ":aws-sdk:sfn:startexecution") {
 		return "stepfunctions"
@@ -134,7 +163,7 @@ func detectTargetKind(arn string, hasBatchParameters bool) string {
 	if strings.Contains(s, ":states:") && strings.Contains(s, ":statemachine:") {
 		return "stepfunctions"
 	}
-	if hasBatchParameters || strings.Contains(s, ":batch:") {
+	if batchParametersPresent || strings.Contains(s, ":batch:") {
 		return "batch"
 	}
 	if strings.Contains(s, ":glue:") {

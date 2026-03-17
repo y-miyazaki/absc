@@ -1,3 +1,4 @@
+//revive:disable:comments-density reason: collector flow mirrors AWS pagination and detailed comments add noise.
 package resources
 
 import (
@@ -21,27 +22,30 @@ type SchedulerCollector struct {
 	cwlSvc   *cloudwatchlogs.Client
 	ecsSvc   *ecs.Client
 	glueSvc  *glue.Client
-	region   string
 	svc      *scheduler.Client
 	stepSvc  *sfn.Client
+	region   string
 }
 
-func NewSchedulerCollector(cfg aws.Config, region string) (Collector, error) {
+// NewSchedulerCollector builds regional clients for EventBridge Scheduler.
+func NewSchedulerCollector(cfg *aws.Config, region string) (*SchedulerCollector, error) {
 	return &SchedulerCollector{
 		region:   region,
-		svc:      scheduler.NewFromConfig(cfg, func(o *scheduler.Options) { o.Region = region }),
-		stepSvc:  sfn.NewFromConfig(cfg, func(o *sfn.Options) { o.Region = region }),
-		batchSvc: batch.NewFromConfig(cfg, func(o *batch.Options) { o.Region = region }),
-		cwlSvc:   cloudwatchlogs.NewFromConfig(cfg, func(o *cloudwatchlogs.Options) { o.Region = region }),
-		ecsSvc:   ecs.NewFromConfig(cfg, func(o *ecs.Options) { o.Region = region }),
-		glueSvc:  glue.NewFromConfig(cfg, func(o *glue.Options) { o.Region = region }),
+		svc:      scheduler.NewFromConfig(*cfg, func(o *scheduler.Options) { o.Region = region }),
+		stepSvc:  sfn.NewFromConfig(*cfg, func(o *sfn.Options) { o.Region = region }),
+		batchSvc: batch.NewFromConfig(*cfg, func(o *batch.Options) { o.Region = region }),
+		cwlSvc:   cloudwatchlogs.NewFromConfig(*cfg, func(o *cloudwatchlogs.Options) { o.Region = region }),
+		ecsSvc:   ecs.NewFromConfig(*cfg, func(o *ecs.Options) { o.Region = region }),
+		glueSvc:  glue.NewFromConfig(*cfg, func(o *glue.Options) { o.Region = region }),
 	}, nil
 }
 
+// Name returns the collector identifier.
 func (*SchedulerCollector) Name() string {
 	return "eventbridge_scheduler"
 }
 
+// Collect lists schedules, computes next invocations, and resolves recent runs.
 func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) ([]Schedule, []ErrorRecord) {
 	schedules := make([]Schedule, 0)
 	errs := make([]ErrorRecord, 0)
@@ -63,10 +67,11 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 			errs = append(errs, ErrorRecord{Service: "eventbridge_scheduler", Region: c.region, Message: err.Error()})
 			return schedules, errs
 		}
-		for _, sum := range page.Schedules {
-			detail, err := c.svc.GetSchedule(ctx, &scheduler.GetScheduleInput{Name: sum.Name, GroupName: sum.GroupName})
-			if err != nil {
-				errs = append(errs, ErrorRecord{Service: "eventbridge_scheduler", Region: c.region, Message: err.Error()})
+		for scheduleIndex := range page.Schedules {
+			sum := page.Schedules[scheduleIndex]
+			detail, getScheduleErr := c.svc.GetSchedule(ctx, &scheduler.GetScheduleInput{Name: sum.Name, GroupName: sum.GroupName})
+			if getScheduleErr != nil {
+				errs = append(errs, ErrorRecord{Service: "eventbridge_scheduler", Region: c.region, Message: getScheduleErr.Error()})
 				continue
 			}
 			enabled := strings.EqualFold(string(detail.State), "ENABLED")
@@ -84,7 +89,22 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 			targetKind := detectTargetKind(targetARN, hasBatchParameters)
 			targetService := detectTargetService(targetARN)
 			nextInvocationAt := computeSchedulerNextInvocation(detail, nowUTC)
-			s := Schedule{ID: fmt.Sprintf("eventbridge_scheduler:%s:%s", c.region, aws.ToString(detail.Name)), Service: "eventbridge_scheduler", ScheduleName: aws.ToString(detail.Name), ScheduleExpression: aws.ToString(detail.ScheduleExpression), ScheduleExpressionTimezone: aws.ToString(detail.ScheduleExpressionTimezone), Enabled: enabled, Region: c.region, TargetARN: targetARN, TargetKind: targetKind, TargetService: targetService, TargetName: resourceNameFromARN(targetARN), NextInvocationAt: nextInvocationAt, Slots: buildSlots(aws.ToString(detail.ScheduleExpression)), Runs: []Run{}}
+			s := Schedule{
+				ID:                         fmt.Sprintf("eventbridge_scheduler:%s:%s", c.region, aws.ToString(detail.Name)),
+				Service:                    "eventbridge_scheduler",
+				ScheduleName:               aws.ToString(detail.Name),
+				ScheduleExpression:         aws.ToString(detail.ScheduleExpression),
+				ScheduleExpressionTimezone: aws.ToString(detail.ScheduleExpressionTimezone),
+				Enabled:                    enabled,
+				Region:                     c.region,
+				TargetARN:                  targetARN,
+				TargetKind:                 targetKind,
+				TargetService:              targetService,
+				TargetName:                 resourceNameFromARN(targetARN),
+				NextInvocationAt:           nextInvocationAt,
+				Slots:                      buildSlots(aws.ToString(detail.ScheduleExpression)),
+				Runs:                       make([]Run, 0),
+			}
 			runs, runErr := collectRunsByTargetKind(ctx, targetKind, runTargetARN, runJobName, opts, deps, caches)
 			if runErr != nil {
 				errs = append(errs, *runErr)
@@ -100,6 +120,7 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 	return schedules, errs
 }
 
+// resolveSchedulerRunTarget extracts the real downstream target from SDK inputs.
 func resolveSchedulerRunTarget(targetARN, input string) (runTargetARN, runJobName string, hasBatchParameters bool) {
 	lowerARN := strings.ToLower(targetARN)
 	if strings.Contains(lowerARN, ":aws-sdk:sfn:startexecution") {
@@ -134,6 +155,7 @@ func resolveSchedulerRunTarget(targetARN, input string) (runTargetARN, runJobNam
 	return "", "", strings.Contains(lowerARN, ":batch:")
 }
 
+// getStringFromJSON returns the first matching string field from a JSON object.
 func getStringFromJSON(raw string, keys ...string) string {
 	if strings.TrimSpace(raw) == "" {
 		return ""
@@ -143,9 +165,9 @@ func getStringFromJSON(raw string, keys ...string) string {
 		return ""
 	}
 	for _, key := range keys {
-		if v, ok := m[key]; ok {
-			if s, ok := v.(string); ok {
-				return s
+		if value, ok := m[key]; ok {
+			if text, okCast := value.(string); okCast {
+				return text
 			}
 		}
 	}

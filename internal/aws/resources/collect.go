@@ -1,3 +1,4 @@
+// Package resources collects AWS schedules and recent execution history.
 package resources
 
 import (
@@ -9,26 +10,27 @@ import (
 )
 
 type CollectOptions struct {
+	Since          time.Time
+	Regions        []string
 	MaxConcurrency int
 	MaxResults     int
-	Regions        []string
-	Since          time.Time
 }
 
 const defaultMaxConcurrency = 5
 const defaultMaxResults = 50
 
+// Collector is implemented by each AWS-backed schedule source.
 type Collector interface {
-	Collect(ctx context.Context, opts CollectOptions) ([]Schedule, []ErrorRecord)
+	// Collect returns schedules and soft errors for the collector's target service.
+	Collect(ctx context.Context, opts CollectOptions) ([]Schedule, []ErrorRecord) //nolint:unparam,unused // Interface signatures need parameter names for readability.
+	// Name returns the stable collector identifier used in output and errors.
 	Name() string
 }
 
-func init() {
-	registerConstructor("eventbridge_rule", NewEventBridgeCollector)
-	registerConstructor("eventbridge_scheduler", NewSchedulerCollector)
-}
-
-func Collect(ctx context.Context, cfg aws.Config, opts CollectOptions) ([]Schedule, []ErrorRecord) {
+// Collect fans out per-region collectors and merges their schedules and errors.
+// It keeps partial failures so one region or service does not stop the full run.
+// Default concurrency and max-results values are applied when callers omit them.
+func Collect(ctx context.Context, cfg *aws.Config, opts CollectOptions) ([]Schedule, []ErrorRecord) {
 	schedules := make([]Schedule, 0)
 	errs := make([]ErrorRecord, 0)
 	concurrency := opts.MaxConcurrency
@@ -44,14 +46,15 @@ func Collect(ctx context.Context, cfg aws.Config, opts CollectOptions) ([]Schedu
 		errs      []ErrorRecord
 	}
 
+	// Build one job per collector per region.
 	jobs := make([]struct {
 		collector Collector
 	}, 0)
 
 	for _, region := range opts.Regions {
-		regionCfg := cfg
+		regionCfg := *cfg
 		regionCfg.Region = region
-		registered, err := initializeCollectors(regionCfg, region)
+		registered, err := initializeCollectors(&regionCfg, region)
 		if err != nil {
 			errs = append(errs, ErrorRecord{Service: "collector_init", Region: region, Message: err.Error()})
 			continue
@@ -68,6 +71,7 @@ func Collect(ctx context.Context, cfg aws.Config, opts CollectOptions) ([]Schedu
 		return schedules, errs
 	}
 
+	// Run collectors with a bounded semaphore.
 	results := make(chan collectResult, len(jobs))
 	semaphore := make(chan struct{}, concurrency)
 	var wg sync.WaitGroup
@@ -78,6 +82,7 @@ func Collect(ctx context.Context, cfg aws.Config, opts CollectOptions) ([]Schedu
 			defer wg.Done()
 			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
+			// Each collector reports partial failures through its own error records.
 			res, colErrs := c.Collect(ctx, opts)
 			results <- collectResult{schedules: res, errs: colErrs}
 		}(job.collector)

@@ -1,3 +1,4 @@
+//revive:disable:comments-density reason: collector flow is repetitive and extra comments would add noise.
 package resources
 
 import (
@@ -19,27 +20,30 @@ type EventBridgeCollector struct {
 	cwlSvc   *cloudwatchlogs.Client
 	ecsSvc   *ecs.Client
 	glueSvc  *glue.Client
-	region   string
 	svc      *eventbridge.Client
 	stepSvc  *sfn.Client
+	region   string
 }
 
-func NewEventBridgeCollector(cfg aws.Config, region string) (Collector, error) {
+// NewEventBridgeCollector builds regional service clients for EventBridge rules.
+func NewEventBridgeCollector(cfg *aws.Config, region string) (*EventBridgeCollector, error) {
 	return &EventBridgeCollector{
 		region:   region,
-		svc:      eventbridge.NewFromConfig(cfg, func(o *eventbridge.Options) { o.Region = region }),
-		stepSvc:  sfn.NewFromConfig(cfg, func(o *sfn.Options) { o.Region = region }),
-		batchSvc: batch.NewFromConfig(cfg, func(o *batch.Options) { o.Region = region }),
-		cwlSvc:   cloudwatchlogs.NewFromConfig(cfg, func(o *cloudwatchlogs.Options) { o.Region = region }),
-		ecsSvc:   ecs.NewFromConfig(cfg, func(o *ecs.Options) { o.Region = region }),
-		glueSvc:  glue.NewFromConfig(cfg, func(o *glue.Options) { o.Region = region }),
+		svc:      eventbridge.NewFromConfig(*cfg, func(o *eventbridge.Options) { o.Region = region }),
+		stepSvc:  sfn.NewFromConfig(*cfg, func(o *sfn.Options) { o.Region = region }),
+		batchSvc: batch.NewFromConfig(*cfg, func(o *batch.Options) { o.Region = region }),
+		cwlSvc:   cloudwatchlogs.NewFromConfig(*cfg, func(o *cloudwatchlogs.Options) { o.Region = region }),
+		ecsSvc:   ecs.NewFromConfig(*cfg, func(o *ecs.Options) { o.Region = region }),
+		glueSvc:  glue.NewFromConfig(*cfg, func(o *glue.Options) { o.Region = region }),
 	}, nil
 }
 
+// Name returns the collector identifier.
 func (*EventBridgeCollector) Name() string {
 	return "eventbridge_rule"
 }
 
+// Collect loads scheduled rules and resolves supported target runs.
 func (c *EventBridgeCollector) Collect(ctx context.Context, opts CollectOptions) ([]Schedule, []ErrorRecord) {
 	schedules := make([]Schedule, 0)
 	errs := make([]ErrorRecord, 0)
@@ -60,31 +64,59 @@ func (c *EventBridgeCollector) Collect(ctx context.Context, opts CollectOptions)
 			errs = append(errs, ErrorRecord{Service: "eventbridge_rule", Region: c.region, Message: err.Error()})
 			return schedules, errs
 		}
-		for _, r := range page.Rules {
+		for ruleIndex := range page.Rules {
+			r := page.Rules[ruleIndex]
 			expr := aws.ToString(r.ScheduleExpression)
 			if expr == "" {
 				continue
 			}
 			enabled := strings.EqualFold(string(r.State), "ENABLED")
-			targets, err := c.svc.ListTargetsByRule(ctx, &eventbridge.ListTargetsByRuleInput{Rule: r.Name})
-			if err != nil {
-				errs = append(errs, ErrorRecord{Service: "eventbridge_rule", Region: c.region, Message: err.Error()})
+			targets, listTargetsErr := c.svc.ListTargetsByRule(ctx, &eventbridge.ListTargetsByRuleInput{Rule: r.Name})
+			if listTargetsErr != nil {
+				errs = append(errs, ErrorRecord{Service: "eventbridge_rule", Region: c.region, Message: listTargetsErr.Error()})
 				continue
 			}
 			if len(targets.Targets) == 0 {
 				// EventBridge Rule APIs do not expose a deterministic "next invocation" timestamp,
 				// so this collector intentionally leaves NextInvocationAt empty.
-				schedules = append(schedules, Schedule{ID: fmt.Sprintf("eventbridge_rule:%s:%s:no-target", c.region, aws.ToString(r.Name)), Service: "eventbridge_rule", ScheduleName: aws.ToString(r.Name), ScheduleExpression: expr, Enabled: enabled, Region: c.region, TargetKind: "other", TargetService: "Other", NextInvocationAt: "", Slots: buildSlots(expr), Runs: []Run{}})
+				schedules = append(schedules, Schedule{
+					ID:                 fmt.Sprintf("eventbridge_rule:%s:%s:no-target", c.region, aws.ToString(r.Name)),
+					Service:            "eventbridge_rule",
+					ScheduleName:       aws.ToString(r.Name),
+					ScheduleExpression: expr,
+					Enabled:            enabled,
+					Region:             c.region,
+					TargetKind:         "other",
+					TargetService:      "Other",
+					NextInvocationAt:   "",
+					Slots:              buildSlots(expr),
+					Runs:               make([]Run, 0),
+				})
 				continue
 			}
 
-			for i, t := range targets.Targets {
+			for i := range targets.Targets {
+				t := targets.Targets[i]
 				targetARN := aws.ToString(t.Arn)
 				targetKind := detectTargetKind(targetARN, t.BatchParameters != nil)
 				targetService := detectTargetService(targetARN)
 				// EventBridge Rule APIs do not expose a deterministic "next invocation" timestamp,
 				// so this collector intentionally leaves NextInvocationAt empty.
-				s := Schedule{ID: fmt.Sprintf("eventbridge_rule:%s:%s:%d", c.region, aws.ToString(r.Name), i), Service: "eventbridge_rule", ScheduleName: aws.ToString(r.Name), ScheduleExpression: expr, Enabled: enabled, Region: c.region, TargetARN: targetARN, TargetKind: targetKind, TargetService: targetService, TargetName: resourceNameFromARN(targetARN), NextInvocationAt: "", Slots: buildSlots(expr), Runs: []Run{}}
+				s := Schedule{
+					ID:                 fmt.Sprintf("eventbridge_rule:%s:%s:%d", c.region, aws.ToString(r.Name), i),
+					Service:            "eventbridge_rule",
+					ScheduleName:       aws.ToString(r.Name),
+					ScheduleExpression: expr,
+					Enabled:            enabled,
+					Region:             c.region,
+					TargetARN:          targetARN,
+					TargetKind:         targetKind,
+					TargetService:      targetService,
+					TargetName:         resourceNameFromARN(targetARN),
+					NextInvocationAt:   "",
+					Slots:              buildSlots(expr),
+					Runs:               make([]Run, 0),
+				}
 
 				jobName := ""
 				if t.BatchParameters != nil {

@@ -2,6 +2,7 @@ package resources
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/batch"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
@@ -10,15 +11,18 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
 )
 
+// runCollectorDeps groups shared AWS service clients used while resolving runs.
 type runCollectorDeps struct {
 	batchSvc *batch.Client
 	cwlSvc   *cloudwatchlogs.Client
 	ecsSvc   *ecs.Client
 	glueSvc  *glue.Client
-	region   string
 	stepSvc  *sfn.Client
+	region   string
 }
 
+// runCollectorCaches stores per-target run lookups to avoid duplicate API calls.
+// Successes and failures are both memoized for one collection pass.
 type runCollectorCaches struct {
 	batchErrCache   map[string]error
 	batchRunsCache  map[string][]Run
@@ -32,6 +36,7 @@ type runCollectorCaches struct {
 	stepRunsCache   map[string][]Run
 }
 
+// newRunCollectorCaches allocates all caches used during a collection cycle.
 func newRunCollectorCaches() *runCollectorCaches {
 	return &runCollectorCaches{
 		stepRunsCache:   make(map[string][]Run),
@@ -47,9 +52,12 @@ func newRunCollectorCaches() *runCollectorCaches {
 	}
 }
 
+// collectRunsByTargetKind routes each target to the service-specific run collector.
+// Cache lookups keep repeated targets within the same export from re-querying AWS.
 func collectRunsByTargetKind(ctx context.Context, targetKind, targetARN, jobName string, opts CollectOptions, deps runCollectorDeps, caches *runCollectorCaches) ([]Run, *ErrorRecord) {
 	switch targetKind {
 	case "stepfunctions":
+		// Step Functions executions are keyed by the state machine ARN.
 		runs, err := getCachedRuns(caches.stepRunsCache, caches.stepErrCache, targetARN, func() ([]Run, error) {
 			return collectStepFunctionRuns(ctx, deps.stepSvc, targetARN, opts.Since, opts.MaxResults)
 		})
@@ -58,6 +66,7 @@ func collectRunsByTargetKind(ctx context.Context, targetKind, targetARN, jobName
 		}
 		return runs, nil
 	case "batch":
+		// Batch schedules can share queues, so the job name is part of the cache key.
 		cacheKey := targetARN + "|" + jobName
 		runs, err := getCachedRuns(caches.batchRunsCache, caches.batchErrCache, cacheKey, func() ([]Run, error) {
 			return collectBatchRuns(ctx, deps.batchSvc, targetARN, jobName, opts.Since, opts.MaxResults)
@@ -95,6 +104,7 @@ func collectRunsByTargetKind(ctx context.Context, targetKind, targetARN, jobName
 	}
 }
 
+// getCachedRuns stores both successful and failed lookups for the current run.
 func getCachedRuns(runsCache map[string][]Run, errCache map[string]error, key string, collectFn func() ([]Run, error)) ([]Run, error) {
 	if runs, ok := runsCache[key]; ok {
 		return runs, nil
@@ -106,7 +116,7 @@ func getCachedRuns(runsCache map[string][]Run, errCache map[string]error, key st
 	runs, err := collectFn()
 	if err != nil {
 		errCache[key] = err
-		return nil, err
+		return nil, fmt.Errorf("collect cached runs for %s: %w", key, err)
 	}
 	runsCache[key] = runs
 	return runs, nil

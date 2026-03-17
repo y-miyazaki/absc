@@ -1,20 +1,20 @@
 package resources
 
 type Schedule struct {
-	ID                         string
-	Service                    string
+	Region                     string
+	TargetName                 string
 	ScheduleName               string
 	ScheduleExpression         string
 	ScheduleExpressionTimezone string
-	Enabled                    bool
-	Region                     string
-	TargetARN                  string
-	TargetKind                 string
-	TargetService              string
-	TargetName                 string
 	NextInvocationAt           string
+	Service                    string
+	TargetKind                 string
+	ID                         string
+	TargetService              string
+	TargetARN                  string
 	Slots                      []int
 	Runs                       []Run
+	Enabled                    bool
 	RunsCapped                 bool
 }
 
