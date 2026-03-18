@@ -21,6 +21,12 @@ type runCollectorDeps struct {
 	region   string
 }
 
+// runTargetHints carries optional target-specific filters for run lookups.
+type runTargetHints struct {
+	ecsStartedBy         string
+	ecsTaskDefinitionARN string
+}
+
 // runCollectorCaches stores per-target run lookups to avoid duplicate API calls.
 // Successes and failures are both memoized for one collection pass.
 type runCollectorCaches struct {
@@ -54,7 +60,7 @@ func newRunCollectorCaches() *runCollectorCaches {
 
 // collectRunsByTargetKind routes each target to the service-specific run collector.
 // Cache lookups keep repeated targets within the same export from re-querying AWS.
-func collectRunsByTargetKind(ctx context.Context, targetKind, targetARN, jobName string, opts CollectOptions, deps runCollectorDeps, caches *runCollectorCaches) ([]Run, *ErrorRecord) {
+func collectRunsByTargetKind(ctx context.Context, targetKind, targetARN, jobName string, hints runTargetHints, opts CollectOptions, deps runCollectorDeps, caches *runCollectorCaches) ([]Run, *ErrorRecord) {
 	switch targetKind {
 	case "stepfunctions":
 		// Step Functions executions are keyed by the state machine ARN.
@@ -76,8 +82,9 @@ func collectRunsByTargetKind(ctx context.Context, targetKind, targetARN, jobName
 		}
 		return runs, nil
 	case "ecs":
-		runs, err := getCachedRuns(caches.ecsRunsCache, caches.ecsErrCache, targetARN, func() ([]Run, error) {
-			return collectECSRuns(ctx, deps.ecsSvc, targetARN, opts.Since, opts.MaxResults)
+		cacheKey := targetARN + "|" + hints.ecsTaskDefinitionARN + "|" + hints.ecsStartedBy
+		runs, err := getCachedRuns(caches.ecsRunsCache, caches.ecsErrCache, cacheKey, func() ([]Run, error) {
+			return collectECSRuns(ctx, deps.ecsSvc, targetARN, hints.ecsTaskDefinitionARN, hints.ecsStartedBy, opts.Since, opts.MaxResults)
 		})
 		if err != nil {
 			return nil, &ErrorRecord{Service: "ecs", Region: deps.region, Message: err.Error()}

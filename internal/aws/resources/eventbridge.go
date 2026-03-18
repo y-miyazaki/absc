@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
+	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 	"github.com/aws/aws-sdk-go-v2/service/glue"
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
 )
@@ -71,12 +72,25 @@ func (c *EventBridgeCollector) Collect(ctx context.Context, opts CollectOptions)
 				continue
 			}
 			enabled := strings.EqualFold(string(r.State), "ENABLED")
-			targets, listTargetsErr := c.svc.ListTargetsByRule(ctx, &eventbridge.ListTargetsByRuleInput{Rule: r.Name})
-			if listTargetsErr != nil {
-				errs = append(errs, ErrorRecord{Service: "eventbridge_rule", Region: c.region, Message: listTargetsErr.Error()})
+			allTargets := make([]eventbridgetypes.Target, 0)
+			var targetsToken *string
+			for {
+				targets, listTargetsErr := c.svc.ListTargetsByRule(ctx, &eventbridge.ListTargetsByRuleInput{Rule: r.Name, NextToken: targetsToken})
+				if listTargetsErr != nil {
+					errs = append(errs, ErrorRecord{Service: "eventbridge_rule", Region: c.region, Message: listTargetsErr.Error()})
+					allTargets = nil
+					break
+				}
+				allTargets = append(allTargets, targets.Targets...)
+				if targets.NextToken == nil {
+					break
+				}
+				targetsToken = targets.NextToken
+			}
+			if allTargets == nil {
 				continue
 			}
-			if len(targets.Targets) == 0 {
+			if len(allTargets) == 0 {
 				// EventBridge Rule APIs do not expose a deterministic "next invocation" timestamp,
 				// so this collector intentionally leaves NextInvocationAt empty.
 				schedules = append(schedules, Schedule{
@@ -95,11 +109,15 @@ func (c *EventBridgeCollector) Collect(ctx context.Context, opts CollectOptions)
 				continue
 			}
 
-			for i := range targets.Targets {
-				t := targets.Targets[i]
+			for i := range allTargets {
+				t := allTargets[i]
 				targetARN := aws.ToString(t.Arn)
 				targetKind := detectTargetKind(targetARN, t.BatchParameters != nil)
 				targetService := detectTargetService(targetARN)
+				hints := runTargetHints{}
+				if t.EcsParameters != nil {
+					hints.ecsTaskDefinitionARN = aws.ToString(t.EcsParameters.TaskDefinitionArn)
+				}
 				// EventBridge Rule APIs do not expose a deterministic "next invocation" timestamp,
 				// so this collector intentionally leaves NextInvocationAt empty.
 				s := Schedule{
@@ -123,7 +141,7 @@ func (c *EventBridgeCollector) Collect(ctx context.Context, opts CollectOptions)
 					jobName = aws.ToString(t.BatchParameters.JobName)
 				}
 
-				runs, runErr := collectRunsByTargetKind(ctx, targetKind, targetARN, jobName, opts, deps, caches)
+				runs, runErr := collectRunsByTargetKind(ctx, targetKind, targetARN, jobName, hints, opts, deps, caches)
 				if runErr != nil {
 					errs = append(errs, *runErr)
 				} else if runs != nil {

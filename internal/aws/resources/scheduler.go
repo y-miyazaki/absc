@@ -27,6 +27,13 @@ type SchedulerCollector struct {
 	region   string
 }
 
+type runTargetResolution struct {
+	hints              runTargetHints
+	runJobName         string
+	runTargetARN       string
+	hasBatchParameters bool
+}
+
 // NewSchedulerCollector builds regional clients for EventBridge Scheduler.
 func NewSchedulerCollector(cfg *aws.Config, region string) (*SchedulerCollector, error) {
 	return &SchedulerCollector{
@@ -79,9 +86,14 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 			runTargetARN := ""
 			runJobName := ""
 			hasBatchParameters := false
+			hints := runTargetHints{}
 			if detail.Target != nil {
 				targetARN = aws.ToString(detail.Target.Arn)
-				runTargetARN, runJobName, hasBatchParameters = resolveSchedulerRunTarget(targetARN, aws.ToString(detail.Target.Input))
+				resolved := resolveSchedulerRunTarget(targetARN, aws.ToString(detail.Target.Input))
+				runTargetARN = resolved.runTargetARN
+				runJobName = resolved.runJobName
+				hasBatchParameters = resolved.hasBatchParameters
+				hints = resolved.hints
 				if runTargetARN == "" {
 					runTargetARN = targetARN
 				}
@@ -105,7 +117,7 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 				Slots:                      buildSlots(aws.ToString(detail.ScheduleExpression)),
 				Runs:                       make([]Run, 0),
 			}
-			runs, runErr := collectRunsByTargetKind(ctx, targetKind, runTargetARN, runJobName, opts, deps, caches)
+			runs, runErr := collectRunsByTargetKind(ctx, targetKind, runTargetARN, runJobName, hints, opts, deps, caches)
 			if runErr != nil {
 				errs = append(errs, *runErr)
 			} else if runs != nil {
@@ -121,38 +133,41 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 }
 
 // resolveSchedulerRunTarget extracts the real downstream target from SDK inputs.
-func resolveSchedulerRunTarget(targetARN, input string) (runTargetARN, runJobName string, hasBatchParameters bool) {
+func resolveSchedulerRunTarget(targetARN, input string) runTargetResolution {
 	lowerARN := strings.ToLower(targetARN)
 	if strings.Contains(lowerARN, ":aws-sdk:sfn:startexecution") {
 		if v := getStringFromJSON(input, "StateMachineArn", "stateMachineArn", "state_machine_arn"); v != "" {
-			return v, "", false
+			return runTargetResolution{runTargetARN: v}
 		}
-		return "", "", false
+		return runTargetResolution{}
 	}
 	if strings.Contains(lowerARN, ":aws-sdk:batch:submitjob") {
 		queue := getStringFromJSON(input, "JobQueue", "jobQueue", "job_queue")
 		name := getStringFromJSON(input, "JobName", "jobName", "job_name")
-		return queue, name, true
+		return runTargetResolution{runTargetARN: queue, runJobName: name, hasBatchParameters: true}
 	}
 	if strings.Contains(lowerARN, ":aws-sdk:lambda:invoke") {
 		if v := getStringFromJSON(input, "FunctionName", "functionName", "function_name"); v != "" {
-			return v, "", false
+			return runTargetResolution{runTargetARN: v}
 		}
-		return "", "", false
+		return runTargetResolution{}
 	}
 	if strings.Contains(lowerARN, ":aws-sdk:glue:") {
 		if v := getStringFromJSON(input, "JobName", "jobName", "job_name"); v != "" {
-			return v, "", false
+			return runTargetResolution{runTargetARN: v}
 		}
-		return "", "", false
+		return runTargetResolution{}
 	}
 	if strings.Contains(lowerARN, ":aws-sdk:ecs:") {
+		resolved := runTargetResolution{}
 		if v := getStringFromJSON(input, "Cluster", "cluster"); v != "" {
-			return v, "", false
+			resolved.runTargetARN = v
 		}
-		return "", "", false
+		resolved.hints.ecsTaskDefinitionARN = getStringFromJSON(input, "TaskDefinition", "taskDefinition", "task_definition")
+		resolved.hints.ecsStartedBy = getStringFromJSON(input, "StartedBy", "startedBy", "started_by")
+		return resolved
 	}
-	return "", "", strings.Contains(lowerARN, ":batch:")
+	return runTargetResolution{hasBatchParameters: strings.Contains(lowerARN, ":batch:")}
 }
 
 // getStringFromJSON returns the first matching string field from a JSON object.

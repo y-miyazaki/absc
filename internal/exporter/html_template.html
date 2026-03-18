@@ -13,9 +13,9 @@
       --sub: #5f6b76;
       --accent: #006d77;
       --grid: #dde3e7;
-      --run-success: #3fb950;
+      --run-success: #16a34a;
       --run-fail: #f85149;
-      --scheduled: #7db9b6;
+      --scheduled: #2563eb;
       --name-col-width: 260px;
     }
     body { margin: 0; font-family: "Noto Sans", "Segoe UI", sans-serif; color: var(--text); background: radial-gradient(circle at 10% 0%, #e4f4f3, var(--bg) 35%); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
@@ -30,7 +30,7 @@
     .dot.sch { background: var(--scheduled); }
     .dot.run-ok { background: var(--run-success); }
     .dot.run-fail { background: var(--run-fail); }
-    .timeline { border: 1px solid #d7e0e7; background: var(--panel); border-radius: 12px; overflow: auto; flex: 1; min-height: 0; }
+    .timeline { border: 1px solid #d7e0e7; background: var(--panel); border-radius: 12px; overflow: auto; flex: 1; min-height: 0; padding-bottom: 16px; box-sizing: border-box; }
     .row {
       display: grid;
       grid-template-columns: var(--name-col-width) repeat(144, 14px);
@@ -86,7 +86,7 @@
 <main>
   <div class="legend">
     <span><span class="dot sch"></span>Scheduled slot</span>
-    <span><span class="dot run-ok"></span>Actual run success (#3fb950)</span>
+    <span><span class="dot run-ok"></span>Actual run success (#16a34a)</span>
     <span><span class="dot run-fail"></span>Actual run failed (#f85149)</span>
     <span><span class="badge">disabled</span>Schedule disabled</span>
     <span><span class="badge warn">max</span>Runs list capped by max-results</span>
@@ -252,7 +252,7 @@ function render() {
         tooltip.style.left = e.clientX + 'px';
         tooltip.style.top = e.clientY + 'px';
         const recentRuns = (s.runs || []).slice(0, 8);
-        const statusColor = st => runClass(st) === 'run-fail' ? '#f85149' : '#3fb950';
+        const statusColor = st => runClass(st) === 'run-fail' ? '#f85149' : '#16a34a';
         const fmtDur = sec => {
           if (sec == null) return '-';
           if (sec < 60) return sec + 's';

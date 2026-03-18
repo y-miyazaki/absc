@@ -13,8 +13,9 @@ import (
 const ecsDescribeTasksBatchSize = 100
 
 // collectECSRuns returns stopped and running ECS tasks for the given cluster ARN.
+// Optional task definition and startedBy filters avoid mixing unrelated tasks.
 // The ECS API retains stopped task data for approximately 1 hour.
-func collectECSRuns(ctx context.Context, svc *ecs.Client, clusterARN string, since time.Time, maxResults int) ([]Run, error) {
+func collectECSRuns(ctx context.Context, svc *ecs.Client, clusterARN, taskDefinitionARN, startedBy string, since time.Time, maxResults int) ([]Run, error) {
 	// Query both running and stopped tasks because recent executions may still be active.
 	var taskARNs []string
 
@@ -61,6 +62,12 @@ func collectECSRuns(ctx context.Context, svc *ecs.Client, clusterARN string, sin
 		// Convert task state into the shared Run shape.
 		for taskIndex := range desc.Tasks {
 			t := desc.Tasks[taskIndex]
+			if taskDefinitionARN != "" && aws.ToString(t.TaskDefinitionArn) != taskDefinitionARN {
+				continue
+			}
+			if startedBy != "" && aws.ToString(t.StartedBy) != startedBy {
+				continue
+			}
 			// Tasks without StartedAt have not transitioned into an execution window yet.
 			if t.StartedAt == nil {
 				continue
