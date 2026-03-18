@@ -1,3 +1,4 @@
+//revive:disable:comments-density reason: parser logic is straightforward and additional comments would add noise.
 package resources
 
 import (
@@ -14,9 +15,13 @@ import (
 )
 
 var lambdaDurationPattern = regexp.MustCompile(`Duration:\s*(\d+(?:\.\d+)?)\s*ms`)
+var lambdaErrorTypePattern = regexp.MustCompile(`Error Type:\s*([A-Za-z0-9._-]+)`)
+var lambdaStatusPattern = regexp.MustCompile(`Status:\s*([A-Za-z_]+)`)
 
 const lambdaSplitParts = 2
 const lambdaFloatBitSize = 64
+const lambdaStatusCompleted = "COMPLETED"
+const lambdaStatusFailed = "FAILED"
 
 // collectLambdaRuns extracts recent Lambda invocations from CloudWatch Logs REPORT lines.
 func collectLambdaRuns(ctx context.Context, svc *cloudwatchlogs.Client, functionTarget string, since time.Time, maxResults int) ([]Run, error) {
@@ -61,7 +66,7 @@ func collectLambdaRuns(ctx context.Context, svc *cloudwatchlogs.Client, function
 
 			run := Run{
 				RunID:         eventIDOrTime(ev.EventId, end),
-				Status:        "COMPLETED",
+				Status:        lambdaRunStatus(*ev.Message),
 				StartAt:       formatRFC3339UTC(start),
 				EndAt:         formatRFC3339UTC(end),
 				SourceService: "lambda",
@@ -111,6 +116,45 @@ func lambdaDurationSec(message string) int64 {
 		return 0
 	}
 	return int64(math.Ceil(ms / 1000.0))
+}
+
+// lambdaRunStatus infers invocation status from REPORT lines.
+func lambdaRunStatus(message string) string {
+	if lambdaRunStatusDetail(message) == lambdaStatusCompleted {
+		return lambdaStatusCompleted
+	}
+	return lambdaStatusFailed
+}
+
+// lambdaRunStatusDetail keeps detailed failure reasons for future UI improvements.
+func lambdaRunStatusDetail(message string) string {
+	lower := strings.ToLower(message)
+
+	if strings.Contains(lower, "task timed out") || strings.Contains(lower, "status: timeout") {
+		return "TIMED_OUT"
+	}
+	if strings.Contains(lower, "outofmemory") || strings.Contains(lower, "out of memory") {
+		return "OUT_OF_MEMORY"
+	}
+
+	if m := lambdaStatusPattern.FindStringSubmatch(message); len(m) == lambdaSplitParts {
+		switch strings.ToUpper(strings.TrimSpace(m[1])) {
+		case "SUCCESS":
+			return lambdaStatusCompleted
+		case "TIMEOUT":
+			return "TIMED_OUT"
+		case "ERROR":
+			if em := lambdaErrorTypePattern.FindStringSubmatch(message); len(em) == lambdaSplitParts {
+				errType := strings.ToUpper(strings.TrimSpace(em[1]))
+				if strings.Contains(errType, "OUTOFMEMORY") {
+					return "OUT_OF_MEMORY"
+				}
+			}
+			return lambdaStatusFailed
+		}
+	}
+
+	return lambdaStatusCompleted
 }
 
 // eventIDOrTime prefers the CloudWatch event id and falls back to a timestamp key.

@@ -27,7 +27,7 @@ const (
 	arnSplitParts         = 6
 	defaultLookbackHours  = 24
 	defaultMaxConcurrency = 5
-	defaultMaxResults     = 50
+	defaultMaxResults     = 144
 	defaultOutputDir      = "./output"
 	defaultRegion         = "ap-northeast-1"
 	// defaultTimeout bounds the full CLI execution to avoid hanging runs.

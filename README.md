@@ -156,7 +156,7 @@ OPTIONS:
    --output-dir value, -D      Output base directory (default: "./output")
    --lookback-hours value      Execution history lookback hours (default: 24)
    --max-concurrency value     Max concurrent resource collectors (default: 5)
-   --max-results value         Max executions/jobs per target (default: 50)
+    --max-results value         Max executions/jobs per target (default: 144)
    --help, -h                  show help
 ```
 
@@ -196,6 +196,8 @@ Recent runs are collected only when the target type supports runtime lookup. Cur
 
 If a target type is not supported for run enrichment, the timeline still shows scheduled slots, but the run list remains empty.
 
+Disabled schedules keep previously executed runs inside the lookback window so the timeline can still show recent actual activity.
+
 ## Output Format
 
 ### Directory Structure
@@ -229,6 +231,7 @@ output/
 - 10-minute slots across a 24-hour window
 - Scheduled slot markers and actual run overlays
 - Disabled schedule highlighting
+- Success/failed run coloring in overlays and tooltip statuses
 - Maximum-result cap indicator when runs are truncated
 
 The HTML file can be opened directly in a browser because the payload is embedded into the document.

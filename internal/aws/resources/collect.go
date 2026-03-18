@@ -17,7 +17,7 @@ type CollectOptions struct {
 }
 
 const defaultMaxConcurrency = 5
-const defaultMaxResults = 50
+const defaultMaxResults = 144
 
 // Collector is implemented by each AWS-backed schedule source.
 type Collector interface {

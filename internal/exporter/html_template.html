@@ -13,22 +13,24 @@
       --sub: #5f6b76;
       --accent: #006d77;
       --grid: #dde3e7;
-      --run: #ff7f50;
+      --run-success: #3fb950;
+      --run-fail: #f85149;
       --scheduled: #7db9b6;
       --name-col-width: 260px;
     }
-    body { margin: 0; font-family: "Noto Sans", "Segoe UI", sans-serif; color: var(--text); background: radial-gradient(circle at 10% 0%, #e4f4f3, var(--bg) 35%); }
-    header { padding: 16px 20px; border-bottom: 1px solid #d5dde3; background: #ffffffcc; backdrop-filter: blur(6px); position: sticky; top: 0; z-index: 10; }
+    body { margin: 0; font-family: "Noto Sans", "Segoe UI", sans-serif; color: var(--text); background: radial-gradient(circle at 10% 0%, #e4f4f3, var(--bg) 35%); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    header { padding: 16px 20px; border-bottom: 1px solid #d5dde3; background: #ffffffcc; backdrop-filter: blur(6px); flex-shrink: 0; }
     .meta { color: var(--sub); font-size: 13px; }
     .controls { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
     .controls input[type="range"] { width: 170px; vertical-align: middle; }
     select { padding: 6px 10px; border: 1px solid #c9d2d9; border-radius: 8px; background: var(--panel); }
-    main { padding: 14px; }
-    .legend { display: flex; gap: 12px; margin: 10px 0; font-size: 12px; color: var(--sub); }
+    main { padding: 14px; flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+    .legend { display: flex; gap: 12px; margin: 10px 0; font-size: 12px; color: var(--sub); flex-shrink: 0; }
     .dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; margin-right: 5px; }
     .dot.sch { background: var(--scheduled); }
-    .dot.run { background: var(--run); }
-    .timeline { border: 1px solid #d7e0e7; background: var(--panel); border-radius: 12px; overflow: auto; max-height: calc(100vh - 180px); }
+    .dot.run-ok { background: var(--run-success); }
+    .dot.run-fail { background: var(--run-fail); }
+    .timeline { border: 1px solid #d7e0e7; background: var(--panel); border-radius: 12px; overflow: auto; flex: 1; min-height: 0; }
     .row {
       display: grid;
       grid-template-columns: var(--name-col-width) repeat(144, 14px);
@@ -59,7 +61,8 @@
     }
     .cell { border-right: 1px solid var(--grid); position: relative; }
     .cell.sch::after { content: ""; position: absolute; inset: 4px; background: var(--scheduled); border-radius: 3px; }
-    .cell.run::before { content: ""; position: absolute; inset: 1px 0; background: var(--run); opacity: .85; }
+    .cell.run-ok::before { content: ""; position: absolute; inset: 1px 0; background: var(--run-success); opacity: .9; }
+    .cell.run-fail::before { content: ""; position: absolute; inset: 1px 0; background: var(--run-fail); opacity: .95; }
     .row.disabled .name { color: #5f6b76; background: #e9eef2; }
     .row.disabled .cell { background: #e9eef2; opacity: .65; }
     .badge { display: inline-block; margin-left: 6px; padding: 1px 6px; font-size: 10px; border-radius: 999px; background: #eef2f5; color: #60717f; vertical-align: middle; }
@@ -83,7 +86,8 @@
 <main>
   <div class="legend">
     <span><span class="dot sch"></span>Scheduled slot</span>
-    <span><span class="dot run"></span>Actual run (start-end)</span>
+    <span><span class="dot run-ok"></span>Actual run success (#3fb950)</span>
+    <span><span class="dot run-fail"></span>Actual run failed (#f85149)</span>
     <span><span class="badge">disabled</span>Schedule disabled</span>
     <span><span class="badge warn">max</span>Runs list capped by max-results</span>
   </div>
@@ -133,6 +137,23 @@ function slotFor(ts){
   const hour = Number(m[1]);
   const minute = Number(m[2]);
   return (hour*6) + Math.floor(minute/10);
+}
+
+function runSeverity(status) {
+  const s = String(status || '').toUpperCase();
+  if (!s) return 2;
+  if (s === 'SUCCEEDED' || s === 'COMPLETED' || s === 'STOPPED' || s === 'SUCCESS') return 1;
+  return 2;
+}
+
+function displayRunStatus(status) {
+  return runSeverity(status) === 1 ? 'COMPLETED' : 'FAILED';
+}
+
+function runClass(status) {
+  const sev = runSeverity(status);
+  if (sev === 1) return 'run-ok';
+  return 'run-fail';
 }
 
 function compareSchedules(a, b) {
@@ -203,29 +224,35 @@ function render() {
     }
     row.appendChild(name);
 
-    const runSlots = new Set();
+    const runSlots = new Map();
     (s.runs || []).forEach(r => {
       const st = slotFor(r.start_at);
       let ed = slotFor(r.end_at);
       if(st == null) return;
       if(ed == null) ed = st;
-      for(let i=st; i<=Math.max(st,ed) && i<144; i++) runSlots.add(i);
+      const cls = runClass(r.status);
+      const sev = runSeverity(r.status);
+      for(let i=st; i<=Math.max(st,ed) && i<144; i++) {
+        const prev = runSlots.get(i);
+        if (!prev || sev > prev.severity) {
+          runSlots.set(i, { className: cls, severity: sev });
+        }
+      }
     });
 
     for(let i=0;i<144;i++) {
       const cell = document.createElement('div');
       let cls = 'cell';
       if((s.slots || [])[i] === 1) cls += ' sch';
-      if(runSlots.has(i)) cls += ' run';
+      const runSlot = runSlots.get(i);
+      if(runSlot) cls += ' ' + runSlot.className;
       cell.className = cls;
       cell.onmousemove = (e) => {
         tooltip.style.display = 'block';
         tooltip.style.left = e.clientX + 'px';
         tooltip.style.top = e.clientY + 'px';
         const recentRuns = (s.runs || []).slice(0, 8);
-        const statusColor = st => st === 'SUCCEEDED' || st === 'COMPLETED' || st === 'STOPPED' ? '#4caf50' :
-                                   st === 'FAILED' || st === 'ABORTED' ? '#f44336' :
-                                   st === 'RUNNING' || st === 'EXECUTING' ? '#ff9800' : '#9e9e9e';
+        const statusColor = st => runClass(st) === 'run-fail' ? '#f85149' : '#3fb950';
         const fmtDur = sec => {
           if (sec == null) return '-';
           if (sec < 60) return sec + 's';
@@ -244,7 +271,7 @@ function render() {
             '<th style="text-align:right;padding:2px 4px">Duration</th></tr>' +
             recentRuns.map(r =>
               '<tr>' +
-              '<td style="color:' + statusColor(r.status) + ';padding:2px 4px">' + r.status + '</td>' +
+              '<td style="color:' + statusColor(r.status) + ';padding:2px 4px">' + displayRunStatus(r.status) + '</td>' +
               '<td style="padding:2px 4px">' + fmtTs(r.start_at) + '</td>' +
               '<td style="padding:2px 4px">' + fmtTs(r.end_at) + '</td>' +
               '<td style="text-align:right;padding:2px 4px">' + fmtDur(r.duration_sec) + '</td>' +
