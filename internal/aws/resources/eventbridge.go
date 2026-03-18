@@ -129,6 +129,7 @@ func (c *EventBridgeCollector) Collect(ctx context.Context, opts CollectOptions)
 					Region:             c.region,
 					TargetARN:          targetARN,
 					TargetKind:         targetKind,
+					TargetAction:       detectTargetAction(targetARN),
 					TargetService:      targetService,
 					TargetName:         resourceNameFromARN(targetARN),
 					NextInvocationAt:   "",

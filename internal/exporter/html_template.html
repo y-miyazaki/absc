@@ -80,7 +80,8 @@
   <div class="controls">
     <label>Service <select id="serviceFilter"></select></label>
     <label>Region <select id="regionFilter"></select></label>
-    <label>Schedule Width <input id="nameWidth" type="range" min="220" max="520" step="10" value="260" /> <span id="nameWidthValue">260px</span></label>
+    <label>Schedule Width <input id="nameWidth" type="range" min="220" max="520" step="10" value="520" /> <span id="nameWidthValue">520px</span></label>
+    <label><input id="hideDisabled" type="checkbox" /> Hide disabled schedules</label>
   </div>
 </header>
 <main>
@@ -99,6 +100,8 @@
 const DATA = JSON.parse(document.getElementById('payload').textContent);
 const timeline = document.getElementById('timeline');
 const tooltip = document.getElementById('tooltip');
+const WINDOW_START_MS = Date.parse(DATA.window.start);
+const SLOT_MINUTES = Number(DATA.window.slot_minutes) || 10;
 document.getElementById('meta').textContent =
   'Account: ' + DATA.account_id +
   ' | TZ: ' + DATA.timezone +
@@ -122,12 +125,46 @@ function setupNameWidthControl() {
   const slider = document.getElementById('nameWidth');
   const value = document.getElementById('nameWidthValue');
   const apply = () => {
-    const width = Number(slider.value) || 260;
+    const width = Number(slider.value) || 520;
     document.documentElement.style.setProperty('--name-col-width', width + 'px');
     value.textContent = width + 'px';
   };
   slider.oninput = apply;
   apply();
+}
+
+function setupDisabledToggle() {
+  const toggle = document.getElementById('hideDisabled');
+  toggle.onchange = render;
+}
+
+function parseTs(ts) {
+  if (!ts) return null;
+  const t = new Date(ts);
+  if (Number.isNaN(t.getTime())) return null;
+  return t;
+}
+
+function slotBounds(slotIndex) {
+  if (!Number.isFinite(WINDOW_START_MS)) return null;
+  const start = new Date(WINDOW_START_MS + (slotIndex * SLOT_MINUTES * 60 * 1000));
+  const end = new Date(start.getTime() + (SLOT_MINUTES * 60 * 1000));
+  return { start, end };
+}
+
+function runOverlapsSlot(run, bounds) {
+  if (!bounds) return false;
+  const start = parseTs(run.start_at);
+  if (!start) return false;
+  const end = parseTs(run.end_at) || start;
+  return start < bounds.end && end >= bounds.start;
+}
+
+function fmtHHMM(dateObj) {
+  if (!(dateObj instanceof Date)) return '-';
+  const hh = String(dateObj.getHours()).padStart(2, '0');
+  const mm = String(dateObj.getMinutes()).padStart(2, '0');
+  return hh + ':' + mm;
 }
 
 function slotFor(ts){
@@ -137,6 +174,27 @@ function slotFor(ts){
   const hour = Number(m[1]);
   const minute = Number(m[2]);
   return (hour*6) + Math.floor(minute/10);
+}
+
+function runSlotRange(run) {
+  if (!Number.isFinite(WINDOW_START_MS)) return null;
+  const windowStart = new Date(WINDOW_START_MS);
+  const windowEnd = new Date(WINDOW_START_MS + (144 * SLOT_MINUTES * 60 * 1000));
+  const start = parseTs(run.start_at);
+  if (!start) return null;
+  const end = parseTs(run.end_at) || start;
+
+  if (end < windowStart || start >= windowEnd) {
+    return null;
+  }
+
+  const clampedStartMs = Math.max(start.getTime(), windowStart.getTime());
+  const clampedEndMs = Math.min(end.getTime(), windowEnd.getTime() - 1);
+  const startIdx = Math.max(0, Math.floor((clampedStartMs - windowStart.getTime()) / (SLOT_MINUTES * 60 * 1000)));
+  const endIdx = Math.min(143, Math.floor((clampedEndMs - windowStart.getTime()) / (SLOT_MINUTES * 60 * 1000)));
+
+  if (endIdx < startIdx) return null;
+  return { startIdx, endIdx };
 }
 
 function runSeverity(status) {
@@ -154,6 +212,10 @@ function runClass(status) {
   const sev = runSeverity(status);
   if (sev === 1) return 'run-ok';
   return 'run-fail';
+}
+
+function targetTypeLabel(schedule) {
+  return schedule.target_action || '-';
 }
 
 function compareSchedules(a, b) {
@@ -179,8 +241,9 @@ function compareSchedules(a, b) {
 function render() {
   const sVal = document.getElementById('serviceFilter').value;
   const rVal = document.getElementById('regionFilter').value;
+  const hideDisabled = document.getElementById('hideDisabled').checked;
   const rows = DATA.schedules
-    .filter(s => (!sVal || s.service === sVal) && (!rVal || s.region === rVal))
+    .filter(s => (!sVal || s.service === sVal) && (!rVal || s.region === rVal) && (!hideDisabled || s.enabled !== false))
     .sort(compareSchedules);
 
   const head = document.createElement('div');
@@ -226,13 +289,11 @@ function render() {
 
     const runSlots = new Map();
     (s.runs || []).forEach(r => {
-      const st = slotFor(r.start_at);
-      let ed = slotFor(r.end_at);
-      if(st == null) return;
-      if(ed == null) ed = st;
+      const range = runSlotRange(r);
+      if (!range) return;
       const cls = runClass(r.status);
       const sev = runSeverity(r.status);
-      for(let i=st; i<=Math.max(st,ed) && i<144; i++) {
+      for(let i=range.startIdx; i<=range.endIdx; i++) {
         const prev = runSlots.get(i);
         if (!prev || sev > prev.severity) {
           runSlots.set(i, { className: cls, severity: sev });
@@ -248,10 +309,9 @@ function render() {
       if(runSlot) cls += ' ' + runSlot.className;
       cell.className = cls;
       cell.onmousemove = (e) => {
-        tooltip.style.display = 'block';
-        tooltip.style.left = e.clientX + 'px';
-        tooltip.style.top = e.clientY + 'px';
-        const recentRuns = (s.runs || []).slice(0, 8);
+        const bounds = slotBounds(i);
+        const slotRuns = (s.runs || []).filter(r => runOverlapsSlot(r, bounds));
+        const shownRuns = slotRuns.slice(0, 20);
         const statusColor = st => runClass(st) === 'run-fail' ? '#f85149' : '#16a34a';
         const fmtDur = sec => {
           if (sec == null) return '-';
@@ -263,13 +323,13 @@ function render() {
           if (!ts) return '-';
           return ts.replace('T', ' ').replace(/(Z|[+-]\d{2}:\d{2})$/, '');
         };
-        const runsHtml = recentRuns.length > 0
+        const runsHtml = shownRuns.length > 0
           ? '<table style="width:100%;margin-top:6px;border-collapse:collapse;font-size:11px">' +
             '<tr style="border-bottom:1px solid #444"><th style="text-align:left;padding:2px 4px">Status</th>' +
             '<th style="text-align:left;padding:2px 4px">Start</th>' +
             '<th style="text-align:left;padding:2px 4px">End</th>' +
             '<th style="text-align:right;padding:2px 4px">Duration</th></tr>' +
-            recentRuns.map(r =>
+            shownRuns.map(r =>
               '<tr>' +
               '<td style="color:' + statusColor(r.status) + ';padding:2px 4px">' + displayRunStatus(r.status) + '</td>' +
               '<td style="padding:2px 4px">' + fmtTs(r.start_at) + '</td>' +
@@ -278,16 +338,26 @@ function render() {
               '</tr>'
             ).join('') +
             '</table>'
-          : '<div style="margin-top:6px;color:#aaa;font-size:11px">no recent runs</div>';
+          : '<div style="margin-top:6px;color:#aaa;font-size:11px">no runs in this slot</div>';
+        const slotLabel = bounds ? (fmtHHMM(bounds.start) + ' - ' + fmtHHMM(bounds.end)) : '-';
         tooltip.innerHTML =
           '<b>' + s.schedule_name + '</b><br/>' +
           'state: ' + (s.enabled === false ? 'DISABLED' : 'ENABLED') + '<br/>' +
           'service: ' + (s.target_service || 'Other') + '<br/>' +
+          'target type: ' + targetTypeLabel(s) + '<br/>' +
           'target: ' + (s.target_name || s.target_arn) + '<br/>' +
           'expression: ' + s.schedule_expression + '<br/>' +
           'next: ' + (s.next_invocation_at || '-') + '<br/>' +
-          'runs (shown): ' + (s.runs || []).length + (s.runs_capped ? ' (capped by max-results)' : '') +
+          'slot: ' + slotLabel + '<br/>' +
+          'runs in slot (shown): ' + shownRuns.length + '/' + slotRuns.length + (s.runs_capped ? ' (source list capped by max-results)' : '') +
           runsHtml;
+        tooltip.style.display = 'block';
+        const ttW = tooltip.offsetWidth, ttH = tooltip.offsetHeight;
+        let tx = e.clientX + 12, ty = e.clientY + 12;
+        if (tx + ttW > window.innerWidth - 8)  tx = e.clientX - ttW - 12;
+        if (ty + ttH > window.innerHeight - 8) ty = e.clientY - ttH - 12;
+        tooltip.style.left = Math.max(0, tx) + 'px';
+        tooltip.style.top  = Math.max(0, ty) + 'px';
       };
       cell.onmouseleave = () => { tooltip.style.display = 'none'; };
       row.appendChild(cell);
@@ -329,6 +399,7 @@ function makeIcon(key) {
 
 buildFilters();
 setupNameWidthControl();
+setupDisabledToggle();
 render();
 </script>
 <!-- Copyright footer -->

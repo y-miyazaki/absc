@@ -100,6 +100,11 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 			}
 			targetKind := detectTargetKind(targetARN, hasBatchParameters)
 			targetService := detectTargetService(targetARN)
+			targetName := resourceNameFromARN(targetARN)
+			if (targetKind == "lambda" || targetKind == "stepfunctions" || targetKind == "glue") && runTargetARN != "" {
+				targetName = resourceNameFromARN(runTargetARN)
+			}
+			targetAction := detectTargetAction(targetARN)
 			nextInvocationAt := computeSchedulerNextInvocation(detail, nowUTC)
 			s := Schedule{
 				ID:                         fmt.Sprintf("eventbridge_scheduler:%s:%s", c.region, aws.ToString(detail.Name)),
@@ -111,8 +116,9 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 				Region:                     c.region,
 				TargetARN:                  targetARN,
 				TargetKind:                 targetKind,
+				TargetAction:               targetAction,
 				TargetService:              targetService,
-				TargetName:                 resourceNameFromARN(targetARN),
+				TargetName:                 targetName,
 				NextInvocationAt:           nextInvocationAt,
 				Slots:                      buildSlots(aws.ToString(detail.ScheduleExpression)),
 				Runs:                       make([]Run, 0),

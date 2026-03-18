@@ -52,6 +52,7 @@ type Schedule struct {
 	NextInvocationAt           string `json:"next_invocation_at,omitempty"`
 	Service                    string `json:"service"`
 	TargetKind                 string `json:"target_kind"`
+	TargetAction               string `json:"target_action,omitempty"`
 	ID                         string `json:"id"`
 	TargetService              string `json:"target_service"`
 	TargetARN                  string `json:"target_arn"`
@@ -104,15 +105,19 @@ func WriteJSON(path string, out *Output) (retErr error) {
 	return nil
 }
 
-func BuildOutput(accountID string, now time.Time, loc *time.Location, schedules []resources.Schedule, errs []resources.ErrorRecord) Output {
+func BuildOutput(accountID string, now, since time.Time, loc *time.Location, schedules []resources.Schedule, errs []resources.ErrorRecord) Output {
+	// Anchor the window to the calendar day of `since` (start of the lookback period)
+	// so that all collected runs fall within the displayed window.
+	sinceInLoc := since.In(loc)
+	dayStart := time.Date(sinceInLoc.Year(), sinceInLoc.Month(), sinceInLoc.Day(), 0, 0, 0, 0, loc)
 	out := Output{
 		Version:     outputVersion,
 		GeneratedAt: now.Format(time.RFC3339),
 		AccountID:   accountID,
 		Timezone:    loc.String(),
 		Window: Window{
-			Start:       time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc).Format(time.RFC3339),
-			End:         time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc).Add(hoursPerDay * time.Hour).Format(time.RFC3339),
+			Start:       dayStart.Format(time.RFC3339),
+			End:         dayStart.Add(hoursPerDay * time.Hour).Format(time.RFC3339),
 			SlotMinutes: slotMinutes,
 		},
 		Schedules: make([]Schedule, 0, len(schedules)),
@@ -122,7 +127,7 @@ func BuildOutput(accountID string, now time.Time, loc *time.Location, schedules 
 	for scheduleIndex := range schedules {
 		s := schedules[scheduleIndex]
 		sourceLoc := scheduleSourceLocation(s.ScheduleExpressionTimezone)
-		slots := remapSlotsToLocation(s.Slots, now, sourceLoc, loc)
+		slots := remapSlotsToLocation(s.Slots, dayStart, sourceLoc, loc)
 		runs := make([]Run, 0, len(s.Runs))
 		for runIndex := range s.Runs {
 			r := s.Runs[runIndex]
@@ -146,6 +151,7 @@ func BuildOutput(accountID string, now time.Time, loc *time.Location, schedules 
 			Region:                     s.Region,
 			TargetARN:                  s.TargetARN,
 			TargetKind:                 s.TargetKind,
+			TargetAction:               s.TargetAction,
 			TargetService:              s.TargetService,
 			TargetName:                 s.TargetName,
 			NextInvocationAt:           nextInvocationAt,

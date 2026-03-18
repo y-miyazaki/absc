@@ -17,9 +17,38 @@ const (
 	maxInt32Value        = 1<<31 - 1
 	parseCronSplitParts  = 2
 	rateDayDefaultSlot   = 0
+	arnServiceIndex      = 2
+	arnSplitParts        = 6
+	colonSeparator       = ":"
+	sdkMinParts          = 2
+	sdkSplitParts        = 3
 	slotsPerHour         = 6
 	slotsPerRateMinute   = 10
+	schedulerSDKMarker   = ":aws-sdk:"
 )
+
+var serviceLabelByARNService = map[string]string{
+	"batch":    "Batch",
+	"ec2":      "EC2",
+	"ecs":      "ECS",
+	"events":   "EventBridge",
+	"glue":     "Glue",
+	"lambda":   "Lambda",
+	"rds":      "RDS",
+	"redshift": "Redshift",
+	"states":   "Step Functions",
+}
+
+var serviceLabelBySDKService = map[string]string{
+	"batch":    "Batch",
+	"ec2":      "EC2",
+	"ecs":      "ECS",
+	"glue":     "Glue",
+	"lambda":   "Lambda",
+	"rds":      "RDS",
+	"redshift": "Redshift",
+	"sfn":      "Step Functions",
+}
 
 // buildSlots maps cron or rate expressions into a fixed per-day slot timeline.
 func buildSlots(expr string) []int {
@@ -179,39 +208,31 @@ func detectTargetKind(arn string, batchParametersPresent bool) string {
 }
 
 func detectTargetService(arn string) string {
-	s := strings.ToLower(arn)
-	switch {
-	case strings.Contains(s, ":aws-sdk:sfn:startexecution"):
-		return "Step Functions"
-	case strings.Contains(s, ":aws-sdk:batch:submitjob"):
-		return "Batch"
-	case strings.Contains(s, ":aws-sdk:ec2:"):
-		return "EC2"
-	case strings.Contains(s, ":aws-sdk:rds:"):
-		return "RDS"
-	case strings.Contains(s, ":aws-sdk:ecs:"):
-		return "ECS"
-	case strings.Contains(s, ":aws-sdk:glue:"):
-		return "Glue"
-	case strings.Contains(s, ":aws-sdk:lambda:"):
-		return "Lambda"
-	case strings.Contains(s, ":aws-sdk:redshift:"):
-		return "Redshift"
-	case strings.Contains(s, ":states:") && strings.Contains(s, ":statemachine:"):
-		return "Step Functions"
-	case strings.Contains(s, ":lambda:"):
-		return "Lambda"
-	case strings.Contains(s, ":ecs:"):
-		return "ECS"
-	case strings.Contains(s, ":batch:"):
-		return "Batch"
-	case strings.Contains(s, ":rds:"):
-		return "RDS"
-	case strings.Contains(s, ":events:"):
-		return "EventBridge"
-	default:
+	v := strings.TrimSpace(arn)
+	if v == "" {
 		return "Other"
 	}
+
+	lower := strings.ToLower(v)
+	if idx := strings.Index(lower, schedulerSDKMarker); idx >= 0 {
+		sdkPart := lower[idx+len(schedulerSDKMarker):]
+		sdkParts := strings.SplitN(sdkPart, colonSeparator, sdkSplitParts)
+		if len(sdkParts) >= 1 {
+			if label, ok := serviceLabelBySDKService[sdkParts[0]]; ok {
+				return label
+			}
+		}
+		return "Other"
+	}
+
+	arnParts := strings.SplitN(lower, colonSeparator, arnSplitParts)
+	if len(arnParts) > arnServiceIndex {
+		if label, ok := serviceLabelByARNService[arnParts[arnServiceIndex]]; ok {
+			return label
+		}
+	}
+
+	return "Other"
 }
 
 func resourceNameFromARN(arn string) string {
@@ -224,6 +245,31 @@ func resourceNameFromARN(arn string) string {
 	}
 	parts = strings.Split(arn, ":")
 	return parts[len(parts)-1]
+}
+
+// detectTargetAction returns a raw service:action label from EventBridge Scheduler
+// aws-sdk target ARNs (e.g. arn:aws:scheduler:::aws-sdk:sfn:startExecution -> sfn:startExecution).
+// Returns empty string for direct-resource ARNs (EventBridge Rule targets).
+func detectTargetAction(arn string) string {
+	lowerARN := strings.ToLower(arn)
+	idx := strings.Index(lowerARN, schedulerSDKMarker)
+	if idx < 0 {
+		return ""
+	}
+
+	sdkPart := arn[idx+len(schedulerSDKMarker):]
+	parts := strings.SplitN(sdkPart, colonSeparator, sdkSplitParts)
+	if len(parts) < sdkMinParts {
+		return ""
+	}
+
+	service := strings.TrimSpace(parts[0])
+	action := strings.TrimSpace(parts[1])
+	if service == "" || action == "" {
+		return ""
+	}
+
+	return service + ":" + action
 }
 
 func fromMillis(v int64) time.Time {

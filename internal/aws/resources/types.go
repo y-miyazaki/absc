@@ -9,6 +9,7 @@ type Schedule struct {
 	NextInvocationAt           string
 	Service                    string
 	TargetKind                 string
+	TargetAction               string
 	ID                         string
 	TargetService              string
 	TargetARN                  string

@@ -207,7 +207,7 @@ func runCommand(c *cli.Context, l interface {
 		Since:          since,
 	})
 
-	result := exporter.BuildOutput(accountID, now, loc, schedules, errs)
+	result := exporter.BuildOutput(accountID, now, since, loc, schedules, errs)
 	outDir := filepath.Join(c.String(outputDirFlagName), accountID, "cron")
 	if mkErr := mkdirAll(outDir, outputDirPermission); mkErr != nil {
 		return fmt.Errorf("failed to create output directory: %w", mkErr)
