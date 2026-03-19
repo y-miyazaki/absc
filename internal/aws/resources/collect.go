@@ -11,6 +11,7 @@ import (
 
 type CollectOptions struct {
 	Since          time.Time
+	Until          time.Time
 	Regions        []string
 	MaxConcurrency int
 	MaxResults     int

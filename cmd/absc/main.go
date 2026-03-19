@@ -30,22 +30,25 @@ const (
 	defaultMaxResults     = 144
 	defaultOutputDir      = "./output"
 	defaultOutputSubDir   = "schedules"
+	defaultErrorsHTMLFile = "errors.html"
+	defaultIssuesCSVFile  = "slot_run_issues.csv"
 	defaultRegion         = "ap-northeast-1"
 	// defaultTimeout bounds the full CLI execution to avoid hanging runs.
-	defaultTimeout         = 10 * time.Minute
-	defaultTimezone        = "UTC"
-	outputDirPermission    = 0o750
-	regionsFlagName        = "regions"
-	regionFlagName         = "region"
-	regionShortAlias       = "r"
-	regionValueMinParts    = accountIndex + 1
-	outputDirFlagName      = "output-dir"
-	profileFlagName        = "profile"
-	lookbackHoursFlagName  = "lookback-hours"
-	maxConcurrencyFlagName = "max-concurrency"
-	maxResultsFlagName     = "max-results"
-	timeoutFlagName        = "timeout"
-	timezoneFlagName       = "timezone"
+	defaultTimeout             = 10 * time.Minute
+	defaultTimezone            = "UTC"
+	outputDirPermission        = 0o750
+	regionsFlagName            = "regions"
+	regionFlagName             = "region"
+	regionShortAlias           = "r"
+	regionValueMinParts        = accountIndex + 1
+	outputDirFlagName          = "output-dir"
+	profileFlagName            = "profile"
+	lookbackHoursFlagName      = "lookback-hours"
+	maxConcurrencyFlagName     = "max-concurrency"
+	maxResultsFlagName         = "max-results"
+	includeNonSlotRunsFlagName = "include-non-slot-runs"
+	timeoutFlagName            = "timeout"
+	timezoneFlagName           = "timezone"
 )
 
 var (
@@ -59,7 +62,10 @@ var (
 	newAWSConfig        = awscfg.NewConfig
 	nowFunc             = time.Now
 	writeHTML           = exporter.WriteHTML
+	buildOutput         = exporter.BuildOutputWithOptions
+	writeErrorsHTML     = exporter.WriteErrorsHTML
 	writeJSON           = exporter.WriteJSON
+	writeSlotIssuesCSV  = exporter.WriteSlotRunIssuesCSV
 )
 
 // parseRegions normalizes a comma-separated region list and removes duplicates.
@@ -154,6 +160,7 @@ func newApp(l interface {
 			&cli.IntFlag{Name: lookbackHoursFlagName, Usage: "Execution history lookback hours", Value: defaultLookbackHours},
 			&cli.IntFlag{Name: maxConcurrencyFlagName, Usage: "Max concurrent resource collectors", Value: defaultMaxConcurrency},
 			&cli.IntFlag{Name: maxResultsFlagName, Usage: "Max executions/jobs per target", Value: defaultMaxResults},
+			&cli.BoolFlag{Name: includeNonSlotRunsFlagName, Usage: "Include runs that do not overlap scheduled slots in output", Value: false},
 			&cli.DurationFlag{Name: timeoutFlagName, Usage: "Overall command timeout", Value: defaultTimeout},
 		},
 		Action: func(c *cli.Context) error {
@@ -213,9 +220,12 @@ func runCommand(c *cli.Context, l interface {
 		MaxResults:     c.Int(maxResultsFlagName),
 		Regions:        regions,
 		Since:          since,
+		Until:          since.Add(24 * time.Hour),
 	})
 
-	result := exporter.BuildOutput(accountID, now, since, loc, schedules, errs)
+	result := buildOutput(accountID, now, since, loc, schedules, errs, exporter.BuildOutputOptions{
+		IncludeNonSlotRuns: c.Bool(includeNonSlotRunsFlagName),
+	})
 	outDir := filepath.Join(c.String(outputDirFlagName), accountID, defaultOutputSubDir)
 	if mkErr := mkdirAll(outDir, outputDirPermission); mkErr != nil {
 		return fmt.Errorf("failed to create output directory: %w", mkErr)
@@ -231,7 +241,17 @@ func runCommand(c *cli.Context, l interface {
 		return fmt.Errorf("failed to write html: %w", hErr)
 	}
 
-	l.Info("generated outputs", "json_path", jsonPath, "html_path", htmlPath)
+	errorsPath := filepath.Join(outDir, defaultErrorsHTMLFile)
+	if eErr := writeErrorsHTML(errorsPath, &result); eErr != nil {
+		return fmt.Errorf("failed to write errors html: %w", eErr)
+	}
+
+	csvPath := filepath.Join(outDir, defaultIssuesCSVFile)
+	if cErr := writeSlotIssuesCSV(csvPath, &result); cErr != nil {
+		return fmt.Errorf("failed to write slot run issues csv: %w", cErr)
+	}
+
+	l.Info("generated outputs", "json_path", jsonPath, "html_path", htmlPath, "errors_html_path", errorsPath, "issues_csv_path", csvPath)
 	return nil
 }
 

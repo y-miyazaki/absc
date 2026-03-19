@@ -48,6 +48,9 @@ func restoreCommandDeps() func() {
 	originalMkdirAll := mkdirAll
 	originalNewAWSConfig := newAWSConfig
 	originalNowFunc := nowFunc
+	originalBuildOutput := buildOutput
+	originalWriteErrorsHTML := writeErrorsHTML
+	originalWriteSlotIssuesCSV := writeSlotIssuesCSV
 	originalWriteHTML := writeHTML
 	originalWriteJSON := writeJSON
 
@@ -57,6 +60,9 @@ func restoreCommandDeps() func() {
 		mkdirAll = originalMkdirAll
 		newAWSConfig = originalNewAWSConfig
 		nowFunc = originalNowFunc
+		buildOutput = originalBuildOutput
+		writeErrorsHTML = originalWriteErrorsHTML
+		writeSlotIssuesCSV = originalWriteSlotIssuesCSV
 		writeHTML = originalWriteHTML
 		writeJSON = originalWriteJSON
 	}
@@ -198,6 +204,8 @@ func TestRunCommand_AWSConfigError(t *testing.T) {
 func TestRunCommand_Success(t *testing.T) {
 	defer restoreCommandDeps()()
 
+	var csvPath string
+	var errorsPath string
 	var jsonPath string
 	var htmlPath string
 	var mkdirPath string
@@ -224,6 +232,17 @@ func TestRunCommand_Success(t *testing.T) {
 		htmlPath = path
 		return nil
 	}
+	writeErrorsHTML = func(path string, _ *exporter.Output) error {
+		errorsPath = path
+		return nil
+	}
+	buildOutput = func(accountID string, now, since time.Time, loc *time.Location, schedules []resources.Schedule, errs []resources.ErrorRecord, options exporter.BuildOutputOptions) exporter.Output {
+		return exporter.BuildOutput(accountID, now, since, loc, schedules, errs)
+	}
+	writeSlotIssuesCSV = func(path string, _ *exporter.Output) error {
+		csvPath = path
+		return nil
+	}
 	nowFunc = func() time.Time {
 		return fixedNow
 	}
@@ -248,5 +267,11 @@ func TestRunCommand_Success(t *testing.T) {
 	}
 	if htmlPath != filepath.Join(wantDir, "index.html") {
 		t.Fatalf("writeHTML path = %q", htmlPath)
+	}
+	if errorsPath != filepath.Join(wantDir, defaultErrorsHTMLFile) {
+		t.Fatalf("writeErrorsHTML path = %q", errorsPath)
+	}
+	if csvPath != filepath.Join(wantDir, defaultIssuesCSVFile) {
+		t.Fatalf("writeSlotIssuesCSV path = %q", csvPath)
 	}
 }

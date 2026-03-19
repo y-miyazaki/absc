@@ -1,0 +1,3 @@
+{
+  "observable_target_kinds": ["batch", "ecs", "glue", "lambda", "stepfunctions"]
+}

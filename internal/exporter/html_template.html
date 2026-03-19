@@ -25,21 +25,31 @@
     .controls input[type="range"] { width: 170px; vertical-align: middle; }
     select { padding: 6px 10px; border: 1px solid #c9d2d9; border-radius: 8px; background: var(--panel); }
     main { padding: 14px; flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
-    .legend { display: flex; gap: 12px; margin: 10px 0; font-size: 12px; color: var(--sub); flex-shrink: 0; }
+    .legend { display: flex; gap: 12px; margin: 10px 0 0; font-size: 12px; color: var(--sub); flex-shrink: 0; }
+    .diagnostics { margin: 6px 0 0; border: 1px solid #ead8b5; background: #fff8ea; border-radius: 10px; padding: 10px; font-size: 12px; color: #6b4f1f; }
+    .diagnostics h3 { margin: 0 0 8px; font-size: 13px; color: #654100; }
+    .diag-summary { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .diag-toggle { color: #654100; text-decoration: underline; cursor: pointer; border: none; background: transparent; font-size: 12px; padding: 0; }
+    .diag-panel { margin-top: 8px; }
+    .diag-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .diag-table th, .diag-table td { border-top: 1px solid #ead8b5; padding: 6px 8px; text-align: left; vertical-align: top; }
+    .diag-table th { color: #654100; }
+    .diag-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 11px; }
     .dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; margin-right: 5px; }
     .dot.sch { background: var(--scheduled); }
+    .dot.sch-outday { background: #94a3b8; }
     .dot.run-ok { background: var(--run-success); }
     .dot.run-fail { background: var(--run-fail); }
-    .timeline { border: 1px solid #d7e0e7; background: var(--panel); border-radius: 12px; overflow: auto; flex: 1; min-height: 0; padding-bottom: 16px; box-sizing: border-box; }
+    .timeline { position: relative; border: 1px solid #d7e0e7; background: var(--panel); border-radius: 12px; overflow: auto; flex: 1; min-height: 0; padding-bottom: 4px; box-sizing: border-box; }
     .row {
       display: grid;
       grid-template-columns: var(--name-col-width) repeat(144, 14px);
       border-bottom: 1px solid #eef2f5;
-      min-height: 22px;
+      min-height: 20px;
       width: max-content;
       min-width: max-content;
     }
-    .row.head { position: sticky; top: 0; background: #f3f8f8; z-index: 5; box-shadow: 0 1px 0 #dde3e7; }
+    .row.head { position: sticky; top: 0; background: #f3f8f8; z-index: 25; box-shadow: 0 1px 0 #dde3e7; }
     .name {
       padding: 4px 8px;
       font-size: 12px;
@@ -53,14 +63,20 @@
       z-index: 20;
     }
     .row.head .name {
+      top: 0;
+      left: 0;
+      background: #f3f8f8;
+      z-index: 40;
+    }
+    .row.head .cell {
+      position: sticky;
+      top: 0;
       background: #f3f8f8;
       z-index: 30;
     }
-    .row.head .cell {
-      background: #f3f8f8;
-    }
     .cell { border-right: 1px solid var(--grid); position: relative; }
     .cell.sch::after { content: ""; position: absolute; inset: 4px; background: var(--scheduled); border-radius: 3px; z-index: 4; }
+    .cell.sch-outday::after { content: ""; position: absolute; inset: 4px; background: #94a3b8; border-radius: 3px; z-index: 4; }
     .cell.run-ok::before { content: ""; position: absolute; inset: 1px 0; background: var(--run-success); opacity: .9; z-index: 2; }
     .cell.run-fail::before { content: ""; position: absolute; inset: 1px 0; background: var(--run-fail); opacity: .95; z-index: 2; }
     .row.disabled .name { color: #5f6b76; background: #e9eef2; }
@@ -87,12 +103,17 @@
 <main>
   <div class="legend">
     <span><span class="dot sch"></span>Scheduled slot</span>
+    <span><span class="dot sch-outday"></span>Scheduled slot (not expected on displayed day)</span>
     <span><span class="dot run-ok"></span>Actual run success (#16a34a)</span>
     <span><span class="dot run-fail"></span>Actual run failed (#f85149)</span>
     <span><span class="badge">disabled</span>Schedule disabled</span>
     <span><span class="badge warn">max</span>Runs list capped by max-results</span>
   </div>
   <div class="timeline" id="timeline"></div>
+  <div id="diagnostics" class="diagnostics" style="display:none"></div>
+  <div style="margin-top:0;font-size:12px;color:#5f6b76;display:flex;justify-content:flex-end">
+    <a id="errorsLink" href="errors.html" style="display:none;color:#b42318;text-decoration:underline">Errors</a>
+  </div>
 </main>
 <div id="tooltip" class="tooltip"></div>
 <script id="payload" type="application/json">@@PAYLOAD@@</script>
@@ -100,6 +121,7 @@
 const DATA = JSON.parse(document.getElementById('payload').textContent);
 const timeline = document.getElementById('timeline');
 const tooltip = document.getElementById('tooltip');
+const diagnostics = document.getElementById('diagnostics');
 const WINDOW_START_MS = Date.parse(DATA.window.start);
 const SLOT_MINUTES = Number(DATA.window.slot_minutes) || 10;
 document.getElementById('meta').textContent =
@@ -136,6 +158,17 @@ function setupNameWidthControl() {
 function setupDisabledToggle() {
   const toggle = document.getElementById('hideDisabled');
   toggle.onchange = render;
+}
+
+function setupErrorsLink() {
+  const link = document.getElementById('errorsLink');
+  const count = (DATA.errors || []).length;
+  if (count > 0) {
+    link.style.display = '';
+    link.textContent = 'Errors (' + count + ')';
+    return;
+  }
+  link.style.display = 'none';
 }
 
 function parseTs(ts) {
@@ -247,6 +280,99 @@ function render() {
     .filter(s => (!sVal || s.service === sVal) && (!rVal || s.region === rVal) && (!hideDisabled || s.enabled !== false))
     .sort(compareSchedules);
 
+  const slotIssueReasonLabel = {
+    NO_RUN_IN_WINDOW: 'no actual run in displayed window',
+    RUN_NOT_ALIGNED_TO_SLOT: 'actual runs exist but do not overlap this slot',
+    COLLECTED_RUNS_CAPPED: 'runs list capped by max-results; this slot cannot be fully validated'
+  };
+
+  const runInSlotCategoryLabel = {
+    observable: 'run tracking is available for this target',
+    not_observable_target: 'run tracking is not available for this target type (for example, EC2/RDS start or stop actions)',
+    not_scheduled_today: 'this schedule is not expected to run on the displayed day'
+  };
+
+  const alignmentBySchedule = new Map();
+  (DATA.alignment_issues || []).forEach(issue => {
+    const key = issue.schedule_id || '';
+    if (!key) return;
+    alignmentBySchedule.set(key, (alignmentBySchedule.get(key) || 0) + 1);
+  });
+
+  const diagnosticsRows = [];
+  rows.forEach(s => {
+    const slotIssues = s.slot_run_issues || [];
+    if (slotIssues.length === 0) return;
+
+    const exampleSlots = slotIssues.slice(0, 3).map(x => x.slot_label || slotLabel(x.slot_index || 0));
+    const extraCount = slotIssues.length - exampleSlots.length;
+    const reasonCounts = {};
+    slotIssues.forEach(x => {
+      const k = x.reason || 'UNKNOWN';
+      reasonCounts[k] = (reasonCounts[k] || 0) + 1;
+    });
+    const reason = Object.keys(reasonCounts)
+      .sort((a, b) => (reasonCounts[b] - reasonCounts[a]))
+      .map(k => (slotIssueReasonLabel[k] || k) + ': ' + reasonCounts[k])
+      .join('<br>');
+
+    diagnosticsRows.push({
+      scheduleName: s.schedule_name,
+      region: s.region,
+      missingCount: slotIssues.length,
+      totalScheduled: (s.slots || []).filter(v => v === 1).length,
+      examples: exampleSlots,
+      extraCount,
+      runsCapped: !!s.runs_capped,
+      alignmentCount: alignmentBySchedule.get(s.id) || 0,
+      reason
+    });
+  });
+
+  if (diagnosticsRows.length > 0) {
+    diagnostics.style.display = '';
+    const detailsID = 'diagDetails';
+    const issuesCount = diagnosticsRows.reduce((acc, d) => acc + d.missingCount, 0);
+    diagnostics.innerHTML =
+      '<div class="diag-summary">' +
+      '<h3 style="margin:0">Scheduled Slot Without Actual Run</h3>' +
+      '<span>' + diagnosticsRows.length + ' schedules / ' + issuesCount + ' slots</span>' +
+      '<button id="diagToggle" class="diag-toggle" type="button">Show details</button>' +
+      '<a href="slot_run_issues.csv" target="_blank" rel="noopener noreferrer" class="diag-toggle">Open CSV</a>' +
+      '</div>' +
+      '<div id="' + detailsID + '" class="diag-panel" style="display:none">' +
+      '<table class="diag-table">' +
+      '<tr>' +
+      '<th>Schedule</th>' +
+      '<th>Missing</th>' +
+      '<th>Example Slots</th>' +
+      '<th>Hint</th>' +
+      '</tr>' +
+      diagnosticsRows.map(d =>
+        '<tr>' +
+        '<td>' + d.scheduleName + '<br><span class="diag-mono">' + d.region + '</span></td>' +
+        '<td>' + d.missingCount + '/' + d.totalScheduled + (d.alignmentCount > 0 ? '<br><span class="diag-mono">alignment issues: ' + d.alignmentCount + '</span>' : '') + '</td>' +
+        '<td>' + d.examples.join('<br>') + (d.extraCount > 0 ? '<br><span class="diag-mono">... +' + d.extraCount + ' slots</span>' : '') + '</td>' +
+        '<td>' + (d.runsCapped ? '<span class="badge warn">max</span> ' : '') + d.reason + '</td>' +
+        '</tr>'
+      ).join('') +
+      '</table>' +
+      '</div>';
+
+    const toggle = document.getElementById('diagToggle');
+    const panel = document.getElementById(detailsID);
+    if (toggle && panel) {
+      toggle.onclick = () => {
+        const hidden = panel.style.display === 'none';
+        panel.style.display = hidden ? '' : 'none';
+        toggle.textContent = hidden ? 'Hide details' : 'Show details';
+      };
+    }
+  } else {
+    diagnostics.style.display = 'none';
+    diagnostics.innerHTML = '';
+  }
+
   const head = document.createElement('div');
   head.className = 'row head';
   const first = document.createElement('div');
@@ -264,6 +390,11 @@ function render() {
   timeline.appendChild(head);
 
   rows.forEach(s => {
+        const slotIssueByIndex = new Map();
+        (s.slot_run_issues || []).forEach(issue => {
+          if (Number.isInteger(issue.slot_index)) slotIssueByIndex.set(issue.slot_index, issue);
+        });
+
     const row = document.createElement('div');
     row.className = 'row';
     if (s.enabled === false) row.className += ' disabled';
@@ -305,12 +436,16 @@ function render() {
     for(let i=0;i<144;i++) {
       const cell = document.createElement('div');
       let cls = 'cell';
-      if((s.slots || [])[i] === 1) cls += ' sch';
+      if((s.slots || [])[i] === 1) {
+        cls += (s.run_in_slot_category === 'not_scheduled_today') ? ' sch-outday' : ' sch';
+      }
       const runSlot = runSlots.get(i);
       if(runSlot) cls += ' ' + runSlot.className;
       cell.className = cls;
       cell.onmousemove = (e) => {
         const bounds = slotBounds(i);
+        const scheduled = ((s.slots || [])[i] === 1);
+        const slotIssue = slotIssueByIndex.get(i);
         const slotRuns = (s.runs || []).filter(r => runOverlapsSlot(r, bounds));
         const shownRuns = slotRuns.slice(0, 20);
         const statusColor = st => runClass(st) === 'run-fail' ? '#f85149' : '#16a34a';
@@ -336,6 +471,18 @@ function render() {
             ).join('') +
             '</table>'
           : '<div style="margin-top:6px;color:#aaa;font-size:11px">no runs in this slot</div>';
+        const missingSlotWarning = (scheduled && slotRuns.length === 0)
+          ? '<div style="margin-top:6px;padding:6px;border-radius:6px;background:#3a2a0a;color:#ffd28a;font-size:11px">' +
+            (
+              (s.run_in_slot_category === 'not_observable_target')
+                ? runInSlotCategoryLabel.not_observable_target
+                : (s.run_in_slot_category === 'not_scheduled_today')
+                  ? runInSlotCategoryLabel.not_scheduled_today
+                  : (slotIssueReasonLabel[(slotIssue && slotIssue.reason) || ''] || 'scheduled slot has no actual run in this window')
+            ) +
+            (s.runs_capped ? ' (runs list capped by max-results)' : '') +
+            '</div>'
+          : '';
         const currentSlotLabel = bounds ? slotLabel(i) : '-';
         tooltip.innerHTML =
           '<b>' + s.schedule_name + '</b><br/>' +
@@ -346,9 +493,11 @@ function render() {
           'expression: ' + s.schedule_expression + '<br/>' +
           'expression timezone: ' + (s.schedule_expression_timezone_label || s.schedule_expression_timezone || 'UTC') + '<br/>' +
           'display timezone: ' + (DATA.timezone || '-') + '<br/>' +
+          'run in slot: ' + (runInSlotCategoryLabel[s.run_in_slot_category] || runInSlotCategoryLabel.observable) + '<br/>' +
           'next: ' + (s.next_invocation_label || s.next_invocation_at || '-') + '<br/>' +
           'slot: ' + currentSlotLabel + '<br/>' +
           'runs in slot (shown): ' + shownRuns.length + '/' + slotRuns.length + (s.runs_capped ? ' (source list capped by max-results)' : '') +
+          missingSlotWarning +
           runsHtml;
         tooltip.style.display = 'block';
         const ttW = tooltip.offsetWidth, ttH = tooltip.offsetHeight;
@@ -399,10 +548,11 @@ function makeIcon(key) {
 buildFilters();
 setupNameWidthControl();
 setupDisabledToggle();
+setupErrorsLink();
 render();
 </script>
 <!-- Copyright footer -->
-<footer style="margin-top: 20px; text-align: center; font-size: 12px; color: var(--sub); padding: 12px;">
+<footer style="margin-top: 0px; text-align: center; font-size: 12px; color: var(--sub); padding: 12px;">
   ABSC designed and created by Yoshiaki Miyazaki.<br>
   &copy; 2025 <a href="https://github.com/y-miyazaki/absc/blob/main/LICENSE" target="_blank"
     rel="noopener noreferrer">Apache License 2.0</a>.

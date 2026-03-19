@@ -14,6 +14,7 @@ const (
 	buildSlotsDayMinutes = buildSlotsDayHours * 60
 	cronHourLimit        = 23
 	cronMinuteLimit      = 59
+	cronRangeSeparator   = "-"
 	maxInt32Value        = 1<<31 - 1
 	parseCronSplitParts  = 2
 	rateDayDefaultSlot   = 0
@@ -112,18 +113,72 @@ func parseCronField(field string, minValue, maxValue int) []int {
 		if p == "" {
 			continue
 		}
-		if strings.HasPrefix(p, "*/") {
-			n, err := strconv.Atoi(strings.TrimPrefix(p, "*/"))
-			if err != nil || n <= 0 {
+		if strings.Contains(p, "/") {
+			stepParts := strings.SplitN(p, "/", parseCronSplitParts)
+			if len(stepParts) != parseCronSplitParts {
 				continue
 			}
-			for i := minValue; i <= maxValue; i += n {
-				result[i] = struct{}{}
+			step, err := strconv.Atoi(strings.TrimSpace(stepParts[1]))
+			if err != nil || step <= 0 {
+				continue
+			}
+
+			start := minValue
+			end := maxValue
+			base := strings.TrimSpace(stepParts[0])
+			if base != "*" && base != "?" {
+				if strings.Contains(base, cronRangeSeparator) {
+					sp := strings.SplitN(base, cronRangeSeparator, parseCronSplitParts)
+					if len(sp) != parseCronSplitParts {
+						continue
+					}
+					start, err = strconv.Atoi(strings.TrimSpace(sp[0]))
+					if err != nil {
+						continue
+					}
+					end, err = strconv.Atoi(strings.TrimSpace(sp[1]))
+					if err != nil {
+						continue
+					}
+				} else {
+					start, err = strconv.Atoi(base)
+					if err != nil {
+						continue
+					}
+				}
+			}
+
+			if start < minValue {
+				start = minValue
+			}
+			if end > maxValue {
+				end = maxValue
+			}
+			if start > maxValue || end < minValue {
+				continue
+			}
+
+			if start <= end {
+				for i := start; i <= end; i += step {
+					result[i] = struct{}{}
+				}
+				continue
+			}
+
+			cycleLength := (maxValue - start + 1) + (end - minValue + 1)
+			for offset := 0; offset < cycleLength; offset += step {
+				candidate := start + offset
+				if candidate > maxValue {
+					candidate = minValue + (candidate - maxValue - 1)
+				}
+				if candidate >= minValue && candidate <= maxValue {
+					result[candidate] = struct{}{}
+				}
 			}
 			continue
 		}
-		if strings.Contains(p, "-") {
-			sp := strings.SplitN(p, "-", parseCronSplitParts)
+		if strings.Contains(p, cronRangeSeparator) {
+			sp := strings.SplitN(p, cronRangeSeparator, parseCronSplitParts)
 			start, e1 := strconv.Atoi(sp[0])
 			end, e2 := strconv.Atoi(sp[1])
 			if e1 != nil || e2 != nil {
@@ -134,6 +189,15 @@ func parseCronField(field string, minValue, maxValue int) []int {
 			}
 			if end > maxValue {
 				end = maxValue
+			}
+			if start > end {
+				for i := start; i <= maxValue; i++ {
+					result[i] = struct{}{}
+				}
+				for i := minValue; i <= end; i++ {
+					result[i] = struct{}{}
+				}
+				continue
 			}
 			for i := start; i <= end; i++ {
 				result[i] = struct{}{}

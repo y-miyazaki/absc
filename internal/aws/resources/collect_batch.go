@@ -13,7 +13,7 @@ import (
 // collectBatchRuns queries Batch job history by queue and optional job name.
 // Batch results are paginated per job status, so this collector walks each state.
 // The function stops early once maxResults is satisfied.
-func collectBatchRuns(ctx context.Context, svc *batch.Client, targetARN, jobName string, since time.Time, maxResults int) ([]Run, error) {
+func collectBatchRuns(ctx context.Context, svc *batch.Client, targetARN, jobName string, since, until time.Time, maxResults int) ([]Run, error) {
 	// Resolve the queue name from either full ARN or plain queue identifier.
 	queueName := resourceNameFromARN(targetARN)
 	if queueName == "" {
@@ -46,6 +46,9 @@ func collectBatchRuns(ctx context.Context, svc *batch.Client, targetARN, jobName
 					start = fromMillisPtr(j.CreatedAt)
 				}
 				if start.IsZero() || start.Before(since) {
+					continue
+				}
+				if !until.IsZero() && start.After(until) {
 					continue
 				}
 				run := Run{RunID: aws.ToString(j.JobId), Status: string(j.Status), StartAt: formatRFC3339UTC(start), SourceService: "batch"}

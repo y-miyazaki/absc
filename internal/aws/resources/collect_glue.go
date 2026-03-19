@@ -11,7 +11,7 @@ import (
 )
 
 // collectGlueRuns returns Glue job run history for the given job name or ARN.
-func collectGlueRuns(ctx context.Context, svc *glue.Client, jobNameOrARN string, since time.Time, maxResults int) ([]Run, error) {
+func collectGlueRuns(ctx context.Context, svc *glue.Client, jobNameOrARN string, since, until time.Time, maxResults int) ([]Run, error) {
 	// Normalize ARN inputs so the Glue API always receives a job name.
 	jobName := jobNameOrARN
 	if strings.Contains(jobNameOrARN, ":") {
@@ -48,6 +48,9 @@ func collectGlueRuns(ctx context.Context, svc *glue.Client, jobNameOrARN string,
 				continue
 			}
 			if r.StartedOn.Before(since) {
+				continue
+			}
+			if !until.IsZero() && r.StartedOn.After(until) {
 				continue
 			}
 			run := Run{

@@ -47,7 +47,7 @@ type lambdaPlatformReportRecord struct {
 }
 
 // collectLambdaRuns extracts recent Lambda invocations from CloudWatch Logs REPORT lines.
-func collectLambdaRuns(ctx context.Context, svc *cloudwatchlogs.Client, functionTarget string, since time.Time, maxResults int) ([]Run, error) {
+func collectLambdaRuns(ctx context.Context, svc *cloudwatchlogs.Client, functionTarget string, since, until time.Time, maxResults int) ([]Run, error) {
 	// Resolve the effective function name from either ARN or plain name inputs.
 	functionName := lambdaFunctionName(functionTarget)
 	if functionName == "" {
@@ -57,7 +57,7 @@ func collectLambdaRuns(ctx context.Context, svc *cloudwatchlogs.Client, function
 	runs := make([]Run, 0, maxResults)
 	seen := make(map[string]struct{}, maxResults)
 	for _, filterPattern := range []string{lambdaFilterPatternReportLine, lambdaFilterPatternPlatformReport} {
-		matchedRuns, err := collectLambdaRunsWithPattern(ctx, svc, functionName, since, maxResults, filterPattern)
+		matchedRuns, err := collectLambdaRunsWithPattern(ctx, svc, functionName, since, until, maxResults, filterPattern)
 		if err != nil {
 			return nil, fmt.Errorf("collect lambda runs with filter %s for %s: %w", filterPattern, functionName, err)
 		}
@@ -81,12 +81,15 @@ func collectLambdaRuns(ctx context.Context, svc *cloudwatchlogs.Client, function
 	return runs, nil
 }
 
-func collectLambdaRunsWithPattern(ctx context.Context, svc *cloudwatchlogs.Client, functionName string, since time.Time, maxResults int, filterPattern string) ([]Run, error) {
+func collectLambdaRunsWithPattern(ctx context.Context, svc *cloudwatchlogs.Client, functionName string, since, until time.Time, maxResults int, filterPattern string) ([]Run, error) {
 	logGroupName := "/aws/lambda/" + functionName
 	input := &cloudwatchlogs.FilterLogEventsInput{
 		LogGroupName:  aws.String(logGroupName),
 		StartTime:     aws.Int64(since.UnixMilli()),
 		FilterPattern: aws.String(filterPattern),
+	}
+	if !until.IsZero() {
+		input.EndTime = aws.Int64(until.UnixMilli())
 	}
 
 	p := cloudwatchlogs.NewFilterLogEventsPaginator(svc, input)

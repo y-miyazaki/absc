@@ -16,7 +16,7 @@ const stepFunctionMaxAttempts = 5
 const stepFunctionLastRetryAttempt = stepFunctionMaxAttempts - 1
 
 // collectStepFunctionRuns lists recent executions and retries transient throttling.
-func collectStepFunctionRuns(ctx context.Context, svc *sfn.Client, stateMachineARN string, since time.Time, maxResults int) ([]Run, error) {
+func collectStepFunctionRuns(ctx context.Context, svc *sfn.Client, stateMachineARN string, since, until time.Time, maxResults int) ([]Run, error) {
 	input := &sfn.ListExecutionsInput{StateMachineArn: aws.String(stateMachineARN), MaxResults: safeInt32(maxResults)}
 	p := sfn.NewListExecutionsPaginator(svc, input)
 	runs := make([]Run, 0)
@@ -49,6 +49,9 @@ func collectStepFunctionRuns(ctx context.Context, svc *sfn.Client, stateMachineA
 			ex := page.Executions[executionIndex]
 			start := aws.ToTime(ex.StartDate)
 			if start.Before(since) {
+				continue
+			}
+			if !until.IsZero() && start.After(until) {
 				continue
 			}
 			run := Run{RunID: aws.ToString(ex.Name), Status: string(ex.Status), StartAt: formatRFC3339UTC(start), SourceService: "stepfunctions"}

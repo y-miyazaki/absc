@@ -280,6 +280,10 @@ func matchCronField(field string, value, minValue, maxValue int, aliases map[str
 	return false
 }
 
+// matchCronPart evaluates if a single cron expression part matches a value.
+// Note: Similar logic exists in exporter/cron.go as matchAWSFieldPart().
+// These functions should be consolidated in a future refactoring to reduce duplication.
+// Currently kept separate to avoid circular package dependencies (exporter depends on resources).
 func matchCronPart(part string, value, minValue, maxValue int, aliases map[string]int) bool {
 	if strings.Contains(part, "/") {
 		sp := strings.SplitN(part, "/", cronRangeSplitParts)
@@ -315,10 +319,20 @@ func matchCronPart(part string, value, minValue, maxValue int, aliases map[strin
 			}
 		}
 
-		if value < start || value > end {
-			return false
+		if start <= end {
+			if value < start || value > end {
+				return false
+			}
+			return (value-start)%step == 0
 		}
-		return (value-start)%step == 0
+
+		if value >= start {
+			return (value-start)%step == 0
+		}
+		if value <= end {
+			return ((maxValue-start+1)+(value-minValue))%step == 0
+		}
+		return false
 	}
 
 	if strings.Contains(part, cronDashSeparator) {
@@ -330,6 +344,9 @@ func matchCronPart(part string, value, minValue, maxValue int, aliases map[strin
 		end, okEnd := parseCronAtom(r[1], aliases)
 		if !okStart || !okEnd {
 			return false
+		}
+		if start > end {
+			return value >= start || value <= end
 		}
 		return value >= start && value <= end
 	}

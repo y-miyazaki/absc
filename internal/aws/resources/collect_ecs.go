@@ -15,8 +15,8 @@ const ecsDescribeTasksBatchSize = 100
 
 // collectECSRuns returns ECS executions for the given cluster and target hints.
 // It prefers ECS task details and backfills older windows from CloudTrail RunTask events.
-func collectECSRuns(ctx context.Context, ecsSvc *ecs.Client, ctSvc *cloudtrail.Client, clusterARN string, hints runTargetHints, since time.Time, maxResults int, caches *runCollectorCaches) ([]Run, error) {
-	ecsRuns, ecsErr := collectECSRunsFromAPI(ctx, ecsSvc, clusterARN, hints.ecsTaskDefinitionARN, hints.ecsStartedBy, since, maxResults)
+func collectECSRuns(ctx context.Context, ecsSvc *ecs.Client, ctSvc *cloudtrail.Client, clusterARN string, hints runTargetHints, since, until time.Time, maxResults int, caches *runCollectorCaches) ([]Run, error) {
+	ecsRuns, ecsErr := collectECSRunsFromAPI(ctx, ecsSvc, clusterARN, hints.ecsTaskDefinitionARN, hints.ecsStartedBy, since, until, maxResults)
 	if !ecsCloudTrailRequired(since, time.Now().UTC()) {
 		if ecsErr != nil {
 			return nil, fmt.Errorf("collect ecs runs from api: %w", ecsErr)
@@ -47,7 +47,7 @@ func collectECSRuns(ctx context.Context, ecsSvc *ecs.Client, ctSvc *cloudtrail.C
 // collectECSRunsFromAPI returns stopped and running ECS tasks for the given cluster ARN.
 // Optional task definition and startedBy filters avoid mixing unrelated tasks.
 // The ECS API retains stopped task data for approximately 1 hour.
-func collectECSRunsFromAPI(ctx context.Context, svc *ecs.Client, clusterARN, taskDefinitionARN, startedBy string, since time.Time, maxResults int) ([]Run, error) {
+func collectECSRunsFromAPI(ctx context.Context, svc *ecs.Client, clusterARN, taskDefinitionARN, startedBy string, since, until time.Time, maxResults int) ([]Run, error) {
 	// Query both running and stopped tasks because recent executions may still be active.
 	var taskARNs []string
 
@@ -105,6 +105,9 @@ func collectECSRunsFromAPI(ctx context.Context, svc *ecs.Client, clusterARN, tas
 				continue
 			}
 			if t.StartedAt.Before(since) {
+				continue
+			}
+			if !until.IsZero() && t.StartedAt.After(until) {
 				continue
 			}
 			run := Run{

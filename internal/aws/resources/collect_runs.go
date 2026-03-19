@@ -129,7 +129,7 @@ func collectBatchRunsForTarget(ctx context.Context, targetARN, jobName string, h
 	_ = hints
 	cacheKey := targetARN + cacheKeySeparator + jobName
 	runs, err := getCachedRuns(caches.batchRunsCache, caches.batchErrCache, cacheKey, func() ([]Run, error) {
-		return collectBatchRuns(ctx, deps.batchSvc, targetARN, jobName, opts.Since, opts.MaxResults)
+		return collectBatchRuns(ctx, deps.batchSvc, targetARN, jobName, opts.Since, opts.Until, opts.MaxResults)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("collect batch runs for target %s: %w", targetARN, err)
@@ -141,7 +141,7 @@ func collectECSRunsForTarget(ctx context.Context, targetARN, jobName string, hin
 	_ = jobName
 	cacheKey := targetARN + cacheKeySeparator + hints.ecsTaskDefinitionARN + cacheKeySeparator + hints.ecsStartedBy + cacheKeySeparator + hints.ecsRoleARN
 	runs, err := getCachedRuns(caches.ecsRunsCache, caches.ecsErrCache, cacheKey, func() ([]Run, error) {
-		return collectECSRuns(ctx, deps.ecsSvc, deps.ctSvc, targetARN, hints, opts.Since, opts.MaxResults, caches)
+		return collectECSRuns(ctx, deps.ecsSvc, deps.ctSvc, targetARN, hints, opts.Since, opts.Until, opts.MaxResults, caches)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("collect ecs runs for target %s: %w", targetARN, err)
@@ -153,7 +153,7 @@ func collectGlueRunsForTarget(ctx context.Context, targetARN, jobName string, hi
 	_ = jobName
 	_ = hints
 	runs, err := getCachedRuns(caches.glueRunsCache, caches.glueErrCache, targetARN, func() ([]Run, error) {
-		return collectGlueRuns(ctx, deps.glueSvc, targetARN, opts.Since, opts.MaxResults)
+		return collectGlueRuns(ctx, deps.glueSvc, targetARN, opts.Since, opts.Until, opts.MaxResults)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("collect glue runs for target %s: %w", targetARN, err)
@@ -165,7 +165,7 @@ func collectLambdaRunsForTarget(ctx context.Context, targetARN, jobName string, 
 	_ = jobName
 	_ = hints
 	runs, err := getCachedRuns(caches.lambdaRunsCache, caches.lambdaErrCache, targetARN, func() ([]Run, error) {
-		return collectLambdaRuns(ctx, deps.cwlSvc, targetARN, opts.Since, opts.MaxResults)
+		return collectLambdaRuns(ctx, deps.cwlSvc, targetARN, opts.Since, opts.Until, opts.MaxResults)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("collect lambda runs for target %s: %w", targetARN, err)
@@ -177,7 +177,7 @@ func collectStepFunctionRunsForTarget(ctx context.Context, targetARN, jobName st
 	_ = jobName
 	_ = hints
 	runs, err := getCachedRuns(caches.stepRunsCache, caches.stepErrCache, targetARN, func() ([]Run, error) {
-		return collectStepFunctionRuns(ctx, deps.stepSvc, targetARN, opts.Since, opts.MaxResults)
+		return collectStepFunctionRuns(ctx, deps.stepSvc, targetARN, opts.Since, opts.Until, opts.MaxResults)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("collect step function runs for target %s: %w", targetARN, err)
