@@ -48,12 +48,12 @@ ABSC generates an interactive HTML viewer that allows you to browse collected sc
 ### Using Go Install
 
 ```bash
-go install github.com/y-miyazaki/absc/cmd/absc@v1.0.2
+go install github.com/y-miyazaki/absc/cmd/absc@v1.0.3
 ```
 
 ### Using Release tar.gz
 
-You can download a prebuilt release tarball from the Releases page and install it quickly. The examples below use the `v1.0.2` release.
+You can download a prebuilt release tarball from the Releases page and install it quickly. The examples below use the `v1.0.3` release.
 
 Available platforms:
 
@@ -64,20 +64,20 @@ Available platforms:
 Linux (AMD64) example:
 
 ```bash
-VERSION=v1.0.2 && curl -L https://github.com/y-miyazaki/absc/releases/download/${VERSION}/absc-linux-amd64.tar.gz | tar -xzf - && sudo mv absc /usr/local/bin/ && sudo chmod +x /usr/local/bin/absc
+VERSION=v1.0.3 && curl -L https://github.com/y-miyazaki/absc/releases/download/${VERSION}/absc-linux-amd64.tar.gz | tar -xzf - && sudo mv absc /usr/local/bin/ && sudo chmod +x /usr/local/bin/absc
 ```
 
 macOS (ARM64) example:
 
 ```bash
-VERSION=v1.0.2 && curl -L https://github.com/y-miyazaki/absc/releases/download/${VERSION}/absc-darwin-arm64.tar.gz | tar -xzf - && sudo mv absc /usr/local/bin/ && sudo chmod +x /usr/local/bin/absc
+VERSION=v1.0.3 && curl -L https://github.com/y-miyazaki/absc/releases/download/${VERSION}/absc-darwin-arm64.tar.gz | tar -xzf - && sudo mv absc /usr/local/bin/ && sudo chmod +x /usr/local/bin/absc
 ```
 
 Notes:
 
 - The release typically ships an `absc-${VERSION}-checksums.txt` file. Verify the checksum before installing in production.
 - For Windows, download the `.zip` asset from the Releases page and extract the `absc.exe` binary.
-- `go install` is convenient for development. Release tarballs are preferable when you want a pinned binary such as `v1.0.2`.
+- `go install` is convenient for development. Release tarballs are preferable when you want a pinned binary such as `v1.0.3`.
 
 ### Build from Source
 
@@ -259,14 +259,55 @@ The HTML file can be opened directly in a browser because the payload is embedde
 
 ABSC requires read-only access for the schedule sources and the target services whose execution history you want to inspect.
 
-At minimum, the tool needs access equivalent to:
+For schedule definitions only, use a minimal policy like this:
 
-- `sts:GetCallerIdentity`
-- EventBridge schedule/rule read permissions
-- EventBridge Scheduler read permissions
-- Read permissions for Step Functions, Batch, ECS, Glue, and CloudWatch Logs when run enrichment is needed
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "sts:GetCallerIdentity",
+        "events:ListRules",
+        "events:ListTargetsByRule",
+        "scheduler:ListSchedules",
+        "scheduler:GetSchedule"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
 
-Exact IAM actions depend on which target services are present in your environment.
+If you also need run enrichment, add the following actions based on target type:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "states:ListExecutions",
+        "batch:ListJobs",
+        "ecs:ListTasks",
+        "ecs:DescribeTasks",
+        "cloudtrail:LookupEvents",
+        "glue:GetJobRuns",
+        "logs:FilterLogEvents"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+Notes:
+
+- `cloudtrail:LookupEvents` is only needed for ECS backfill when stopped-task history is outside ECS API retention.
+- If you do not use run enrichment, the second policy block is not required.
+- You can scope resources more tightly per service where IAM supports resource-level restrictions.
 
 ## Examples
 
@@ -317,7 +358,7 @@ jobs:
           aws-region: ap-northeast-1
 
       - name: Install absc
-        run: go install github.com/y-miyazaki/absc/cmd/absc@v1.0.2
+        run: go install github.com/y-miyazaki/absc/cmd/absc@v1.0.3
 
       - name: Collect schedules
         run: absc --timezone Asia/Tokyo
