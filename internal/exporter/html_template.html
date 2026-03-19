@@ -50,25 +50,25 @@
       position: sticky;
       left: 0;
       background: var(--panel);
-      z-index: 2;
+      z-index: 20;
     }
     .row.head .name {
       background: #f3f8f8;
-      z-index: 6;
+      z-index: 30;
     }
     .row.head .cell {
       background: #f3f8f8;
     }
     .cell { border-right: 1px solid var(--grid); position: relative; }
-    .cell.sch::after { content: ""; position: absolute; inset: 4px; background: var(--scheduled); border-radius: 3px; }
-    .cell.run-ok::before { content: ""; position: absolute; inset: 1px 0; background: var(--run-success); opacity: .9; }
-    .cell.run-fail::before { content: ""; position: absolute; inset: 1px 0; background: var(--run-fail); opacity: .95; }
+    .cell.sch::after { content: ""; position: absolute; inset: 4px; background: var(--scheduled); border-radius: 3px; z-index: 4; }
+    .cell.run-ok::before { content: ""; position: absolute; inset: 1px 0; background: var(--run-success); opacity: .9; z-index: 2; }
+    .cell.run-fail::before { content: ""; position: absolute; inset: 1px 0; background: var(--run-fail); opacity: .95; z-index: 2; }
     .row.disabled .name { color: #5f6b76; background: #e9eef2; }
     .row.disabled .cell { background: #e9eef2; opacity: .65; }
     .badge { display: inline-block; margin-left: 6px; padding: 1px 6px; font-size: 10px; border-radius: 999px; background: #eef2f5; color: #60717f; vertical-align: middle; }
     .badge.warn { background: #fff4e5; color: #9a5d1d; }
     .hour { font-size: 10px; color: var(--sub); text-align: center; }
-    .tooltip { position: fixed; background: #1f2d34; color: #fff; padding: 8px; border-radius: 8px; font-size: 12px; pointer-events: none; transform: translate(8px, 8px); display: none; max-width: 360px; }
+    .tooltip { position: fixed; background: #1f2d34; color: #fff; padding: 8px; border-radius: 8px; font-size: 12px; pointer-events: none; transform: translate(8px, 8px); display: none; max-width: 360px; z-index: 9999; }
     .svc-icon { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; vertical-align: middle; flex-shrink: 0; margin-right: 2px; }
     .svc-icon img { width: 18px; height: 18px; display: block; }
   </style>
@@ -160,11 +160,8 @@ function runOverlapsSlot(run, bounds) {
   return start < bounds.end && end >= bounds.start;
 }
 
-function fmtHHMM(dateObj) {
-  if (!(dateObj instanceof Date)) return '-';
-  const hh = String(dateObj.getHours()).padStart(2, '0');
-  const mm = String(dateObj.getMinutes()).padStart(2, '0');
-  return hh + ':' + mm;
+function slotLabel(slotIndex) {
+  return (DATA.window.slot_labels || [])[slotIndex] || '-';
 }
 
 function slotFor(ts){
@@ -201,10 +198,14 @@ function runSeverity(status) {
   const s = String(status || '').toUpperCase();
   if (!s) return 2;
   if (s === 'SUCCEEDED' || s === 'COMPLETED' || s === 'STOPPED' || s === 'SUCCESS') return 1;
+  if (s === 'STARTED' || s === 'RUN_TASK' || s === 'RUNNING' || s === 'PENDING' || s === 'PROVISIONING') return 1;
   return 2;
 }
 
 function displayRunStatus(status) {
+  const s = String(status || '').toUpperCase();
+  if (s === 'STARTED' || s === 'RUN_TASK') return 'STARTED';
+  if (s === 'RUNNING' || s === 'PENDING' || s === 'PROVISIONING') return 'IN_PROGRESS';
   return runSeverity(status) === 1 ? 'COMPLETED' : 'FAILED';
 }
 
@@ -255,7 +256,7 @@ function render() {
   for(let i=0;i<144;i++) {
     const c = document.createElement('div');
     c.className = 'cell hour';
-    c.textContent = i%6===0 ? String(i/6).padStart(2,'0') : '';
+    c.textContent = i%6===0 ? ((DATA.window.hour_labels || [])[Math.floor(i / 6)] || '') : '';
     head.appendChild(c);
   }
 
@@ -319,10 +320,6 @@ function render() {
           const m = Math.floor(sec / 60), s2 = sec % 60;
           return m + 'm' + (s2 > 0 ? s2 + 's' : '');
         };
-        const fmtTs = ts => {
-          if (!ts) return '-';
-          return ts.replace('T', ' ').replace(/(Z|[+-]\d{2}:\d{2})$/, '');
-        };
         const runsHtml = shownRuns.length > 0
           ? '<table style="width:100%;margin-top:6px;border-collapse:collapse;font-size:11px">' +
             '<tr style="border-bottom:1px solid #444"><th style="text-align:left;padding:2px 4px">Status</th>' +
@@ -332,14 +329,14 @@ function render() {
             shownRuns.map(r =>
               '<tr>' +
               '<td style="color:' + statusColor(r.status) + ';padding:2px 4px">' + displayRunStatus(r.status) + '</td>' +
-              '<td style="padding:2px 4px">' + fmtTs(r.start_at) + '</td>' +
-              '<td style="padding:2px 4px">' + fmtTs(r.end_at) + '</td>' +
+              '<td style="padding:2px 4px">' + (r.start_label || r.start_at || '-') + '</td>' +
+              '<td style="padding:2px 4px">' + (r.end_label || r.end_at || '-') + '</td>' +
               '<td style="text-align:right;padding:2px 4px">' + fmtDur(r.duration_sec) + '</td>' +
               '</tr>'
             ).join('') +
             '</table>'
           : '<div style="margin-top:6px;color:#aaa;font-size:11px">no runs in this slot</div>';
-        const slotLabel = bounds ? (fmtHHMM(bounds.start) + ' - ' + fmtHHMM(bounds.end)) : '-';
+        const currentSlotLabel = bounds ? slotLabel(i) : '-';
         tooltip.innerHTML =
           '<b>' + s.schedule_name + '</b><br/>' +
           'state: ' + (s.enabled === false ? 'DISABLED' : 'ENABLED') + '<br/>' +
@@ -347,8 +344,10 @@ function render() {
           'target type: ' + targetTypeLabel(s) + '<br/>' +
           'target: ' + (s.target_name || s.target_arn) + '<br/>' +
           'expression: ' + s.schedule_expression + '<br/>' +
-          'next: ' + (s.next_invocation_at || '-') + '<br/>' +
-          'slot: ' + slotLabel + '<br/>' +
+          'expression timezone: ' + (s.schedule_expression_timezone_label || s.schedule_expression_timezone || 'UTC') + '<br/>' +
+          'display timezone: ' + (DATA.timezone || '-') + '<br/>' +
+          'next: ' + (s.next_invocation_label || s.next_invocation_at || '-') + '<br/>' +
+          'slot: ' + currentSlotLabel + '<br/>' +
           'runs in slot (shown): ' + shownRuns.length + '/' + slotRuns.length + (s.runs_capped ? ' (source list capped by max-results)' : '') +
           runsHtml;
         tooltip.style.display = 'block';

@@ -29,6 +29,7 @@ const (
 	defaultMaxConcurrency = 5
 	defaultMaxResults     = 144
 	defaultOutputDir      = "./output"
+	defaultOutputSubDir   = "schedules"
 	defaultRegion         = "ap-northeast-1"
 	// defaultTimeout bounds the full CLI execution to avoid hanging runs.
 	defaultTimeout         = 10 * time.Minute
@@ -104,6 +105,13 @@ func commandContext(c *cli.Context) context.Context {
 		return c.Context
 	}
 	return context.Background()
+}
+
+// timelineWindowStart returns the calendar-day start used by the timeline output.
+func timelineWindowStart(now time.Time, lookbackHours int, loc *time.Location) time.Time {
+	since := now.Add(-time.Duration(lookbackHours) * time.Hour)
+	sinceInLoc := since.In(loc)
+	return time.Date(sinceInLoc.Year(), sinceInLoc.Month(), sinceInLoc.Day(), 0, 0, 0, 0, loc)
 }
 
 // accountIDFromARN extracts the AWS account ID from a caller identity ARN.
@@ -199,7 +207,7 @@ func runCommand(c *cli.Context, l interface {
 
 	// Collect schedules first, then persist both JSON and HTML outputs.
 	now := nowFunc().In(loc)
-	since := now.Add(-time.Duration(c.Int(lookbackHoursFlagName)) * time.Hour)
+	since := timelineWindowStart(now, c.Int(lookbackHoursFlagName), loc)
 	schedules, errs := collectSchedules(ctx, &cfg, resources.CollectOptions{
 		MaxConcurrency: c.Int(maxConcurrencyFlagName),
 		MaxResults:     c.Int(maxResultsFlagName),
@@ -208,7 +216,7 @@ func runCommand(c *cli.Context, l interface {
 	})
 
 	result := exporter.BuildOutput(accountID, now, since, loc, schedules, errs)
-	outDir := filepath.Join(c.String(outputDirFlagName), accountID, "cron")
+	outDir := filepath.Join(c.String(outputDirFlagName), accountID, defaultOutputSubDir)
 	if mkErr := mkdirAll(outDir, outputDirPermission); mkErr != nil {
 		return fmt.Errorf("failed to create output directory: %w", mkErr)
 	}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/batch"
+	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
@@ -18,6 +19,7 @@ import (
 
 type EventBridgeCollector struct {
 	batchSvc *batch.Client
+	ctSvc    *cloudtrail.Client
 	cwlSvc   *cloudwatchlogs.Client
 	ecsSvc   *ecs.Client
 	glueSvc  *glue.Client
@@ -33,6 +35,7 @@ func NewEventBridgeCollector(cfg *aws.Config, region string) (*EventBridgeCollec
 		svc:      eventbridge.NewFromConfig(*cfg, func(o *eventbridge.Options) { o.Region = region }),
 		stepSvc:  sfn.NewFromConfig(*cfg, func(o *sfn.Options) { o.Region = region }),
 		batchSvc: batch.NewFromConfig(*cfg, func(o *batch.Options) { o.Region = region }),
+		ctSvc:    cloudtrail.NewFromConfig(*cfg, func(o *cloudtrail.Options) { o.Region = region }),
 		cwlSvc:   cloudwatchlogs.NewFromConfig(*cfg, func(o *cloudwatchlogs.Options) { o.Region = region }),
 		ecsSvc:   ecs.NewFromConfig(*cfg, func(o *ecs.Options) { o.Region = region }),
 		glueSvc:  glue.NewFromConfig(*cfg, func(o *glue.Options) { o.Region = region }),
@@ -48,14 +51,7 @@ func (*EventBridgeCollector) Name() string {
 func (c *EventBridgeCollector) Collect(ctx context.Context, opts CollectOptions) ([]Schedule, []ErrorRecord) {
 	schedules := make([]Schedule, 0)
 	errs := make([]ErrorRecord, 0)
-	deps := runCollectorDeps{
-		region:   c.region,
-		stepSvc:  c.stepSvc,
-		batchSvc: c.batchSvc,
-		ecsSvc:   c.ecsSvc,
-		glueSvc:  c.glueSvc,
-		cwlSvc:   c.cwlSvc,
-	}
+	deps := newRunCollectorDeps(c.region, c.stepSvc, c.batchSvc, c.ctSvc, c.ecsSvc, c.glueSvc, c.cwlSvc)
 	caches := newRunCollectorCaches()
 
 	var nextToken *string
@@ -118,6 +114,7 @@ func (c *EventBridgeCollector) Collect(ctx context.Context, opts CollectOptions)
 				if t.EcsParameters != nil {
 					hints.ecsTaskDefinitionARN = aws.ToString(t.EcsParameters.TaskDefinitionArn)
 				}
+				hints.ecsRoleARN = aws.ToString(t.RoleArn)
 				// EventBridge Rule APIs do not expose a deterministic "next invocation" timestamp,
 				// so this collector intentionally leaves NextInvocationAt empty.
 				s := Schedule{
@@ -142,14 +139,8 @@ func (c *EventBridgeCollector) Collect(ctx context.Context, opts CollectOptions)
 					jobName = aws.ToString(t.BatchParameters.JobName)
 				}
 
-				runs, runErr := collectRunsByTargetKind(ctx, targetKind, targetARN, jobName, hints, opts, deps, caches)
-				if runErr != nil {
+				if runErr := populateScheduleRuns(ctx, &s, targetARN, jobName, hints, opts, deps, caches); runErr != nil {
 					errs = append(errs, *runErr)
-				} else if runs != nil {
-					s.Runs = runs
-					if opts.MaxResults > 0 && len(runs) >= opts.MaxResults {
-						s.RunsCapped = true
-					}
 				}
 
 				schedules = append(schedules, s)

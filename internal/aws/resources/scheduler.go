@@ -10,6 +10,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/batch"
+	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/glue"
@@ -19,6 +20,7 @@ import (
 
 type SchedulerCollector struct {
 	batchSvc *batch.Client
+	ctSvc    *cloudtrail.Client
 	cwlSvc   *cloudwatchlogs.Client
 	ecsSvc   *ecs.Client
 	glueSvc  *glue.Client
@@ -41,6 +43,7 @@ func NewSchedulerCollector(cfg *aws.Config, region string) (*SchedulerCollector,
 		svc:      scheduler.NewFromConfig(*cfg, func(o *scheduler.Options) { o.Region = region }),
 		stepSvc:  sfn.NewFromConfig(*cfg, func(o *sfn.Options) { o.Region = region }),
 		batchSvc: batch.NewFromConfig(*cfg, func(o *batch.Options) { o.Region = region }),
+		ctSvc:    cloudtrail.NewFromConfig(*cfg, func(o *cloudtrail.Options) { o.Region = region }),
 		cwlSvc:   cloudwatchlogs.NewFromConfig(*cfg, func(o *cloudwatchlogs.Options) { o.Region = region }),
 		ecsSvc:   ecs.NewFromConfig(*cfg, func(o *ecs.Options) { o.Region = region }),
 		glueSvc:  glue.NewFromConfig(*cfg, func(o *glue.Options) { o.Region = region }),
@@ -57,14 +60,7 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 	schedules := make([]Schedule, 0)
 	errs := make([]ErrorRecord, 0)
 	nowUTC := time.Now().UTC()
-	deps := runCollectorDeps{
-		region:   c.region,
-		stepSvc:  c.stepSvc,
-		batchSvc: c.batchSvc,
-		ecsSvc:   c.ecsSvc,
-		glueSvc:  c.glueSvc,
-		cwlSvc:   c.cwlSvc,
-	}
+	deps := newRunCollectorDeps(c.region, c.stepSvc, c.batchSvc, c.ctSvc, c.ecsSvc, c.glueSvc, c.cwlSvc)
 	caches := newRunCollectorCaches()
 
 	p := scheduler.NewListSchedulesPaginator(c.svc, &scheduler.ListSchedulesInput{})
@@ -94,6 +90,7 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 				runJobName = resolved.runJobName
 				hasBatchParameters = resolved.hasBatchParameters
 				hints = resolved.hints
+				hints.ecsRoleARN = aws.ToString(detail.Target.RoleArn)
 				if runTargetARN == "" {
 					runTargetARN = targetARN
 				}
@@ -123,14 +120,8 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 				Slots:                      buildSlots(aws.ToString(detail.ScheduleExpression)),
 				Runs:                       make([]Run, 0),
 			}
-			runs, runErr := collectRunsByTargetKind(ctx, targetKind, runTargetARN, runJobName, hints, opts, deps, caches)
-			if runErr != nil {
+			if runErr := populateScheduleRuns(ctx, &s, runTargetARN, runJobName, hints, opts, deps, caches); runErr != nil {
 				errs = append(errs, *runErr)
-			} else if runs != nil {
-				s.Runs = runs
-				if opts.MaxResults > 0 && len(runs) >= opts.MaxResults {
-					s.RunsCapped = true
-				}
 			}
 			schedules = append(schedules, s)
 		}

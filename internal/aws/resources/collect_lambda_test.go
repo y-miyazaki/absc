@@ -35,6 +35,11 @@ func TestLambdaRunStatus(t *testing.T) {
 			message: "REPORT RequestId: abc Duration: 12.34 ms Billed Duration: 100 ms",
 			want:    lambdaStatusCompleted,
 		},
+		{
+			name:    "platform report success maps to completed",
+			message: `{"time":"2026-03-19T00:00:00.000Z","type":"platform.report","record":{"requestId":"abc","status":"success","metrics":{"durationMs":12.34}}}`,
+			want:    lambdaStatusCompleted,
+		},
 	}
 
 	for _, tt := range tests {
@@ -77,6 +82,16 @@ func TestLambdaRunStatusDetail(t *testing.T) {
 			message: "REPORT RequestId: abc Duration: 12.34 ms Status: success",
 			want:    lambdaStatusCompleted,
 		},
+		{
+			name:    "platform report timeout returns timed out detail",
+			message: `{"time":"2026-03-19T00:00:00.000Z","type":"platform.report","record":{"requestId":"abc","status":"timeout","metrics":{"durationMs":120000}}}`,
+			want:    "TIMED_OUT",
+		},
+		{
+			name:    "platform report oom returns out of memory detail",
+			message: `{"time":"2026-03-19T00:00:00.000Z","type":"platform.report","record":{"requestId":"abc","status":"error","errorType":"Runtime.OutOfMemory","metrics":{"durationMs":12.34}}}`,
+			want:    "OUT_OF_MEMORY",
+		},
 	}
 
 	for _, tt := range tests {
@@ -86,6 +101,38 @@ func TestLambdaRunStatusDetail(t *testing.T) {
 			got := lambdaRunStatusDetail(tt.message)
 			if got != tt.want {
 				t.Fatalf("lambdaRunStatusDetail() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLambdaDurationSec(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		message string
+		want    int64
+	}{
+		{
+			name:    "plain report rounds up duration seconds",
+			message: "REPORT RequestId: abc Duration: 1500.00 ms Status: success",
+			want:    2,
+		},
+		{
+			name:    "platform report rounds up duration seconds",
+			message: `{"time":"2026-03-19T00:00:00.000Z","type":"platform.report","record":{"requestId":"abc","status":"success","metrics":{"durationMs":1500}}}`,
+			want:    2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := lambdaDurationSec(tt.message)
+			if got != tt.want {
+				t.Fatalf("lambdaDurationSec() = %d, want %d", got, tt.want)
 			}
 		})
 	}

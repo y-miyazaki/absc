@@ -17,8 +17,11 @@ const (
 	defaultDirPermission  = 0o750
 	defaultFilePermission = 0o600
 	hoursPerDay           = 24
+	hourLabelStep         = 1
 	minutesPerSlot        = 10
 	outputVersion         = "1.0"
+	secondsPerHour        = 3600
+	secondsPerMinute      = 60
 	slotsPerHour          = 6
 	slotsPerTimelineDay   = 144
 	slotMinutes           = 10
@@ -26,20 +29,33 @@ const (
 
 //nolint:tagliatelle // Output is a stable external snake_case JSON schema.
 type Output struct {
-	Version     string      `json:"version"`
-	GeneratedAt string      `json:"generated_at"`
-	AccountID   string      `json:"account_id"`
-	Timezone    string      `json:"timezone"`
-	Window      Window      `json:"window"`
-	Schedules   []Schedule  `json:"schedules"`
-	Errors      []ErrRecord `json:"errors"`
+	Version     string           `json:"version"`
+	GeneratedAt string           `json:"generated_at"`
+	AccountID   string           `json:"account_id"`
+	Timezone    string           `json:"timezone"`
+	Schedules   []Schedule       `json:"schedules"`
+	Alignment   []AlignmentIssue `json:"alignment_issues,omitempty"`
+	Errors      []ErrRecord      `json:"errors"`
+	Window      Window           `json:"window"`
+}
+
+//nolint:tagliatelle // AlignmentIssue is a stable external snake_case JSON schema.
+type AlignmentIssue struct {
+	ScheduleID   string `json:"schedule_id"`
+	ScheduleName string `json:"schedule_name"`
+	RunID        string `json:"run_id"`
+	RunStartAt   string `json:"run_start_at"`
+	RunEndAt     string `json:"run_end_at,omitempty"`
+	Reason       string `json:"reason"`
 }
 
 //nolint:tagliatelle // Window is a stable external snake_case JSON schema.
 type Window struct {
-	Start       string `json:"start"`
-	End         string `json:"end"`
-	SlotMinutes int    `json:"slot_minutes"`
+	Start       string   `json:"start"`
+	End         string   `json:"end"`
+	HourLabels  []string `json:"hour_labels,omitempty"`
+	SlotLabels  []string `json:"slot_labels,omitempty"`
+	SlotMinutes int      `json:"slot_minutes"`
 }
 
 //nolint:tagliatelle // Schedule is a stable external snake_case JSON schema.
@@ -49,7 +65,9 @@ type Schedule struct {
 	ScheduleName               string `json:"schedule_name"`
 	ScheduleExpression         string `json:"schedule_expression"`
 	ScheduleExpressionTimezone string `json:"schedule_expression_timezone,omitempty"`
+	ScheduleExpressionTZLabel  string `json:"schedule_expression_timezone_label,omitempty"`
 	NextInvocationAt           string `json:"next_invocation_at,omitempty"`
+	NextInvocationLabel        string `json:"next_invocation_label,omitempty"`
 	Service                    string `json:"service"`
 	TargetKind                 string `json:"target_kind"`
 	TargetAction               string `json:"target_action,omitempty"`
@@ -67,7 +85,9 @@ type Run struct {
 	RunID         string `json:"run_id"`
 	Status        string `json:"status"`
 	StartAt       string `json:"start_at,omitempty"`
+	StartLabel    string `json:"start_label,omitempty"`
 	EndAt         string `json:"end_at,omitempty"`
+	EndLabel      string `json:"end_label,omitempty"`
 	DurationSec   *int64 `json:"duration_sec,omitempty"`
 	SourceService string `json:"source_service"`
 }
@@ -106,10 +126,11 @@ func WriteJSON(path string, out *Output) (retErr error) {
 }
 
 func BuildOutput(accountID string, now, since time.Time, loc *time.Location, schedules []resources.Schedule, errs []resources.ErrorRecord) Output {
-	// Anchor the window to the calendar day of `since` (start of the lookback period)
-	// so that all collected runs fall within the displayed window.
+	// Anchor the window to the local calendar day of `since` (lookback start).
+	// With the default 24h lookback, this shows the previous day's full timeline.
 	sinceInLoc := since.In(loc)
 	dayStart := time.Date(sinceInLoc.Year(), sinceInLoc.Month(), sinceInLoc.Day(), 0, 0, 0, 0, loc)
+	windowEnd := dayStart.Add(hoursPerDay * time.Hour)
 	out := Output{
 		Version:     outputVersion,
 		GeneratedAt: now.Format(time.RFC3339),
@@ -119,8 +140,11 @@ func BuildOutput(accountID string, now, since time.Time, loc *time.Location, sch
 			Start:       dayStart.Format(time.RFC3339),
 			End:         dayStart.Add(hoursPerDay * time.Hour).Format(time.RFC3339),
 			SlotMinutes: slotMinutes,
+			HourLabels:  buildHourLabels(dayStart),
+			SlotLabels:  buildSlotLabels(dayStart),
 		},
 		Schedules: make([]Schedule, 0, len(schedules)),
+		Alignment: make([]AlignmentIssue, 0),
 		Errors:    make([]ErrRecord, 0, len(errs)),
 	}
 
@@ -131,11 +155,18 @@ func BuildOutput(accountID string, now, since time.Time, loc *time.Location, sch
 		runs := make([]Run, 0, len(s.Runs))
 		for runIndex := range s.Runs {
 			r := s.Runs[runIndex]
+			startAt := convertRFC3339ToLocation(r.StartAt, loc)
+			endAt := convertRFC3339ToLocation(r.EndAt, loc)
+			if !runOverlapsWindow(startAt, endAt, dayStart, windowEnd) {
+				continue
+			}
 			runs = append(runs, Run{
 				RunID:         r.RunID,
 				Status:        r.Status,
-				StartAt:       convertRFC3339ToLocation(r.StartAt, loc),
-				EndAt:         convertRFC3339ToLocation(r.EndAt, loc),
+				StartAt:       startAt,
+				StartLabel:    formatDisplayTimestamp(startAt, loc),
+				EndAt:         endAt,
+				EndLabel:      formatDisplayTimestamp(endAt, loc),
 				DurationSec:   r.DurationSec,
 				SourceService: r.SourceService,
 			})
@@ -147,6 +178,7 @@ func BuildOutput(accountID string, now, since time.Time, loc *time.Location, sch
 			ScheduleName:               s.ScheduleName,
 			ScheduleExpression:         s.ScheduleExpression,
 			ScheduleExpressionTimezone: s.ScheduleExpressionTimezone,
+			ScheduleExpressionTZLabel:  scheduleTimezoneLabel(s.ScheduleExpressionTimezone, dayStart),
 			Enabled:                    s.Enabled,
 			Region:                     s.Region,
 			TargetARN:                  s.TargetARN,
@@ -155,10 +187,26 @@ func BuildOutput(accountID string, now, since time.Time, loc *time.Location, sch
 			TargetService:              s.TargetService,
 			TargetName:                 s.TargetName,
 			NextInvocationAt:           nextInvocationAt,
+			NextInvocationLabel:        formatDisplayTimestamp(nextInvocationAt, loc),
 			Slots:                      slots,
 			RunsCapped:                 s.RunsCapped,
 			Runs:                       runs,
 		})
+
+		for runIndex := range runs {
+			run := runs[runIndex]
+			if runOverlapsScheduledSlots(&run, slots, dayStart) {
+				continue
+			}
+			out.Alignment = append(out.Alignment, AlignmentIssue{
+				ScheduleID:   s.ID,
+				ScheduleName: s.ScheduleName,
+				RunID:        run.RunID,
+				RunStartAt:   run.StartAt,
+				RunEndAt:     run.EndAt,
+				Reason:       "run does not overlap any scheduled slot in the displayed window",
+			})
+		}
 	}
 
 	seenErrors := make(map[string]struct{}, len(errs))
@@ -173,6 +221,102 @@ func BuildOutput(accountID string, now, since time.Time, loc *time.Location, sch
 	}
 
 	return out
+}
+
+func buildHourLabels(dayStart time.Time) []string {
+	labels := make([]string, 0, hoursPerDay/hourLabelStep)
+	for hour := 0; hour < hoursPerDay; hour += hourLabelStep {
+		labels = append(labels, dayStart.Add(time.Duration(hour)*time.Hour).Format("15"))
+	}
+	return labels
+}
+
+func buildSlotLabels(dayStart time.Time) []string {
+	labels := make([]string, 0, slotsPerTimelineDay)
+	for i := 0; i < slotsPerTimelineDay; i++ {
+		start := dayStart.Add(time.Duration(i*slotMinutes) * time.Minute)
+		end := start.Add(time.Duration(slotMinutes) * time.Minute)
+		labels = append(labels, start.Format("15:04")+" - "+end.Format("15:04"))
+	}
+	return labels
+}
+
+func formatDisplayTimestamp(value string, loc *time.Location) string {
+	v := strings.TrimSpace(value)
+	if v == "" {
+		return ""
+	}
+	t, err := time.Parse(time.RFC3339, v)
+	if err != nil {
+		return value
+	}
+	return t.In(loc).Format("2006-01-02 15:04:05 MST")
+}
+
+func runOverlapsWindow(startAt, endAt string, windowStart, windowEnd time.Time) bool {
+	start, err := time.Parse(time.RFC3339, strings.TrimSpace(startAt))
+	if err != nil {
+		return true
+	}
+	end := start
+	trimmedEnd := strings.TrimSpace(endAt)
+	if trimmedEnd != "" {
+		if parsedEnd, parseErr := time.Parse(time.RFC3339, trimmedEnd); parseErr == nil {
+			end = parsedEnd
+		}
+	}
+	return start.Before(windowEnd) && (end.Equal(windowStart) || end.After(windowStart))
+}
+
+func runOverlapsScheduledSlots(run *Run, slots []int, windowStart time.Time) bool {
+	if len(slots) != slotsPerTimelineDay {
+		return true
+	}
+	start, err := time.Parse(time.RFC3339, strings.TrimSpace(run.StartAt))
+	if err != nil {
+		return true
+	}
+	end := start
+	trimmedEnd := strings.TrimSpace(run.EndAt)
+	if trimmedEnd != "" {
+		if parsedEnd, parseErr := time.Parse(time.RFC3339, trimmedEnd); parseErr == nil {
+			end = parsedEnd
+		}
+	}
+
+	windowEnd := windowStart.Add(hoursPerDay * time.Hour)
+	if end.Before(windowStart) || !start.Before(windowEnd) {
+		return true
+	}
+
+	slotDuration := time.Duration(slotMinutes) * time.Minute
+	clampedStart := start
+	if clampedStart.Before(windowStart) {
+		clampedStart = windowStart
+	}
+	clampedEnd := end
+	if !clampedEnd.Before(windowEnd) {
+		clampedEnd = windowEnd.Add(-time.Nanosecond)
+	}
+
+	startIdx := int(clampedStart.Sub(windowStart) / slotDuration)
+	endIdx := int(clampedEnd.Sub(windowStart) / slotDuration)
+	if startIdx < 0 {
+		startIdx = 0
+	}
+	if endIdx >= slotsPerTimelineDay {
+		endIdx = slotsPerTimelineDay - 1
+	}
+	if endIdx < startIdx {
+		return true
+	}
+
+	for i := startIdx; i <= endIdx; i++ {
+		if slots[i] == 1 {
+			return true
+		}
+	}
+	return false
 }
 
 // convertRFC3339ToLocation converts canonical UTC/offset timestamps into
@@ -225,6 +369,32 @@ func scheduleSourceLocation(exprTZ string) *time.Location {
 		return time.UTC
 	}
 	return loc
+}
+
+func scheduleTimezoneLabel(exprTZ string, reference time.Time) string {
+	raw := strings.TrimSpace(exprTZ)
+	loc := scheduleSourceLocation(raw)
+	name := raw
+	if name == "" {
+		name = loc.String()
+	}
+	if name == "" {
+		name = "UTC"
+	}
+	_, offsetSeconds := reference.In(loc).Zone()
+	return name + " (" + formatUTCOffset(offsetSeconds) + ")"
+}
+
+func formatUTCOffset(offsetSeconds int) string {
+	sign := "+"
+	absOffsetSeconds := offsetSeconds
+	if absOffsetSeconds < 0 {
+		sign = "-"
+		absOffsetSeconds = -absOffsetSeconds
+	}
+	hours := absOffsetSeconds / secondsPerHour
+	minutes := (absOffsetSeconds % secondsPerHour) / secondsPerMinute
+	return fmt.Sprintf("UTC%s%02d:%02d", sign, hours, minutes)
 }
 
 func WriteHTML(path string, out *Output) (retErr error) {

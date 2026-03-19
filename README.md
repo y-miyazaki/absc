@@ -5,7 +5,7 @@
 [![GitHub release](https://img.shields.io/github/release/y-miyazaki/absc.svg)](https://github.com/y-miyazaki/absc/releases/latest)
 [![cd-wd-go-releaser](https://github.com/y-miyazaki/absc/actions/workflows/cd-wd-go-releaser.yaml/badge.svg?branch=master)](https://github.com/y-miyazaki/absc/actions/workflows/cd-wd-go-releaser.yaml)
 
-ABSC is a command-line tool for collecting AWS cron-style schedules and rendering a timeline viewer as JSON and HTML.
+ABSC is a command-line tool for collecting AWS cron-style schedules and rendering a schedule timeline viewer as JSON and HTML.
 
 It focuses on scheduled workloads managed by EventBridge Rules and EventBridge Scheduler, then enriches each schedule with recent execution history when the target service supports it.
 
@@ -110,10 +110,10 @@ absc --timezone Asia/Tokyo
 3. Open the generated output.
 
 ```bash
-ls -lh ./output/*/cron/
+ls -lh ./output/*/schedules/
 ```
 
-The main artifacts are generated under `./output/{account-id}/cron/`.
+The main artifacts are generated under `./output/{account-id}/schedules/`.
 
 ## Usage
 
@@ -194,6 +194,11 @@ Recent runs are collected only when the target type supports runtime lookup. Cur
 - Glue job runs
 - Lambda invocations derived from CloudWatch Logs
 
+ECS note:
+
+- ECS stopped task history from ECS APIs is short-lived (approximately 1 hour).
+- ABSC backfills older ECS schedule windows by reading CloudTrail management events (`RunTask`) and merges them with ECS API results.
+
 If a target type is not supported for run enrichment, the timeline still shows scheduled slots, but the run list remains empty.
 
 Disabled schedules keep previously executed runs inside the lookback window so the timeline can still show recent actual activity.
@@ -205,7 +210,7 @@ Disabled schedules keep previously executed runs inside the lookback window so t
 ```text
 output/
 └── {account-id}/
-    └── cron/
+  └── schedules/
         ├── index.html
         ├── schedules.json
         └── assets/
@@ -233,6 +238,9 @@ output/
 - Disabled schedule highlighting
 - Success/failed run coloring in overlays and tooltip statuses
 - Maximum-result cap indicator when runs are truncated
+- Tooltip timezone metadata for each schedule:
+  - `expression timezone` (for example, `Asia/Tokyo (UTC+09:00)`)
+  - `display timezone` (the CLI timezone used for rendering, for example `UTC`)
 
 The HTML file can be opened directly in a browser because the payload is embedded into the document.
 

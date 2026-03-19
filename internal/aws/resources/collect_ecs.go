@@ -6,16 +6,48 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 )
 
 const ecsDescribeTasksBatchSize = 100
 
-// collectECSRuns returns stopped and running ECS tasks for the given cluster ARN.
+// collectECSRuns returns ECS executions for the given cluster and target hints.
+// It prefers ECS task details and backfills older windows from CloudTrail RunTask events.
+func collectECSRuns(ctx context.Context, ecsSvc *ecs.Client, ctSvc *cloudtrail.Client, clusterARN string, hints runTargetHints, since time.Time, maxResults int, caches *runCollectorCaches) ([]Run, error) {
+	ecsRuns, ecsErr := collectECSRunsFromAPI(ctx, ecsSvc, clusterARN, hints.ecsTaskDefinitionARN, hints.ecsStartedBy, since, maxResults)
+	if !ecsCloudTrailRequired(since, time.Now().UTC()) {
+		if ecsErr != nil {
+			return nil, fmt.Errorf("collect ecs runs from api: %w", ecsErr)
+		}
+		return ecsRuns, nil
+	}
+
+	cloudTrailRuns, cloudTrailErr := collectECSCloudTrailRuns(ctx, ctSvc, since, caches)
+	filteredCloudTrailRuns := filterECSCloudTrailRuns(cloudTrailRuns, clusterARN, hints, maxResults)
+	mergedRuns := mergeECSRuns(ecsRuns, filteredCloudTrailRuns, maxResults)
+
+	switch {
+	case ecsErr == nil && cloudTrailErr == nil:
+		return mergedRuns, nil
+	case ecsErr == nil && len(mergedRuns) > 0:
+		return mergedRuns, nil
+	case cloudTrailErr == nil && len(mergedRuns) > 0:
+		return mergedRuns, nil
+	case ecsErr != nil && cloudTrailErr != nil:
+		return nil, fmt.Errorf("collect ecs runs from api and cloudtrail: %w; %w", ecsErr, cloudTrailErr)
+	case ecsErr != nil:
+		return nil, fmt.Errorf("collect ecs runs from api: %w", ecsErr)
+	default:
+		return nil, fmt.Errorf("collect ecs runs from cloudtrail: %w", cloudTrailErr)
+	}
+}
+
+// collectECSRunsFromAPI returns stopped and running ECS tasks for the given cluster ARN.
 // Optional task definition and startedBy filters avoid mixing unrelated tasks.
 // The ECS API retains stopped task data for approximately 1 hour.
-func collectECSRuns(ctx context.Context, svc *ecs.Client, clusterARN, taskDefinitionARN, startedBy string, since time.Time, maxResults int) ([]Run, error) {
+func collectECSRunsFromAPI(ctx context.Context, svc *ecs.Client, clusterARN, taskDefinitionARN, startedBy string, since time.Time, maxResults int) ([]Run, error) {
 	// Query both running and stopped tasks because recent executions may still be active.
 	var taskARNs []string
 

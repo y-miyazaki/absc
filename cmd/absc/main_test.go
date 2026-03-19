@@ -239,7 +239,7 @@ func TestRunCommand_Success(t *testing.T) {
 		t.Fatalf("runCommand() unexpected error: %v", err)
 	}
 
-	wantDir := filepath.Join(baseDir, "123456789012", "cron")
+	wantDir := filepath.Join(baseDir, "123456789012", "schedules")
 	if mkdirPath != wantDir {
 		t.Fatalf("mkdirAll path = %q, want %q", mkdirPath, wantDir)
 	}
