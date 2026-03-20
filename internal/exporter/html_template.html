@@ -81,6 +81,7 @@
     .cell.run-fail::before { content: ""; position: absolute; inset: 1px 0; background: var(--run-fail); opacity: .95; z-index: 2; }
     .row.disabled .name { color: #5f6b76; background: #e9eef2; }
     .row.disabled .cell { background: #e9eef2; opacity: .65; }
+    .schedule-link { margin-left: 3px; color: inherit; text-decoration: underline; text-underline-offset: 2px; }
     .badge { display: inline-block; margin-left: 6px; padding: 1px 6px; font-size: 10px; border-radius: 999px; background: #eef2f5; color: #60717f; vertical-align: middle; }
     .badge.warn { background: #fff4e5; color: #9a5d1d; }
     .hour { font-size: 10px; color: var(--sub); text-align: center; }
@@ -252,15 +253,16 @@ function targetTypeLabel(schedule) {
   return schedule.target_action || '-';
 }
 
-function serviceConsoleURL(service, region, scheduleName) {
+function serviceConsoleURL(service, region, scheduleName, scheduleGroupName) {
   const safeRegion = encodeURIComponent(region || 'us-east-1');
   const safeName = encodeURIComponent(scheduleName || '');
+  const safeGroup = encodeURIComponent(scheduleGroupName || 'default');
 
   if (service === 'eventbridge_rule') {
     return 'https://console.aws.amazon.com/events/home?region=' + safeRegion + '#/rules/' + safeName + '?eventBus=default';
   }
   if (service === 'eventbridge_scheduler') {
-    return 'https://console.aws.amazon.com/scheduler/home?region=' + safeRegion + '#/schedules/default/' + safeName;
+    return 'https://console.aws.amazon.com/scheduler/home?region=' + safeRegion + '#/schedules/' + safeGroup + '/' + safeName;
   }
   return '';
 }
@@ -462,7 +464,7 @@ function render() {
     const name = document.createElement('div');
     name.className = 'name';
     name.title = s.schedule_name;
-    const scheduleConsoleURL = serviceConsoleURL(s.service, s.region, s.schedule_name);
+    const scheduleConsoleURL = serviceConsoleURL(s.service, s.region, s.schedule_name, s.schedule_group_name);
     name.appendChild(makeIcon(s.service, {
       href: scheduleConsoleURL,
       altText: 'Schedule/Rule: ' + (s.schedule_name || '-')
@@ -474,8 +476,13 @@ function render() {
       href: targetConsoleURL(s),
       altText: targetAltText
     }));
-    const nameText = document.createElement('span');
-    nameText.style.marginLeft = '3px';
+    const nameText = scheduleConsoleURL ? document.createElement('a') : document.createElement('span');
+    nameText.className = 'schedule-link';
+    if (scheduleConsoleURL) {
+      nameText.href = scheduleConsoleURL;
+      nameText.target = '_blank';
+      nameText.rel = 'noopener noreferrer';
+    }
     nameText.textContent = s.schedule_name;
     name.appendChild(nameText);
     const regionBadge = document.createElement('span');

@@ -96,6 +96,7 @@ type Window struct {
 type Schedule struct {
 	TargetAction               string         `json:"target_action,omitempty"`
 	ID                         string         `json:"id"`
+	ScheduleGroupName          string         `json:"schedule_group_name,omitempty"`
 	ScheduleName               string         `json:"schedule_name"`
 	ScheduleExpression         string         `json:"schedule_expression"`
 	ScheduleExpressionTimezone string         `json:"schedule_expression_timezone,omitempty"`
@@ -357,6 +358,7 @@ func BuildOutputWithOptions(accountID string, now, since time.Time, loc *time.Lo
 		out.Schedules = append(out.Schedules, Schedule{
 			ID:                         s.ID,
 			Service:                    s.Service,
+			ScheduleGroupName:          s.ScheduleGroupName,
 			ScheduleName:               s.ScheduleName,
 			ScheduleExpression:         s.ScheduleExpression,
 			ScheduleExpressionTimezone: s.ScheduleExpressionTimezone,

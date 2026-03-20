@@ -31,6 +31,7 @@ type Run struct {
 type Schedule struct {
 	Region                     string
 	TargetName                 string
+	ScheduleGroupName          string
 	ScheduleName               string
 	ScheduleExpression         string
 	ScheduleExpressionTimezone string
