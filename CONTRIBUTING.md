@@ -288,7 +288,7 @@ ABSC uses [GoReleaser](https://goreleaser.com/) with GitHub Actions for automate
    - Go to GitHub Actions → "cd-wd-go-releaser" workflow
    - Click "Run workflow"
    - Fill in the parameters:
-     - **version**: Release version (e.g., `v1.0.5`, `v1.1.0-beta.1`)
+     - **version**: Release version (e.g., `v1.0.6`, `v1.1.0-beta.1`)
      - **draft**: Create as draft (recommended for review)
      - **prerelease**: Mark as prerelease (for beta/rc versions)
      - **create_tag**: Automatically create git tag (default: true)
@@ -321,8 +321,8 @@ aqua i -l
 goreleaser release --snapshot --clean
 
 # Create a git tag
-git tag -a v1.0.5 -m "Release v1.0.5"
-git push origin v1.0.5
+git tag -a v1.0.6 -m "Release v1.0.6"
+git push origin v1.0.6
 
 # Run goreleaser (requires GITHUB_TOKEN)
 export GITHUB_TOKEN="your-github-token"
@@ -337,7 +337,7 @@ Follow [Semantic Versioning](https://semver.org/):
 - **PATCH**: Bug fixes (backward compatible)
 
 Examples:
-- `v1.0.5` - Stable release
+- `v1.0.6` - Stable release
 - `v1.1.0-beta.1` - Beta release
 - `v1.1.0-rc.1` - Release candidate
 
