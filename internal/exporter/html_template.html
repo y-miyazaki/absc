@@ -16,7 +16,9 @@
       --run-success: #16a34a;
       --run-fail: #f85149;
       --scheduled: #2563eb;
-      --name-col-width: 260px;
+      --schedule-col-width: 420px;
+      --description-col-width: 280px;
+      --target-col-width: 320px;
     }
     body { margin: 0; font-family: "Noto Sans", "Segoe UI", sans-serif; color: var(--text); background: radial-gradient(circle at 10% 0%, #e4f4f3, var(--bg) 35%); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
     header { padding: 16px 20px; border-bottom: 1px solid #d5dde3; background: #ffffffcc; backdrop-filter: blur(6px); flex-shrink: 0; }
@@ -43,30 +45,43 @@
     .timeline { position: relative; border: 1px solid #d7e0e7; background: var(--panel); border-radius: 12px; overflow: auto; flex: 1; min-height: 0; padding-bottom: 4px; box-sizing: border-box; }
     .row {
       display: grid;
-      grid-template-columns: var(--name-col-width) repeat(144, 14px);
+      grid-template-columns: var(--schedule-col-width) repeat(144, 14px);
       border-bottom: 1px solid #eef2f5;
       min-height: 20px;
       width: max-content;
       min-width: max-content;
     }
+    .timeline.show-description .row {
+      grid-template-columns: var(--schedule-col-width) var(--description-col-width) repeat(144, 14px);
+    }
+    .timeline.show-target .row {
+      grid-template-columns: var(--schedule-col-width) var(--target-col-width) repeat(144, 14px);
+    }
+    .timeline.show-description.show-target .row {
+      grid-template-columns: var(--schedule-col-width) var(--description-col-width) var(--target-col-width) repeat(144, 14px);
+    }
     .row.head { position: sticky; top: 0; background: #f3f8f8; z-index: 25; box-shadow: 0 1px 0 #dde3e7; }
-    .name {
+    .left-col {
       padding: 4px 8px;
       font-size: 12px;
       border-right: 1px solid #dde3e7;
+      min-width: 0;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      position: sticky;
-      left: 0;
       background: var(--panel);
+    }
+    .sticky-col {
+      position: sticky;
       z-index: 20;
     }
-    .row.head .name {
+    .row.head .left-col {
       top: 0;
-      left: 0;
       background: #f3f8f8;
       z-index: 40;
+    }
+    .left-col.hidden {
+      display: none;
     }
     .row.head .cell {
       position: sticky;
@@ -79,9 +94,13 @@
     .cell.sch-outday::after { content: ""; position: absolute; inset: 4px; background: #94a3b8; border-radius: 3px; z-index: 4; }
     .cell.run-ok::before { content: ""; position: absolute; inset: 1px 0; background: var(--run-success); opacity: .9; z-index: 2; }
     .cell.run-fail::before { content: ""; position: absolute; inset: 1px 0; background: var(--run-fail); opacity: .95; z-index: 2; }
-    .row.disabled .name { color: #5f6b76; background: #e9eef2; }
+    .row.disabled .left-col { color: #5f6b76; background: #e9eef2; }
     .row.disabled .cell { background: #e9eef2; opacity: .65; }
     .schedule-link { margin-left: 3px; color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+    .target-link { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+    .target-inline { display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; }
+    .target-text { display: inline-block; min-width: 0; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+    .col-title { font-weight: 600; }
     .badge { display: inline-block; margin-left: 6px; padding: 1px 6px; font-size: 10px; border-radius: 999px; background: #eef2f5; color: #60717f; vertical-align: middle; }
     .badge.warn { background: #fff4e5; color: #9a5d1d; }
     .hour { font-size: 10px; color: var(--sub); text-align: center; }
@@ -97,7 +116,9 @@
   <div class="controls">
     <label>Service <select id="serviceFilter"></select></label>
     <label>Region <select id="regionFilter"></select></label>
-    <label>Schedule Width <input id="nameWidth" type="range" min="220" max="520" step="10" value="520" /> <span id="nameWidthValue">520px</span></label>
+    <label>Schedule Width <input id="nameWidth" type="range" min="220" max="640" step="10" value="420" /> <span id="nameWidthValue">420px</span></label>
+    <label id="descriptionToggleWrap" style="display:none"><input id="showDescription" type="checkbox" checked /> Show Description</label>
+    <label id="targetToggleWrap" style="display:none"><input id="showTarget" type="checkbox" checked /> Show Target</label>
     <label><input id="hideDisabled" type="checkbox" /> Hide disabled schedules</label>
   </div>
 </header>
@@ -125,8 +146,12 @@ const tooltip = document.getElementById('tooltip');
 const diagnostics = document.getElementById('diagnostics');
 const WINDOW_START_MS = Date.parse(DATA.window.start);
 const SLOT_MINUTES = Number(DATA.window.slot_minutes) || 10;
+const DESCRIPTION_COLUMN_WIDTH = 280;
+const TARGET_COLUMN_WIDTH = 320;
+const TARGET_COLUMN_WIDTH_WITHOUT_DESCRIPTION = 320;
+const accountLabel = DATA.account_name ? DATA.account_name + '(' + DATA.account_id + ')' : DATA.account_id;
 document.getElementById('meta').textContent =
-  'Account: ' + DATA.account_id +
+  'Account: ' + accountLabel +
   ' | TZ: ' + DATA.timezone +
   ' | Window: ' + DATA.window.start +
   ' - ' + DATA.window.end;
@@ -148,12 +173,92 @@ function setupNameWidthControl() {
   const slider = document.getElementById('nameWidth');
   const value = document.getElementById('nameWidthValue');
   const apply = () => {
-    const width = Number(slider.value) || 520;
-    document.documentElement.style.setProperty('--name-col-width', width + 'px');
+    const width = Number(slider.value) || 420;
+    document.documentElement.style.setProperty('--schedule-col-width', width + 'px');
     value.textContent = width + 'px';
+    applyStickyColumns();
   };
   slider.oninput = apply;
   apply();
+}
+
+function hasDescriptionData() {
+  return (DATA.schedules || []).some(s => String(s.description || '').trim() !== '');
+}
+
+function hasTargetData() {
+  return (DATA.schedules || []).some(s => String((s.target_name || s.target_arn || '')).trim() !== '');
+}
+
+function showDescriptionColumn() {
+  const checkbox = document.getElementById('showDescription');
+  return hasDescriptionData() && !!checkbox && checkbox.checked;
+}
+
+function showTargetColumn() {
+  const checkbox = document.getElementById('showTarget');
+  return hasTargetData() && !!checkbox && checkbox.checked;
+}
+
+function setupColumnVisibilityControls() {
+  const hasDescription = hasDescriptionData();
+  const hasTarget = hasTargetData();
+  const descriptionWrap = document.getElementById('descriptionToggleWrap');
+  const targetWrap = document.getElementById('targetToggleWrap');
+  const descriptionToggle = document.getElementById('showDescription');
+  const targetToggle = document.getElementById('showTarget');
+
+  if (descriptionWrap) descriptionWrap.style.display = hasDescription ? '' : 'none';
+  if (targetWrap) targetWrap.style.display = hasTarget ? '' : 'none';
+  if (descriptionToggle) descriptionToggle.checked = hasDescription;
+  if (targetToggle) targetToggle.checked = hasTarget;
+  if (descriptionToggle) descriptionToggle.onchange = render;
+  if (targetToggle) targetToggle.onchange = render;
+}
+
+function applyStickyColumns() {
+  const scheduleWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--schedule-col-width'), 10) || 420;
+  const descriptionWidth = DESCRIPTION_COLUMN_WIDTH;
+
+  const showDescription = showDescriptionColumn();
+  const showTarget = showTargetColumn();
+  const targetWidth = showDescription ? TARGET_COLUMN_WIDTH : TARGET_COLUMN_WIDTH_WITHOUT_DESCRIPTION;
+
+  timeline.classList.toggle('show-description', showDescription);
+  timeline.classList.toggle('show-target', showTarget);
+
+  document.documentElement.style.setProperty('--description-col-width', (showDescription ? descriptionWidth : 0) + 'px');
+  document.documentElement.style.setProperty('--target-col-width', (showTarget ? targetWidth : 0) + 'px');
+
+  const scheduleCols = timeline.querySelectorAll('.schedule-col');
+  const descriptionCols = timeline.querySelectorAll('.description-col');
+  const targetCols = timeline.querySelectorAll('.target-col');
+
+  scheduleCols.forEach(el => {
+    el.classList.remove('hidden');
+    el.style.left = '0px';
+  });
+
+  descriptionCols.forEach(el => {
+    if (!showDescription) {
+      el.classList.add('hidden');
+      el.style.left = '';
+      return;
+    }
+    el.classList.remove('hidden');
+    el.style.left = scheduleWidth + 'px';
+  });
+
+  targetCols.forEach(el => {
+    if (!showTarget) {
+      el.classList.add('hidden');
+      el.style.left = '';
+      return;
+    }
+    el.classList.remove('hidden');
+    const left = scheduleWidth + (showDescription ? descriptionWidth : 0);
+    el.style.left = left + 'px';
+  });
 }
 
 function setupDisabledToggle() {
@@ -438,10 +543,21 @@ function render() {
 
   const head = document.createElement('div');
   head.className = 'row head';
-  const first = document.createElement('div');
-  first.className = 'name';
-  first.textContent = 'Schedule';
-  head.appendChild(first);
+  const scheduleHead = document.createElement('div');
+  scheduleHead.className = 'left-col sticky-col schedule-col col-title';
+  scheduleHead.textContent = 'Schedule';
+  head.appendChild(scheduleHead);
+
+  const descriptionHead = document.createElement('div');
+  descriptionHead.className = 'left-col sticky-col description-col col-title';
+  descriptionHead.textContent = 'Description';
+  head.appendChild(descriptionHead);
+
+  const targetHead = document.createElement('div');
+  targetHead.className = 'left-col sticky-col target-col col-title';
+  targetHead.textContent = 'Target';
+  head.appendChild(targetHead);
+
   for(let i=0;i<144;i++) {
     const c = document.createElement('div');
     c.className = 'cell hour';
@@ -461,21 +577,16 @@ function render() {
     const row = document.createElement('div');
     row.className = 'row';
     if (s.enabled === false) row.className += ' disabled';
-    const name = document.createElement('div');
-    name.className = 'name';
-    name.title = s.schedule_name;
+    const scheduleCol = document.createElement('div');
+    scheduleCol.className = 'left-col sticky-col schedule-col';
+    scheduleCol.title = s.schedule_name;
     const scheduleConsoleURL = serviceConsoleURL(s.service, s.region, s.schedule_name, s.schedule_group_name);
-    name.appendChild(makeIcon(s.service, {
+    scheduleCol.appendChild(makeIcon(s.service, {
       href: scheduleConsoleURL,
       altText: 'Schedule/Rule: ' + (s.schedule_name || '-')
     }));
 
     const targetDisplayName = s.target_name || s.target_arn || '-';
-    const targetAltText = (s.target_service || 'Other') + ': ' + targetDisplayName;
-    name.appendChild(makeIcon(s.target_service || 'Other', {
-      href: targetConsoleURL(s),
-      altText: targetAltText
-    }));
     const nameText = scheduleConsoleURL ? document.createElement('a') : document.createElement('span');
     nameText.className = 'schedule-link';
     if (scheduleConsoleURL) {
@@ -484,18 +595,47 @@ function render() {
       nameText.rel = 'noopener noreferrer';
     }
     nameText.textContent = s.schedule_name;
-    name.appendChild(nameText);
+    scheduleCol.appendChild(nameText);
     const regionBadge = document.createElement('span');
     regionBadge.className = 'badge';
     regionBadge.textContent = s.region;
-    name.appendChild(regionBadge);
+    scheduleCol.appendChild(regionBadge);
     if (s.runs_capped) {
       const cap = document.createElement('span');
       cap.className = 'badge warn';
       cap.textContent = 'max';
-      name.appendChild(cap);
+      scheduleCol.appendChild(cap);
     }
-    row.appendChild(name);
+    row.appendChild(scheduleCol);
+
+    const descriptionCol = document.createElement('div');
+    descriptionCol.className = 'left-col sticky-col description-col';
+    descriptionCol.title = s.description || '';
+    descriptionCol.textContent = s.description || '-';
+    row.appendChild(descriptionCol);
+
+    const targetCol = document.createElement('div');
+    targetCol.className = 'left-col sticky-col target-col';
+    const targetURL = targetConsoleURL(s);
+    const targetAltText = (s.target_service || 'Other') + ': ' + targetDisplayName;
+    const targetWrap = targetURL ? document.createElement('a') : document.createElement('span');
+    targetWrap.className = targetURL ? 'target-inline target-link' : 'target-inline';
+    if (targetURL) {
+      targetWrap.href = targetURL;
+      targetWrap.target = '_blank';
+      targetWrap.rel = 'noopener noreferrer';
+    }
+    targetWrap.title = targetAltText;
+    targetWrap.appendChild(makeIcon(s.target_service || 'Other', {
+      href: '',
+      altText: targetAltText
+    }));
+    const targetText = document.createElement('span');
+    targetText.className = 'target-text';
+    targetText.textContent = targetDisplayName;
+    targetWrap.appendChild(targetText);
+    targetCol.appendChild(targetWrap);
+    row.appendChild(targetCol);
 
     const runSlots = new Map();
     (s.runs || []).forEach(r => {
@@ -591,6 +731,8 @@ function render() {
 
     timeline.appendChild(row);
   });
+
+  applyStickyColumns();
 }
 
 const AWS_ICONS = {
@@ -634,6 +776,7 @@ function makeIcon(key, options) {
 buildFilters();
 setupNameWidthControl();
 setupDisabledToggle();
+setupColumnVisibilityControls();
 setupErrorsLink();
 render();
 </script>

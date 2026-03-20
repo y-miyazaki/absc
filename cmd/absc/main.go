@@ -1,4 +1,6 @@
 // Package main provides the absc CLI entry point.
+//
+//revive:disable:comments-density reason: CLI orchestration keeps comments focused on behavior boundaries.
 package main
 
 import (
@@ -10,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/account"
 	"github.com/urfave/cli/v2"
 
 	awscfg "github.com/y-miyazaki/absc/internal/aws"
@@ -53,6 +57,14 @@ const (
 	timezoneFlagName           = "timezone"
 )
 
+type accountInformationAPI interface {
+	GetAccountInformation(
+		_ context.Context,
+		_ *account.GetAccountInformationInput,
+		_ ...func(*account.Options),
+	) (*account.GetAccountInformationOutput, error)
+}
+
 var (
 	// errInvalidMaxResults is returned when the caller requests zero records.
 	errInvalidMaxResults = errors.New("max-results must be >= 1")
@@ -60,8 +72,10 @@ var (
 	// Injected functions keep the command path testable without AWS access.
 	checkAWSCredentials = validation.CheckAWSCredentials
 	collectSchedules    = resources.Collect
+	getAccountName      = fetchAccountName
 	mkdirAll            = os.MkdirAll
 	newAWSConfig        = awscfg.NewConfig
+	newAccountClient    = func(cfg *awssdk.Config) accountInformationAPI { return account.NewFromConfig(*cfg) }
 	nowFunc             = time.Now
 	writeHTML           = exporter.WriteHTML
 	buildOutput         = exporter.BuildOutputWithOptions
@@ -129,6 +143,18 @@ func accountIDFromARN(arn string) string {
 		return accountIDUnknown
 	}
 	return parts[accountIndex]
+}
+
+func fetchAccountName(ctx context.Context, cfg *awssdk.Config, accountID string) (string, error) {
+	client := newAccountClient(cfg)
+	result, err := client.GetAccountInformation(ctx, &account.GetAccountInformationInput{
+		AccountId: awssdk.String(accountID),
+	})
+	if err != nil {
+		return "", fmt.Errorf("get account information: %w", err)
+	}
+
+	return strings.TrimSpace(awssdk.ToString(result.AccountName)), nil
 }
 
 // newApp builds the CLI application and wires the main action.
@@ -213,6 +239,10 @@ func runCommand(c *cli.Context, l interface {
 
 	l.Info("AWS identity", "identity", identityARN)
 	accountID := accountIDFromARN(identityARN)
+	accountName, accountNameErr := getAccountName(ctx, &cfg, accountID)
+	if accountNameErr != nil {
+		l.Error("failed to fetch AWS account information", "account_id", accountID, "error", accountNameErr)
+	}
 
 	// Collect schedules first, then persist both JSON and HTML outputs.
 	now := nowFunc().In(loc)
@@ -228,6 +258,7 @@ func runCommand(c *cli.Context, l interface {
 	result := buildOutput(accountID, now, since, loc, schedules, errs, exporter.BuildOutputOptions{
 		IncludeNonSlotRuns: c.Bool(includeNonSlotRunsFlagName),
 	})
+	result.AccountName = accountName
 	outDir := filepath.Join(c.String(outputDirFlagName), accountID, defaultOutputSubDir)
 	if mkErr := mkdirAll(outDir, outputDirPermission); mkErr != nil {
 		return fmt.Errorf("failed to create output directory: %w", mkErr)

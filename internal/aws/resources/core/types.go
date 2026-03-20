@@ -29,6 +29,7 @@ type Run struct {
 }
 
 type Schedule struct {
+	Description                string
 	Region                     string
 	TargetName                 string
 	ScheduleGroupName          string

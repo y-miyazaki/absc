@@ -48,12 +48,12 @@ ABSC generates an interactive HTML viewer that allows you to browse collected sc
 ### Using Go Install
 
 ```bash
-go install github.com/y-miyazaki/absc/cmd/absc@v1.0.6
+go install github.com/y-miyazaki/absc/cmd/absc@v1.0.7
 ```
 
 ### Using Release tar.gz
 
-You can download a prebuilt release tarball from the Releases page and install it quickly. The examples below use the `v1.0.6` release.
+You can download a prebuilt release tarball from the Releases page and install it quickly. The examples below use the `v1.0.7` release.
 
 Available platforms:
 
@@ -64,20 +64,20 @@ Available platforms:
 Linux (AMD64) example:
 
 ```bash
-VERSION=v1.0.6 && curl -L https://github.com/y-miyazaki/absc/releases/download/${VERSION}/absc-linux-amd64.tar.gz | tar -xzf - && sudo mv absc /usr/local/bin/ && sudo chmod +x /usr/local/bin/absc
+VERSION=v1.0.7 && curl -L https://github.com/y-miyazaki/absc/releases/download/${VERSION}/absc-linux-amd64.tar.gz | tar -xzf - && sudo mv absc /usr/local/bin/ && sudo chmod +x /usr/local/bin/absc
 ```
 
 macOS (ARM64) example:
 
 ```bash
-VERSION=v1.0.6 && curl -L https://github.com/y-miyazaki/absc/releases/download/${VERSION}/absc-darwin-arm64.tar.gz | tar -xzf - && sudo mv absc /usr/local/bin/ && sudo chmod +x /usr/local/bin/absc
+VERSION=v1.0.7 && curl -L https://github.com/y-miyazaki/absc/releases/download/${VERSION}/absc-darwin-arm64.tar.gz | tar -xzf - && sudo mv absc /usr/local/bin/ && sudo chmod +x /usr/local/bin/absc
 ```
 
 Notes:
 
 - The release typically ships an `absc-${VERSION}-checksums.txt` file. Verify the checksum before installing in production.
 - For Windows, download the `.zip` asset from the Releases page and extract the `absc.exe` binary.
-- `go install` is convenient for development. Release tarballs are preferable when you want a pinned binary such as `v1.0.6`.
+- `go install` is convenient for development. Release tarballs are preferable when you want a pinned binary such as `v1.0.7`.
 
 ### Build from Source
 
@@ -114,6 +114,8 @@ ls -lh ./output/*/schedules/
 ```
 
 The main artifacts are generated under `./output/{account-id}/schedules/`.
+
+In the generated HTML viewer and errors page, the account header is displayed as `accountName(accountID)` when AWS Account metadata is available.
 
 ## Usage
 
@@ -222,7 +224,7 @@ output/
 
 `schedules.json` contains:
 
-- Metadata such as account ID, timezone, generation time, and timeline window
+- Metadata such as account ID, optional account name, timezone, generation time, and timeline window
 - Schedule definitions collected from EventBridge Rules and Scheduler
 - Recent run history for supported target services
 - Error records grouped by service and region
@@ -231,6 +233,7 @@ output/
 
 `index.html` is a self-contained timeline viewer backed by the same JSON payload. It provides:
 
+- Account metadata shown as `accountName(accountID)` when available
 - Service and region filters
 - Sticky schedule name column
 - 10-minute slots across a 24-hour window
@@ -259,15 +262,17 @@ The HTML file can be opened directly in a browser because the payload is embedde
 
 ABSC requires read-only access for the schedule sources and the target services whose execution history you want to inspect.
 
-For schedule definitions only, use a minimal policy like this:
+For normal ABSC usage, it is safer to start with a single base policy like this:
 
 ```json
 {
   "Version": "2012-10-17",
   "Statement": [
     {
+      "Sid": "ReadScheduleDefinitionsAndAccountMetadata",
       "Effect": "Allow",
       "Action": [
+        "account:GetAccountInformation",
         "sts:GetCallerIdentity",
         "events:ListRules",
         "events:ListTargetsByRule",
@@ -275,18 +280,35 @@ For schedule definitions only, use a minimal policy like this:
         "scheduler:GetSchedule"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "ReadExecutionHistoryForSupportedTargets",
+      "Effect": "Allow",
+      "Action": [
+        "states:ListExecutions",
+        "batch:ListJobs",
+        "ecs:ListTasks",
+        "ecs:DescribeTasks",
+        "cloudtrail:LookupEvents",
+        "glue:GetJobRuns",
+        "logs:FilterLogEvents"
+      ],
+      "Resource": "*"
     }
   ]
 }
 ```
 
-If you also need run enrichment, add the following actions based on target type:
+If you only need schedule-definition collection and do not need run enrichment, you can remove the `ReadExecutionHistoryForSupportedTargets` statement.
+
+If you prefer to separate permissions, the run-enrichment statement is:
 
 ```json
 {
   "Version": "2012-10-17",
   "Statement": [
     {
+      "Sid": "ReadExecutionHistoryForSupportedTargets",
       "Effect": "Allow",
       "Action": [
         "states:ListExecutions",
@@ -305,6 +327,9 @@ If you also need run enrichment, add the following actions based on target type:
 
 Notes:
 
+- `account:GetAccountInformation` is used to resolve the account display name shown as `accountName(accountID)` in generated HTML and error pages.
+- `account:GetAccountInformation` is recommended as part of the default policy because it is easy to miss and ABSC now uses it for standard account display metadata.
+- If you run ABSC from CI/CD or an assumed role, add `account:GetAccountInformation` to that role as well.
 - `cloudtrail:LookupEvents` is only needed for ECS backfill when stopped-task history is outside ECS API retention.
 - If you do not use run enrichment, the second policy block is not required.
 - You can scope resources more tightly per service where IAM supports resource-level restrictions.
@@ -357,8 +382,11 @@ jobs:
           role-to-assume: arn:aws:iam::123456789012:role/GitHubActionsRole
           aws-region: ap-northeast-1
 
+      # The assumed role should include account:GetAccountInformation
+      # if you want the generated pages to show accountName(accountID).
+
       - name: Install absc
-        run: go install github.com/y-miyazaki/absc/cmd/absc@v1.0.6
+        run: go install github.com/y-miyazaki/absc/cmd/absc@v1.0.7
 
       - name: Collect schedules
         run: absc --timezone Asia/Tokyo

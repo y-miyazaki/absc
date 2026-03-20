@@ -5,6 +5,7 @@ go 1.25.8
 require (
 	github.com/aws/aws-sdk-go-v2 v1.41.4
 	github.com/aws/aws-sdk-go-v2/config v1.32.12
+	github.com/aws/aws-sdk-go-v2/service/account v1.30.4
 	github.com/aws/aws-sdk-go-v2/service/batch v1.61.2
 	github.com/aws/aws-sdk-go-v2/service/cloudtrail v1.55.8
 	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.64.1
@@ -14,7 +15,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/scheduler v1.17.21
 	github.com/aws/aws-sdk-go-v2/service/sfn v1.40.9
 	github.com/urfave/cli/v2 v2.27.7
-	github.com/y-miyazaki/go-common v0.7.0
+	github.com/y-miyazaki/go-common v0.8.1
 )
 
 require (

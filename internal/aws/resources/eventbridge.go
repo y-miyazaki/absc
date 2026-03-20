@@ -94,6 +94,7 @@ func (c *EventBridgeCollector) Collect(ctx context.Context, opts CollectOptions)
 				schedules = append(schedules, Schedule{
 					ID:                 fmt.Sprintf("eventbridge_rule:%s:%s:no-target", c.region, aws.ToString(r.Name)),
 					Service:            "eventbridge_rule",
+					Description:        aws.ToString(r.Description),
 					ScheduleName:       aws.ToString(r.Name),
 					ScheduleExpression: expr,
 					Enabled:            enabled,
@@ -122,6 +123,7 @@ func (c *EventBridgeCollector) Collect(ctx context.Context, opts CollectOptions)
 				s := Schedule{
 					ID:                 fmt.Sprintf("eventbridge_rule:%s:%s:%d", c.region, aws.ToString(r.Name), i),
 					Service:            "eventbridge_rule",
+					Description:        aws.ToString(r.Description),
 					ScheduleName:       aws.ToString(r.Name),
 					ScheduleExpression: expr,
 					Enabled:            enabled,

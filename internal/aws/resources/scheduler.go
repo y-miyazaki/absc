@@ -105,6 +105,7 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 				s := Schedule{
 					ID:                         fmt.Sprintf("eventbridge_scheduler:%s:%s", c.region, aws.ToString(detail.Name)),
 					Service:                    "eventbridge_scheduler",
+					Description:                aws.ToString(detail.Description),
 					ScheduleGroupName:          aws.ToString(detail.GroupName),
 					ScheduleName:               aws.ToString(detail.Name),
 					ScheduleExpression:         aws.ToString(detail.ScheduleExpression),
@@ -134,6 +135,7 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 			s := Schedule{
 				ID:                         fmt.Sprintf("eventbridge_scheduler:%s:%s", c.region, aws.ToString(detail.Name)),
 				Service:                    "eventbridge_scheduler",
+				Description:                aws.ToString(detail.Description),
 				ScheduleGroupName:          aws.ToString(detail.GroupName),
 				ScheduleName:               aws.ToString(detail.Name),
 				ScheduleExpression:         aws.ToString(detail.ScheduleExpression),

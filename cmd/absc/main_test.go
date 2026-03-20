@@ -11,6 +11,7 @@ import (
 	"time"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/account"
 	"github.com/urfave/cli/v2"
 
 	"github.com/y-miyazaki/absc/internal/aws/resources"
@@ -18,6 +19,18 @@ import (
 )
 
 type noopLogger struct{}
+
+type stubAccountClient struct {
+	getAccountInformation func(context.Context, *account.GetAccountInformationInput, ...func(*account.Options)) (*account.GetAccountInformationOutput, error)
+}
+
+func (s stubAccountClient) GetAccountInformation(
+	ctx context.Context,
+	in *account.GetAccountInformationInput,
+	optFns ...func(*account.Options),
+) (*account.GetAccountInformationOutput, error) {
+	return s.getAccountInformation(ctx, in, optFns...)
+}
 
 func (noopLogger) Error(string, ...any) {}
 
@@ -45,7 +58,9 @@ func newTestContext(t *testing.T, values map[string]string) *cli.Context {
 func restoreCommandDeps() func() {
 	originalCheck := checkAWSCredentials
 	originalCollect := collectSchedules
+	originalGetAccountName := getAccountName
 	originalMkdirAll := mkdirAll
+	originalNewAccountClient := newAccountClient
 	originalNewAWSConfig := newAWSConfig
 	originalNowFunc := nowFunc
 	originalBuildOutput := buildOutput
@@ -57,7 +72,9 @@ func restoreCommandDeps() func() {
 	return func() {
 		checkAWSCredentials = originalCheck
 		collectSchedules = originalCollect
+		getAccountName = originalGetAccountName
 		mkdirAll = originalMkdirAll
+		newAccountClient = originalNewAccountClient
 		newAWSConfig = originalNewAWSConfig
 		nowFunc = originalNowFunc
 		buildOutput = originalBuildOutput
@@ -171,6 +188,50 @@ func TestAccountIDFromARN(t *testing.T) {
 	}
 }
 
+func TestFetchAccountName(t *testing.T) {
+	t.Parallel()
+
+	defer restoreCommandDeps()()
+
+	newAccountClient = func(_ *awssdk.Config) accountInformationAPI {
+		return stubAccountClient{
+			getAccountInformation: func(_ context.Context, in *account.GetAccountInformationInput, _ ...func(*account.Options)) (*account.GetAccountInformationOutput, error) {
+				if got := awssdk.ToString(in.AccountId); got != "123456789012" {
+					t.Fatalf("account id = %q, want %q", got, "123456789012")
+				}
+				return &account.GetAccountInformationOutput{AccountName: awssdk.String("sandbox")}, nil
+			},
+		}
+	}
+
+	got, err := fetchAccountName(context.Background(), &awssdk.Config{}, "123456789012")
+	if err != nil {
+		t.Fatalf("fetchAccountName() error = %v", err)
+	}
+	if got != "sandbox" {
+		t.Fatalf("fetchAccountName() = %q, want %q", got, "sandbox")
+	}
+}
+
+func TestFetchAccountName_Error(t *testing.T) {
+	t.Parallel()
+
+	defer restoreCommandDeps()()
+
+	newAccountClient = func(_ *awssdk.Config) accountInformationAPI {
+		return stubAccountClient{
+			getAccountInformation: func(context.Context, *account.GetAccountInformationInput, ...func(*account.Options)) (*account.GetAccountInformationOutput, error) {
+				return nil, errors.New("boom")
+			},
+		}
+	}
+
+	_, err := fetchAccountName(context.Background(), &awssdk.Config{}, "123456789012")
+	if err == nil || !strings.Contains(err.Error(), "get account information") {
+		t.Fatalf("fetchAccountName() error = %v, want wrapped error", err)
+	}
+}
+
 func TestRunCommand_MaxResultsValidation(t *testing.T) {
 	ctx := newTestContext(t, map[string]string{maxResultsFlagName: "0"})
 	err := runCommand(ctx, noopLogger{})
@@ -217,6 +278,9 @@ func TestRunCommand_Success(t *testing.T) {
 	checkAWSCredentials = func(context.Context, *awssdk.Config) (string, error) {
 		return "arn:aws:iam::123456789012:role/Admin", nil
 	}
+	getAccountName = func(context.Context, *awssdk.Config, string) (string, error) {
+		return "sandbox", nil
+	}
 	collectSchedules = func(context.Context, *awssdk.Config, resources.CollectOptions) ([]resources.Schedule, []resources.ErrorRecord) {
 		return nil, nil
 	}
@@ -224,8 +288,11 @@ func TestRunCommand_Success(t *testing.T) {
 		mkdirPath = path
 		return nil
 	}
-	writeJSON = func(path string, _ *exporter.Output) error {
+	writeJSON = func(path string, out *exporter.Output) error {
 		jsonPath = path
+		if out.AccountName != "sandbox" {
+			t.Fatalf("output account name = %q, want %q", out.AccountName, "sandbox")
+		}
 		return nil
 	}
 	writeHTML = func(path string, _ *exporter.Output) error {

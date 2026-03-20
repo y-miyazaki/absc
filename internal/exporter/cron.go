@@ -49,6 +49,7 @@ var slotIssuePolicyJSON string
 type Output struct {
 	Version     string           `json:"version"`
 	GeneratedAt string           `json:"generated_at"`
+	AccountName string           `json:"account_name,omitempty"`
 	AccountID   string           `json:"account_id"`
 	Timezone    string           `json:"timezone"`
 	Schedules   []Schedule       `json:"schedules"`
@@ -96,6 +97,7 @@ type Window struct {
 type Schedule struct {
 	TargetAction               string         `json:"target_action,omitempty"`
 	ID                         string         `json:"id"`
+	Description                string         `json:"description,omitempty"`
 	ScheduleGroupName          string         `json:"schedule_group_name,omitempty"`
 	ScheduleName               string         `json:"schedule_name"`
 	ScheduleExpression         string         `json:"schedule_expression"`
@@ -223,7 +225,7 @@ const errorsHTMLTemplate = `<!doctype html>
 </head>
 <body>
 	<h1>ABSC Errors</h1>
-	<div class="meta">Generated at {{ .GeneratedAt }} | Account: {{ .AccountID }} | Timezone: {{ .Timezone }} | Count: {{ len .Errors }}</div>
+	<div class="meta">Generated at {{ .GeneratedAt }} | Account: {{ if .AccountName }}{{ .AccountName }}({{ .AccountID }}){{ else }}{{ .AccountID }}{{ end }} | Timezone: {{ .Timezone }} | Count: {{ len .Errors }}</div>
 	<div class="toplink"><a href="index.html">&larr; Back to timeline</a></div>
 	{{ if .Errors }}
 	<table>
@@ -358,6 +360,7 @@ func BuildOutputWithOptions(accountID string, now, since time.Time, loc *time.Lo
 		out.Schedules = append(out.Schedules, Schedule{
 			ID:                         s.ID,
 			Service:                    s.Service,
+			Description:                s.Description,
 			ScheduleGroupName:          s.ScheduleGroupName,
 			ScheduleName:               s.ScheduleName,
 			ScheduleExpression:         s.ScheduleExpression,
