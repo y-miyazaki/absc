@@ -1,5 +1,7 @@
-//revive:disable:comments-density reason: parser logic is straightforward and additional comments would add noise.
-package resources
+// Package runs resolves execution history for schedule targets.
+//
+//revive:disable:comments-density reason: parser-focused collector code is intentionally compact.
+package runs
 
 import (
 	"context"
@@ -15,20 +17,23 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	cloudwatchlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
+	resourcescore "github.com/y-miyazaki/absc/internal/aws/resources/core"
+	"github.com/y-miyazaki/absc/internal/helpers"
 )
 
-const lambdaFilterPatternPlatformReport = "\"platform.report\""
-const lambdaFilterPatternReportLine = "\"REPORT RequestId\""
-const lambdaPlatformReportType = "platform.report"
+const (
+	lambdaFilterPatternPlatformReport = "\"platform.report\""
+	lambdaFilterPatternReportLine     = "\"REPORT RequestId\""
+	lambdaFloatBitSize                = 64
+	lambdaPlatformReportType          = "platform.report"
+	lambdaSplitParts                  = 2
+	lambdaStatusCompleted             = "COMPLETED"
+	lambdaStatusFailed                = "FAILED"
+)
 
 var lambdaDurationPattern = regexp.MustCompile(`Duration:\s*(\d+(?:\.\d+)?)\s*ms`)
 var lambdaErrorTypePattern = regexp.MustCompile(`Error Type:\s*([A-Za-z0-9._-]+)`)
 var lambdaStatusPattern = regexp.MustCompile(`Status:\s*([A-Za-z_]+)`)
-
-const lambdaSplitParts = 2
-const lambdaFloatBitSize = 64
-const lambdaStatusCompleted = "COMPLETED"
-const lambdaStatusFailed = "FAILED"
 
 type lambdaPlatformReport struct {
 	Type   string                     `json:"type"`
@@ -46,15 +51,13 @@ type lambdaPlatformReportRecord struct {
 	Metrics   lambdaPlatformReportMetrics `json:"metrics"`
 }
 
-// collectLambdaRuns extracts recent Lambda invocations from CloudWatch Logs REPORT lines.
-func collectLambdaRuns(ctx context.Context, svc *cloudwatchlogs.Client, functionTarget string, since, until time.Time, maxResults int) ([]Run, error) {
-	// Resolve the effective function name from either ARN or plain name inputs.
+func collectLambdaRuns(ctx context.Context, svc *cloudwatchlogs.Client, functionTarget string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
 	functionName := lambdaFunctionName(functionTarget)
 	if functionName == "" {
-		return make([]Run, 0), nil
+		return make([]resourcescore.Run, 0), nil
 	}
 
-	runs := make([]Run, 0, maxResults)
+	runs := make([]resourcescore.Run, 0, maxResults)
 	seen := make(map[string]struct{}, maxResults)
 	for _, filterPattern := range []string{lambdaFilterPatternReportLine, lambdaFilterPatternPlatformReport} {
 		matchedRuns, err := collectLambdaRunsWithPattern(ctx, svc, functionName, since, until, maxResults, filterPattern)
@@ -72,7 +75,7 @@ func collectLambdaRuns(ctx context.Context, svc *cloudwatchlogs.Client, function
 		}
 	}
 
-	slices.SortStableFunc(runs, func(left, right Run) int {
+	slices.SortStableFunc(runs, func(left, right resourcescore.Run) int {
 		return lambdaRunSortTime(&right).Compare(lambdaRunSortTime(&left))
 	})
 	if len(runs) > maxResults {
@@ -81,19 +84,13 @@ func collectLambdaRuns(ctx context.Context, svc *cloudwatchlogs.Client, function
 	return runs, nil
 }
 
-func collectLambdaRunsWithPattern(ctx context.Context, svc *cloudwatchlogs.Client, functionName string, since, until time.Time, maxResults int, filterPattern string) ([]Run, error) {
-	logGroupName := "/aws/lambda/" + functionName
-	input := &cloudwatchlogs.FilterLogEventsInput{
-		LogGroupName:  aws.String(logGroupName),
-		StartTime:     aws.Int64(since.UnixMilli()),
-		FilterPattern: aws.String(filterPattern),
-	}
+func collectLambdaRunsWithPattern(ctx context.Context, svc *cloudwatchlogs.Client, functionName string, since, until time.Time, maxResults int, filterPattern string) ([]resourcescore.Run, error) {
+	input := &cloudwatchlogs.FilterLogEventsInput{LogGroupName: aws.String("/aws/lambda/" + functionName), StartTime: aws.Int64(since.UnixMilli()), FilterPattern: aws.String(filterPattern)}
 	if !until.IsZero() {
 		input.EndTime = aws.Int64(until.UnixMilli())
 	}
-
 	p := cloudwatchlogs.NewFilterLogEventsPaginator(svc, input)
-	runs := make([]Run, 0, maxResults)
+	runs := make([]resourcescore.Run, 0, maxResults)
 	for p.HasMorePages() {
 		page, err := p.NextPage(ctx)
 		if err != nil {
@@ -113,56 +110,46 @@ func collectLambdaRunsWithPattern(ctx context.Context, svc *cloudwatchlogs.Clien
 	return runs, nil
 }
 
-func lambdaRunFromLogEvent(ev cloudwatchlogstypes.FilteredLogEvent, since time.Time) (Run, bool) {
-	if ev.Timestamp == nil || ev.Message == nil {
-		return Run{}, false
+func lambdaRunFromLogEvent(event cloudwatchlogstypes.FilteredLogEvent, since time.Time) (resourcescore.Run, bool) {
+	if event.Timestamp == nil || event.Message == nil {
+		return resourcescore.Run{}, false
 	}
-	end := fromMillis(*ev.Timestamp)
+	end := helpers.FromMillis(*event.Timestamp)
 	if end.IsZero() || end.Before(since) {
-		return Run{}, false
+		return resourcescore.Run{}, false
 	}
 
-	durSec := lambdaDurationSec(*ev.Message)
+	durationSec := lambdaDurationSec(*event.Message)
 	start := end
-	if durSec > 0 {
-		start = end.Add(-time.Duration(durSec) * time.Second)
+	if durationSec > 0 {
+		start = end.Add(-time.Duration(durationSec) * time.Second)
 	}
 
-	run := Run{
-		RunID:         eventIDOrTime(ev.EventId, end),
-		Status:        lambdaRunStatus(*ev.Message),
-		StartAt:       formatRFC3339UTC(start),
-		EndAt:         formatRFC3339UTC(end),
-		SourceService: "lambda",
-	}
-	if durSec > 0 {
-		d := durSec
-		run.DurationSec = &d
+	run := resourcescore.Run{RunID: eventIDOrTime(event.EventId, end), Status: lambdaRunStatus(*event.Message), StartAt: helpers.FormatRFC3339UTC(start), EndAt: helpers.FormatRFC3339UTC(end), SourceService: "lambda"}
+	if durationSec > 0 {
+		duration := durationSec
+		run.DurationSec = &duration
 	}
 	return run, true
 }
 
-// lambdaFunctionName normalizes supported Lambda target formats to a function name.
 func lambdaFunctionName(functionTarget string) string {
-	// Event targets can be plain names, Lambda ARNs, or qualified Lambda ARNs.
-	t := strings.TrimSpace(functionTarget)
-	if t == "" {
+	trimmed := strings.TrimSpace(functionTarget)
+	if trimmed == "" {
 		return ""
 	}
-	if strings.Contains(t, ":function:") {
-		parts := strings.SplitN(t, ":function:", lambdaSplitParts)
+	if strings.Contains(trimmed, ":function:") {
+		parts := strings.SplitN(trimmed, ":function:", lambdaSplitParts)
 		if len(parts) == lambdaSplitParts {
-			nameWithQualifier := parts[1]
-			return strings.SplitN(nameWithQualifier, ":", lambdaSplitParts)[0]
+			return strings.SplitN(parts[1], ":", lambdaSplitParts)[0]
 		}
 	}
-	if strings.Contains(t, ":") {
-		return resourceNameFromARN(t)
+	if strings.Contains(trimmed, ":") {
+		return helpers.ResourceNameFromARN(trimmed)
 	}
-	return t
+	return trimmed
 }
 
-// lambdaDurationSec extracts the reported duration and rounds it to whole seconds.
 func lambdaDurationSec(message string) int64 {
 	if report, ok := parseLambdaPlatformReport(message); ok {
 		if report.Record.Metrics.DurationMs <= 0 {
@@ -170,20 +157,17 @@ func lambdaDurationSec(message string) int64 {
 		}
 		return int64(math.Ceil(report.Record.Metrics.DurationMs / 1000.0))
 	}
-
-	// REPORT lines contain duration in milliseconds, which is rounded up to seconds.
-	m := lambdaDurationPattern.FindStringSubmatch(message)
-	if len(m) < lambdaSplitParts {
+	match := lambdaDurationPattern.FindStringSubmatch(message)
+	if len(match) < lambdaSplitParts {
 		return 0
 	}
-	ms, err := strconv.ParseFloat(m[1], lambdaFloatBitSize)
-	if err != nil || ms <= 0 {
+	milliseconds, err := strconv.ParseFloat(match[1], lambdaFloatBitSize)
+	if err != nil || milliseconds <= 0 {
 		return 0
 	}
-	return int64(math.Ceil(ms / 1000.0))
+	return int64(math.Ceil(milliseconds / 1000.0))
 }
 
-// lambdaRunStatus infers invocation status from REPORT lines.
 func lambdaRunStatus(message string) string {
 	if lambdaRunStatusDetail(message) == lambdaStatusCompleted {
 		return lambdaStatusCompleted
@@ -191,38 +175,33 @@ func lambdaRunStatus(message string) string {
 	return lambdaStatusFailed
 }
 
-// lambdaRunStatusDetail keeps detailed failure reasons for future UI improvements.
 func lambdaRunStatusDetail(message string) string {
 	if report, ok := parseLambdaPlatformReport(message); ok {
 		return lambdaStatusDetailFromFields(report.Record.Status, report.Record.ErrorType)
 	}
-
 	lower := strings.ToLower(message)
-
 	if strings.Contains(lower, "task timed out") || strings.Contains(lower, "status: timeout") {
 		return "TIMED_OUT"
 	}
 	if strings.Contains(lower, "outofmemory") || strings.Contains(lower, "out of memory") {
 		return "OUT_OF_MEMORY"
 	}
-
-	if m := lambdaStatusPattern.FindStringSubmatch(message); len(m) == lambdaSplitParts {
+	if match := lambdaStatusPattern.FindStringSubmatch(message); len(match) == lambdaSplitParts {
 		errorType := ""
-		if em := lambdaErrorTypePattern.FindStringSubmatch(message); len(em) == lambdaSplitParts {
-			errorType = em[1]
+		if errorMatch := lambdaErrorTypePattern.FindStringSubmatch(message); len(errorMatch) == lambdaSplitParts {
+			errorType = errorMatch[1]
 		}
-		return lambdaStatusDetailFromFields(m[1], errorType)
+		return lambdaStatusDetailFromFields(match[1], errorType)
 	}
-
 	return lambdaStatusCompleted
 }
 
-func lambdaRunSortTime(run *Run) time.Time {
-	if t, err := time.Parse(time.RFC3339, run.EndAt); err == nil {
-		return t
+func lambdaRunSortTime(run *resourcescore.Run) time.Time {
+	if parsed, err := time.Parse(time.RFC3339, run.EndAt); err == nil {
+		return parsed
 	}
-	if t, err := time.Parse(time.RFC3339, run.StartAt); err == nil {
-		return t
+	if parsed, err := time.Parse(time.RFC3339, run.StartAt); err == nil {
+		return parsed
 	}
 	return time.Time{}
 }
@@ -230,18 +209,15 @@ func lambdaRunSortTime(run *Run) time.Time {
 func lambdaStatusDetailFromFields(status, errorType string) string {
 	normalizedStatus := strings.ToUpper(strings.TrimSpace(status))
 	normalizedErrorType := strings.ToUpper(strings.TrimSpace(errorType))
-
 	if strings.Contains(normalizedErrorType, "OUTOFMEMORY") {
 		return "OUT_OF_MEMORY"
 	}
-
 	switch normalizedStatus {
 	case "TIMEOUT", "TIMED_OUT":
 		return "TIMED_OUT"
 	case "ERROR", "FAILURE", "FAILED":
 		return lambdaStatusFailed
 	}
-
 	return lambdaStatusCompleted
 }
 
@@ -256,10 +232,9 @@ func parseLambdaPlatformReport(message string) (lambdaPlatformReport, bool) {
 	return report, true
 }
 
-// eventIDOrTime prefers the CloudWatch event id and falls back to a timestamp key.
-func eventIDOrTime(eventID *string, t time.Time) string {
+func eventIDOrTime(eventID *string, timestamp time.Time) string {
 	if eventID != nil && *eventID != "" {
 		return *eventID
 	}
-	return formatRFC3339NanoUTC(t)
+	return helpers.FormatRFC3339NanoUTC(timestamp)
 }

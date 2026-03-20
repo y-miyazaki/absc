@@ -4,18 +4,12 @@ package resources
 import (
 	"context"
 	"sync"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	resourcescore "github.com/y-miyazaki/absc/internal/aws/resources/core"
 )
 
-type CollectOptions struct {
-	Since          time.Time
-	Until          time.Time
-	Regions        []string
-	MaxConcurrency int
-	MaxResults     int
-}
+type CollectOptions = resourcescore.CollectOptions
 
 const defaultMaxConcurrency = 5
 const defaultMaxResults = 144
@@ -31,6 +25,8 @@ type Collector interface {
 // Collect fans out per-region collectors and merges their schedules and errors.
 // It keeps partial failures so one region or service does not stop the full run.
 // Default concurrency and max-results values are applied when callers omit them.
+//
+//nolint:gocritic // CollectOptions is intentionally passed by value to preserve the public API.
 func Collect(ctx context.Context, cfg *aws.Config, opts CollectOptions) ([]Schedule, []ErrorRecord) {
 	schedules := make([]Schedule, 0)
 	errs := make([]ErrorRecord, 0)

@@ -1,100 +1,65 @@
-# メンテナンス ノート
+# Maintenance Notes
 
-## Cron 式解析ロジックの統一化（将来の課題）
+## Current Cron Parsing Architecture
 
-### 現状の冗長性
-現在、Cron 式マッチング ロジックが 2 つの場所に分散しています：
+Cron parsing and matching logic is now centralized in [internal/helpers/aws_cron.go](internal/helpers/aws_cron.go).
 
-| 場所                                                  | 関数                  | 用途                                 |
-| ----------------------------------------------------- | --------------------- | ------------------------------------ |
-| `internal/aws/resources/scheduler_next_invocation.go` | `matchCronPart()`     | EventBridge Scheduler の cron 式評価 |
-| `internal/exporter/cron.go`                           | `matchAWSFieldPart()` | HTML 出力用の cron 期間判定          |
+The following packages delegate to the shared helper functions:
 
-両関数のロジックはほぼ同一ですが、パッケージの循環依存を避けるため分散しています：
-- `exporter` は `resources` に依存
-- `resources` が `exporter` に依存すると循環参照となる
+- [internal/aws/resources/scheduler_next_invocation.go](internal/aws/resources/scheduler_next_invocation.go)
+- [internal/exporter/cron.go](internal/exporter/cron.go)
 
-### 推奨される将来の改善案
+This removed prior duplication and eliminated the need for a separate cron utility package proposal.
 
-#### Option 1: 共有モジュール化（推奨）
-```
-internal/aws/cron/
-├── matcher.go       # MatchCronFieldPart() など統一関数
-┗── constants.go     # 共有定数
-```
+## Current Resource Collection Architecture
 
-利点：
-- DRY 原則を満たす
-- バグ修正が一箇所
-- テストが一元化
+The resources package was split into a small shared-core layer and service-specific run collectors.
 
-実装手順：
-1. `internal/aws/cron/` ディレクトリを作成
-2. `resources/scheduler_next_invocation.go` の `matchCronPart()` をリファクタリング
-3. `exporter/cron.go` からインポートして使用
+Shared types and collection options:
+- [internal/aws/resources/core/types.go](internal/aws/resources/core/types.go)
 
-#### Option 2: 標準ライブラリの活用
-Go 1.21+ では `github.com/robfig/cron/v3` や他の高品質なライブラリの採用も検討。
+Run collection implementations:
+- [internal/aws/resources/runs/resolver.go](internal/aws/resources/runs/resolver.go)
+- [internal/aws/resources/runs/batch.go](internal/aws/resources/runs/batch.go)
+- [internal/aws/resources/runs/ecs.go](internal/aws/resources/runs/ecs.go)
+- [internal/aws/resources/runs/ecs_cloudtrail.go](internal/aws/resources/runs/ecs_cloudtrail.go)
+- [internal/aws/resources/runs/glue_step.go](internal/aws/resources/runs/glue_step.go)
+- [internal/aws/resources/runs/lambda.go](internal/aws/resources/runs/lambda.go)
 
-### 定数の分散
+Legacy files such as `collect_batch.go`, `collect_ecs.go`, and `collect_lambda.go` were removed as part of this refactor.
 
-#### scheduler_next_invocation.go の定数
-```go
-const (
-    cronDashSeparator = "-"
-    cronRangeSplitParts = 2
-    cronNoSpecificValue = "?"
-    // ...
-)
-```
+## Change Log
 
-#### cron.go の定数
-```go
-const (
-    awsCronDashSeparator = "-"
-    awsCronSplitParts = 2
-    awsCronNoSpecific = "?"
-    // ...色/パターンの定数
-)
-```
+### 2026-03-19: Restored Lambda maxResults Guard
 
-**統一提案:**
-- 接頭語を統一（`cronXxx` vs `awsCronXxx`）
-- 定数値は同じため、共有ファイルに統合可能
+Issue:
+- In Lambda run collection, the max-results guard had been removed from pattern-based log collection, which could cause over-collection from CloudWatch Logs.
 
----
-
-## 修正履歴
-
-### 2026-03-19: Lambda maxResults 制限の復活
-
-**問題:** `collect_lambda.go` の `collectLambdaRunsWithPattern()` から maxResults チェックが削除され、CloudWatch Logs が無制限に返される
+Current behavior:
+- [internal/aws/resources/runs/lambda.go](internal/aws/resources/runs/lambda.go) enforces the cap in `collectLambdaRunsWithPattern()`.
 
 ```go
-// 削除されていたコード（復活済み）
 if len(runs) >= maxResults {
-    return runs, nil
+        return runs, nil
 }
 ```
 
-**影響:**
-- Lambda 関数の実行数が多い環境で、メモリ使用量が増加
-- 他の収集器との一貫性が低下
+Impact:
+- Prevents unbounded memory growth for high-volume functions.
+- Keeps behavior consistent with other collectors that enforce `maxResults`.
 
-**修正:** チェックを復活させ、maxResults 制限を有効化
+## Test Coverage Notes
 
----
+### Existing Cron-Related Regression Tests
 
-## テスト戦略
+- `TestComputeSchedulerNextInvocation_CronWraparoundMinuteRange`
+- `TestComputeSchedulerNextInvocation_CronWraparoundWeekdayRange`
+- `TestBuildOutput_SlotRunIssues_WraparoundMinuteRange_Issue`
+- `TestBuildOutput_SlotRunIssues_WraparoundWeekdayOnWindowDay_Issue`
+- `TestBuildSlots_CronWraparoundHourRange`
+- `TestBuildSlots_CronWraparoundMinuteStepRange`
 
-### Cron マッチング テスト
-- ✅ `TestComputeSchedulerNextInvocation_CronWraparoundMinuteRange`
-- ✅ `TestComputeSchedulerNextInvocation_CronWraparoundWeekdayRange`
-- ✅ `TestBuildOutput_SlotRunIssues_WraparoundMinuteRange_Issue`
-- ✅ `TestBuildOutput_SlotRunIssues_WraparoundWeekdayOnWindowDay_Issue`
-- ✅ `TestBuildSlots_CronWraparoundHourRange`
-- ✅ `TestBuildSlots_CronWraparoundMinuteStepRange`
+### Suggested Additional Tests
 
-### 今後のテスト追加
-1. Cron マッチング関数の統一後：`internal/aws/cron/` パッケージの包括的なテスト
-2. エッジケース：年の範囲、月の範囲、複数の wrapping range など
+1. Add focused tests for scheduler target-input parsing in [internal/aws/resources/scheduler.go](internal/aws/resources/scheduler.go), especially `resolveSchedulerRunTarget()` for `aws-sdk:ecs:*` payload variants.
+2. Expand edge-case cron tests for wider year ranges and mixed wrapping ranges in one expression.

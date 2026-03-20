@@ -2,30 +2,20 @@
 package resources
 
 import (
-	"strconv"
 	"strings"
 	"time"
+
+	"github.com/y-miyazaki/absc/internal/helpers"
 )
 
 const (
-	buildSlotsFieldCount = 2
-	closeSuffix          = ")"
-	buildSlotsDayHours   = 24
-	buildSlotsDayMinutes = buildSlotsDayHours * 60
-	cronHourLimit        = 23
-	cronMinuteLimit      = 59
-	cronRangeSeparator   = "-"
-	maxInt32Value        = 1<<31 - 1
-	parseCronSplitParts  = 2
-	rateDayDefaultSlot   = 0
-	arnServiceIndex      = 2
-	arnSplitParts        = 6
-	colonSeparator       = ":"
-	sdkMinParts          = 2
-	sdkSplitParts        = 3
-	slotsPerHour         = 6
-	slotsPerRateMinute   = 10
-	schedulerSDKMarker   = ":aws-sdk:"
+	arnServiceIndex    = 2
+	arnSplitParts      = 6
+	colonSeparator     = ":"
+	sdkMinParts        = 2
+	sdkSplitParts      = 3
+	timelineSlotMinute = 10
+	schedulerSDKMarker = ":aws-sdk:"
 )
 
 var serviceLabelByARNService = map[string]string{
@@ -53,186 +43,17 @@ var serviceLabelBySDKService = map[string]string{
 
 // buildSlots maps cron or rate expressions into a fixed per-day slot timeline.
 func buildSlots(expr string) []int {
-	slots := make([]int, slotsPerDay)
-	e := strings.TrimSpace(expr)
-	if strings.HasPrefix(e, "cron(") && strings.HasSuffix(e, ")") {
-		inside := strings.TrimSuffix(strings.TrimPrefix(e, "cron("), closeSuffix)
-		fields := strings.Fields(inside)
-		if len(fields) >= buildSlotsFieldCount {
-			mins := parseCronField(fields[0], 0, cronMinuteLimit)
-			hours := parseCronField(fields[1], 0, cronHourLimit)
-			for _, h := range hours {
-				for _, m := range mins {
-					idx := h*slotsPerHour + (m / slotsPerRateMinute)
-					if idx >= 0 && idx < slotsPerDay {
-						slots[idx] = 1
-					}
-				}
-			}
-		}
-		return slots
-	}
-	if strings.HasPrefix(e, "rate(") && strings.HasSuffix(e, ")") {
-		inside := strings.TrimSuffix(strings.TrimPrefix(e, "rate("), closeSuffix)
-		fields := strings.Fields(inside)
-		if len(fields) >= buildSlotsFieldCount {
-			n, err := strconv.Atoi(fields[0])
-			if err == nil && n > 0 {
-				unit := strings.ToLower(fields[1])
-				switch {
-				case strings.HasPrefix(unit, "minute"):
-					for m := 0; m < buildSlotsDayMinutes; m += n {
-						slots[m/slotsPerRateMinute] = 1
-					}
-				case strings.HasPrefix(unit, "hour"):
-					for h := 0; h < buildSlotsDayHours; h += n {
-						slots[h*slotsPerHour] = 1
-					}
-				default:
-					slots[rateDayDefaultSlot] = 1
-				}
-			}
-		}
-	}
-	return slots
+	return helpers.BuildDailySlots(expr, timelineSlotMinute)
 }
 
+//nolint:unused // Transitional compatibility helper for legacy collectors.
 func parseCronField(field string, minValue, maxValue int) []int {
-	f := strings.TrimSpace(field)
-	// Expand all values when the field is a wildcard.
-	if f == "*" || f == "?" {
-		vals := make([]int, 0, maxValue-minValue+1)
-		for i := minValue; i <= maxValue; i++ {
-			vals = append(vals, i)
-		}
-		return vals
-	}
-	result := make(map[int]struct{})
-	for _, part := range strings.Split(f, ",") {
-		p := strings.TrimSpace(part)
-		if p == "" {
-			continue
-		}
-		if strings.Contains(p, "/") {
-			stepParts := strings.SplitN(p, "/", parseCronSplitParts)
-			if len(stepParts) != parseCronSplitParts {
-				continue
-			}
-			step, err := strconv.Atoi(strings.TrimSpace(stepParts[1]))
-			if err != nil || step <= 0 {
-				continue
-			}
-
-			start := minValue
-			end := maxValue
-			base := strings.TrimSpace(stepParts[0])
-			if base != "*" && base != "?" {
-				if strings.Contains(base, cronRangeSeparator) {
-					sp := strings.SplitN(base, cronRangeSeparator, parseCronSplitParts)
-					if len(sp) != parseCronSplitParts {
-						continue
-					}
-					start, err = strconv.Atoi(strings.TrimSpace(sp[0]))
-					if err != nil {
-						continue
-					}
-					end, err = strconv.Atoi(strings.TrimSpace(sp[1]))
-					if err != nil {
-						continue
-					}
-				} else {
-					start, err = strconv.Atoi(base)
-					if err != nil {
-						continue
-					}
-				}
-			}
-
-			if start < minValue {
-				start = minValue
-			}
-			if end > maxValue {
-				end = maxValue
-			}
-			if start > maxValue || end < minValue {
-				continue
-			}
-
-			if start <= end {
-				for i := start; i <= end; i += step {
-					result[i] = struct{}{}
-				}
-				continue
-			}
-
-			cycleLength := (maxValue - start + 1) + (end - minValue + 1)
-			for offset := 0; offset < cycleLength; offset += step {
-				candidate := start + offset
-				if candidate > maxValue {
-					candidate = minValue + (candidate - maxValue - 1)
-				}
-				if candidate >= minValue && candidate <= maxValue {
-					result[candidate] = struct{}{}
-				}
-			}
-			continue
-		}
-		if strings.Contains(p, cronRangeSeparator) {
-			sp := strings.SplitN(p, cronRangeSeparator, parseCronSplitParts)
-			start, e1 := strconv.Atoi(sp[0])
-			end, e2 := strconv.Atoi(sp[1])
-			if e1 != nil || e2 != nil {
-				continue
-			}
-			if start < minValue {
-				start = minValue
-			}
-			if end > maxValue {
-				end = maxValue
-			}
-			if start > end {
-				for i := start; i <= maxValue; i++ {
-					result[i] = struct{}{}
-				}
-				for i := minValue; i <= end; i++ {
-					result[i] = struct{}{}
-				}
-				continue
-			}
-			for i := start; i <= end; i++ {
-				result[i] = struct{}{}
-			}
-			continue
-		}
-		v, err := strconv.Atoi(p)
-		if err != nil {
-			continue
-		}
-		if v >= minValue && v <= maxValue {
-			result[v] = struct{}{}
-		}
-	}
-	vals := make([]int, 0, len(result))
-	for v := range result {
-		vals = append(vals, v)
-	}
-	// Fall back to the full supported range when no explicit values were parsed.
-	if len(vals) == 0 {
-		for i := minValue; i <= maxValue; i++ {
-			vals = append(vals, i)
-		}
-	}
-	return vals
+	return helpers.ParseCronField(field, minValue, maxValue)
 }
 
+//nolint:unused // Transitional compatibility helper for legacy collectors.
 func safeInt32(value int) int32 {
-	if value < 0 {
-		return 0
-	}
-	if value > maxInt32Value {
-		return maxInt32Value
-	}
-	return int32(value)
+	return helpers.SafeInt32(value)
 }
 
 //revive:disable-next-line:flag-parameter reason: batch parameters are part of the target classification input.
@@ -300,15 +121,7 @@ func detectTargetService(arn string) string {
 }
 
 func resourceNameFromARN(arn string) string {
-	if arn == "" {
-		return ""
-	}
-	parts := strings.Split(arn, "/")
-	if len(parts) > 1 {
-		return parts[len(parts)-1]
-	}
-	parts = strings.Split(arn, ":")
-	return parts[len(parts)-1]
+	return helpers.ResourceNameFromARN(arn)
 }
 
 // detectTargetAction returns a raw service:action label from EventBridge Scheduler
@@ -336,33 +149,27 @@ func detectTargetAction(arn string) string {
 	return service + ":" + action
 }
 
+//nolint:unused // Transitional compatibility helper for legacy collectors.
 func fromMillis(v int64) time.Time {
-	if v <= 0 {
-		return time.Time{}
-	}
-	return time.UnixMilli(v).UTC()
+	return helpers.FromMillis(v)
 }
 
+//nolint:unused // Transitional compatibility helper for legacy collectors.
 func fromMillisPtr(v *int64) time.Time {
-	if v == nil {
-		return time.Time{}
-	}
-	return fromMillis(*v)
+	return helpers.FromMillisPtr(v)
 }
 
 // formatRFC3339UTC normalizes collected service timestamps to canonical UTC.
 // User-facing timezone conversion is handled later in exporter.BuildOutput.
+//
+//nolint:unused // Transitional compatibility helper for legacy collectors.
 func formatRFC3339UTC(t time.Time) string {
-	if t.IsZero() {
-		return ""
-	}
-	return t.UTC().Format(time.RFC3339)
+	return helpers.FormatRFC3339UTC(t)
 }
 
 // formatRFC3339NanoUTC normalizes auxiliary identifiers based on timestamp to UTC.
+//
+//nolint:unused // Transitional compatibility helper for legacy collectors.
 func formatRFC3339NanoUTC(t time.Time) string {
-	if t.IsZero() {
-		return ""
-	}
-	return t.UTC().Format(time.RFC3339Nano)
+	return helpers.FormatRFC3339NanoUTC(t)
 }

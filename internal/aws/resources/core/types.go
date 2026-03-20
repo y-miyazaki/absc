@@ -1,0 +1,48 @@
+// Package core contains shared value types used across resources subpackages.
+package core
+
+import "time"
+
+const SlotsPerDay = 144
+
+type CollectOptions struct {
+	Since          time.Time
+	Until          time.Time
+	Regions        []string
+	MaxConcurrency int
+	MaxResults     int
+}
+
+type ErrorRecord struct {
+	Service string
+	Region  string
+	Message string
+}
+
+type Run struct {
+	RunID         string
+	Status        string
+	StartAt       string
+	EndAt         string
+	DurationSec   *int64
+	SourceService string
+}
+
+type Schedule struct {
+	Region                     string
+	TargetName                 string
+	ScheduleName               string
+	ScheduleExpression         string
+	ScheduleExpressionTimezone string
+	NextInvocationAt           string
+	Service                    string
+	TargetKind                 string
+	TargetAction               string
+	ID                         string
+	TargetService              string
+	TargetARN                  string
+	Slots                      []int
+	Runs                       []Run
+	Enabled                    bool
+	RunsCapped                 bool
+}

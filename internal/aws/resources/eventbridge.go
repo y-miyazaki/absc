@@ -15,6 +15,7 @@ import (
 	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 	"github.com/aws/aws-sdk-go-v2/service/glue"
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
+	"github.com/y-miyazaki/absc/internal/aws/resources/runs"
 )
 
 type EventBridgeCollector struct {
@@ -48,11 +49,12 @@ func (*EventBridgeCollector) Name() string {
 }
 
 // Collect loads scheduled rules and resolves supported target runs.
+//
+//nolint:gocritic // CollectOptions is intentionally passed by value to preserve the public API.
 func (c *EventBridgeCollector) Collect(ctx context.Context, opts CollectOptions) ([]Schedule, []ErrorRecord) {
 	schedules := make([]Schedule, 0)
 	errs := make([]ErrorRecord, 0)
-	deps := newRunCollectorDeps(c.region, c.stepSvc, c.batchSvc, c.ctSvc, c.ecsSvc, c.glueSvc, c.cwlSvc)
-	caches := newRunCollectorCaches()
+	resolver := runs.NewResolver(c.region, c.stepSvc, c.batchSvc, c.ctSvc, c.ecsSvc, c.glueSvc, c.cwlSvc)
 
 	var nextToken *string
 	for {
@@ -110,11 +112,11 @@ func (c *EventBridgeCollector) Collect(ctx context.Context, opts CollectOptions)
 				targetARN := aws.ToString(t.Arn)
 				targetKind := detectTargetKind(targetARN, t.BatchParameters != nil)
 				targetService := detectTargetService(targetARN)
-				hints := runTargetHints{}
+				hints := runs.TargetHints{}
 				if t.EcsParameters != nil {
-					hints.ecsTaskDefinitionARN = aws.ToString(t.EcsParameters.TaskDefinitionArn)
+					hints.ECSTaskDefinitionARN = aws.ToString(t.EcsParameters.TaskDefinitionArn)
 				}
-				hints.ecsRoleARN = aws.ToString(t.RoleArn)
+				hints.ECSRoleARN = aws.ToString(t.RoleArn)
 				// EventBridge Rule APIs do not expose a deterministic "next invocation" timestamp,
 				// so this collector intentionally leaves NextInvocationAt empty.
 				s := Schedule{
@@ -139,7 +141,7 @@ func (c *EventBridgeCollector) Collect(ctx context.Context, opts CollectOptions)
 					jobName = aws.ToString(t.BatchParameters.JobName)
 				}
 
-				if runErr := populateScheduleRuns(ctx, &s, targetARN, jobName, hints, opts, deps, caches); runErr != nil {
+				if runErr := resolver.PopulateScheduleRuns(ctx, &s, targetARN, jobName, hints, opts); runErr != nil {
 					errs = append(errs, *runErr)
 				}
 

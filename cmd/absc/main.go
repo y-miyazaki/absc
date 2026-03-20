@@ -26,6 +26,7 @@ const (
 	accountIndex          = 4
 	arnSplitParts         = 6
 	defaultLookbackHours  = 24
+	defaultWindowDays     = 1
 	defaultMaxConcurrency = 5
 	defaultMaxResults     = 144
 	defaultOutputDir      = "./output"
@@ -35,6 +36,7 @@ const (
 	defaultRegion         = "ap-northeast-1"
 	// defaultTimeout bounds the full CLI execution to avoid hanging runs.
 	defaultTimeout             = 10 * time.Minute
+	dayDuration                = 24 * time.Hour
 	defaultTimezone            = "UTC"
 	outputDirPermission        = 0o750
 	regionsFlagName            = "regions"
@@ -220,7 +222,7 @@ func runCommand(c *cli.Context, l interface {
 		MaxResults:     c.Int(maxResultsFlagName),
 		Regions:        regions,
 		Since:          since,
-		Until:          since.Add(24 * time.Hour),
+		Until:          since.Add(defaultWindowDays * dayDuration),
 	})
 
 	result := buildOutput(accountID, now, since, loc, schedules, errs, exporter.BuildOutputOptions{

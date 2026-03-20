@@ -16,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/glue"
 	"github.com/aws/aws-sdk-go-v2/service/scheduler"
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
+	"github.com/y-miyazaki/absc/internal/aws/resources/runs"
 )
 
 type SchedulerCollector struct {
@@ -30,7 +31,7 @@ type SchedulerCollector struct {
 }
 
 type runTargetResolution struct {
-	hints              runTargetHints
+	hints              runs.TargetHints
 	runJobName         string
 	runTargetARN       string
 	hasBatchParameters bool
@@ -56,12 +57,13 @@ func (*SchedulerCollector) Name() string {
 }
 
 // Collect lists schedules, computes next invocations, and resolves recent runs.
+//
+//nolint:gocritic // CollectOptions is intentionally passed by value to preserve the public API.
 func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) ([]Schedule, []ErrorRecord) {
 	schedules := make([]Schedule, 0)
 	errs := make([]ErrorRecord, 0)
 	nowUTC := time.Now().UTC()
-	deps := newRunCollectorDeps(c.region, c.stepSvc, c.batchSvc, c.ctSvc, c.ecsSvc, c.glueSvc, c.cwlSvc)
-	caches := newRunCollectorCaches()
+	resolver := runs.NewResolver(c.region, c.stepSvc, c.batchSvc, c.ctSvc, c.ecsSvc, c.glueSvc, c.cwlSvc)
 
 	p := scheduler.NewListSchedulesPaginator(c.svc, &scheduler.ListSchedulesInput{})
 	for p.HasMorePages() {
@@ -82,7 +84,7 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 			runTargetARN := ""
 			runJobName := ""
 			hasBatchParameters := false
-			hints := runTargetHints{}
+			hints := runs.TargetHints{}
 			if detail.Target != nil {
 				targetARN = aws.ToString(detail.Target.Arn)
 				resolved := resolveSchedulerRunTarget(targetARN, aws.ToString(detail.Target.Input))
@@ -90,7 +92,7 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 				runJobName = resolved.runJobName
 				hasBatchParameters = resolved.hasBatchParameters
 				hints = resolved.hints
-				hints.ecsRoleARN = aws.ToString(detail.Target.RoleArn)
+				hints.ECSRoleARN = aws.ToString(detail.Target.RoleArn)
 				if runTargetARN == "" {
 					runTargetARN = targetARN
 				}
@@ -120,7 +122,7 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 				Slots:                      buildSlots(aws.ToString(detail.ScheduleExpression)),
 				Runs:                       make([]Run, 0),
 			}
-			if runErr := populateScheduleRuns(ctx, &s, runTargetARN, runJobName, hints, opts, deps, caches); runErr != nil {
+			if runErr := resolver.PopulateScheduleRuns(ctx, &s, runTargetARN, runJobName, hints, opts); runErr != nil {
 				errs = append(errs, *runErr)
 			}
 			schedules = append(schedules, s)
@@ -160,8 +162,8 @@ func resolveSchedulerRunTarget(targetARN, input string) runTargetResolution {
 		if v := getStringFromJSON(input, "Cluster", "cluster"); v != "" {
 			resolved.runTargetARN = v
 		}
-		resolved.hints.ecsTaskDefinitionARN = getStringFromJSON(input, "TaskDefinition", "taskDefinition", "task_definition")
-		resolved.hints.ecsStartedBy = getStringFromJSON(input, "StartedBy", "startedBy", "started_by")
+		resolved.hints.ECSTaskDefinitionARN = getStringFromJSON(input, "TaskDefinition", "taskDefinition", "task_definition")
+		resolved.hints.ECSStartedBy = getStringFromJSON(input, "StartedBy", "startedBy", "started_by")
 		return resolved
 	}
 	return runTargetResolution{hasBatchParameters: strings.Contains(lowerARN, ":batch:")}

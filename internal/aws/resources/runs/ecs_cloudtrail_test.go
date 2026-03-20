@@ -1,4 +1,4 @@
-package resources
+package runs
 
 import (
 	"testing"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
+	resourcescore "github.com/y-miyazaki/absc/internal/aws/resources/core"
 )
 
 func TestECSCloudTrailRunsFromEvent(t *testing.T) {
@@ -67,20 +68,20 @@ func TestFilterECSCloudTrailRuns(t *testing.T) {
 			clusterARN:        "arn:aws:ecs:ap-northeast-1:582064665348:cluster/prd-recommend-cluster",
 			startedBy:         "AWS Step Functions",
 			taskDefinitionARN: "arn:aws:ecs:ap-northeast-1:582064665348:task-definition/prd-recommend-batch-td:31",
-			run:               Run{RunID: "step-functions", StartAt: "2026-03-18T23:33:54Z", Status: ecsRunStatusStarted, SourceService: "cloudtrail"},
+			run:               resourcescore.Run{RunID: "step-functions", StartAt: "2026-03-18T23:33:54Z", Status: ecsRunStatusStarted, SourceService: "cloudtrail"},
 		},
 		{
 			callerARN:         "arn:aws:iam::582064665348:role/prd-recommend-batch-st-cw-role",
 			clusterARN:        "arn:aws:ecs:ap-northeast-1:582064665348:cluster/prd-recommend-cluster",
 			startedBy:         "events-rule/prd-recommend-batch-even",
 			taskDefinitionARN: "arn:aws:ecs:ap-northeast-1:582064665348:task-definition/prd-recommend-batch-td:31",
-			run:               Run{RunID: "eventbridge", StartAt: "2026-03-18T17:00:49Z", Status: ecsRunStatusStarted, SourceService: "cloudtrail"},
+			run:               resourcescore.Run{RunID: "eventbridge", StartAt: "2026-03-18T17:00:49Z", Status: ecsRunStatusStarted, SourceService: "cloudtrail"},
 		},
 	}
 
-	filtered := filterECSCloudTrailRuns(allRuns, "arn:aws:ecs:ap-northeast-1:582064665348:cluster/prd-recommend-cluster", runTargetHints{
-		ecsRoleARN:           "arn:aws:iam::582064665348:role/prd-recommend-batch-st-cw-role",
-		ecsTaskDefinitionARN: "arn:aws:ecs:ap-northeast-1:582064665348:task-definition/prd-recommend-batch-td",
+	filtered := filterECSCloudTrailRuns(allRuns, "arn:aws:ecs:ap-northeast-1:582064665348:cluster/prd-recommend-cluster", TargetHints{
+		ECSRoleARN:           "arn:aws:iam::582064665348:role/prd-recommend-batch-st-cw-role",
+		ECSTaskDefinitionARN: "arn:aws:ecs:ap-northeast-1:582064665348:task-definition/prd-recommend-batch-td",
 	}, 10)
 
 	if got, want := len(filtered), 1; got != want {
@@ -91,12 +92,12 @@ func TestFilterECSCloudTrailRuns(t *testing.T) {
 	}
 }
 
-func TestMergeECSRuns_PrefersDetailedRuns(t *testing.T) {
+func TestMergeECSRunsPrefersDetailedRuns(t *testing.T) {
 	t.Parallel()
 
 	merged := mergeECSRuns(
-		[]Run{{RunID: "same-task", StartAt: "2026-03-18T17:00:55Z", EndAt: "2026-03-18T17:05:00Z", Status: "STOPPED", SourceService: "ecs"}},
-		[]Run{{RunID: "same-task", StartAt: "2026-03-18T17:00:49Z", Status: ecsRunStatusStarted, SourceService: "cloudtrail"}},
+		[]resourcescore.Run{{RunID: "same-task", StartAt: "2026-03-18T17:00:55Z", EndAt: "2026-03-18T17:05:00Z", Status: "STOPPED", SourceService: "ecs"}},
+		[]resourcescore.Run{{RunID: "same-task", StartAt: "2026-03-18T17:00:49Z", Status: ecsRunStatusStarted, SourceService: "cloudtrail"}},
 		10,
 	)
 

@@ -14,40 +14,11 @@ import (
 	"time"
 
 	"github.com/y-miyazaki/absc/internal/aws/resources"
+	"github.com/y-miyazaki/absc/internal/helpers"
 )
 
 const (
-	awsCronApril                       = 4
-	awsCronAugust                      = 8
-	awsCronDayOfMonthMax               = 31
-	awsCronDayOfMonthMin               = 1
-	awsCronDecember                    = 12
-	awsCronDashSeparator               = "-"
-	awsCronFebruary                    = 2
 	awsCronFieldCount                  = 6
-	awsCronFriday                      = 6
-	awsCronHourMax                     = 23
-	awsCronJanuary                     = 1
-	awsCronJuly                        = 7
-	awsCronJune                        = 6
-	awsCronMarch                       = 3
-	awsCronMay                         = 5
-	awsCronMinuteMax                   = 59
-	awsCronMonday                      = 2
-	awsCronMonthMax                    = 12
-	awsCronMonthMin                    = 1
-	awsCronNoSpecific                  = "?"
-	awsCronNovember                    = 11
-	awsCronOctober                     = 10
-	awsCronSaturday                    = 7
-	awsCronSeptember                   = 9
-	awsCronSplitParts                  = 2
-	awsCronSunday                      = 1
-	awsCronThursday                    = 5
-	awsCronTuesday                     = 3
-	awsCronWednesday                   = 4
-	awsCronYearMax                     = 2199
-	awsCronYearMin                     = 1970
 	defaultDirPermission               = 0o750
 	defaultFilePermission              = 0o600
 	hourLabelStep                      = 1
@@ -57,8 +28,6 @@ const (
 	runInSlotCategoryNotObservable     = "not_observable_target"
 	runInSlotCategoryNotScheduledToday = "not_scheduled_today"
 	runInSlotCategoryObservable        = "observable"
-	secondsPerHour                     = 3600
-	secondsPerMinute                   = 60
 	slotIssueCollectedRunsCapped       = "COLLECTED_RUNS_CAPPED"
 	slotIssueNoRunInWindow             = "NO_RUN_IN_WINDOW"
 	slotIssueRunNotAlignedToSlot       = "RUN_NOT_ALIGNED_TO_SLOT"
@@ -66,31 +35,6 @@ const (
 	slotsPerHour                       = 6
 	slotsPerTimelineDay                = 144
 )
-
-var awsCronDayAliases = map[string]int{
-	"SUN": awsCronSunday,
-	"MON": awsCronMonday,
-	"TUE": awsCronTuesday,
-	"WED": awsCronWednesday,
-	"THU": awsCronThursday,
-	"FRI": awsCronFriday,
-	"SAT": awsCronSaturday,
-}
-
-var awsCronMonthAliases = map[string]int{
-	"JAN": awsCronJanuary,
-	"FEB": awsCronFebruary,
-	"MAR": awsCronMarch,
-	"APR": awsCronApril,
-	"MAY": awsCronMay,
-	"JUN": awsCronJune,
-	"JUL": awsCronJuly,
-	"AUG": awsCronAugust,
-	"SEP": awsCronSeptember,
-	"OCT": awsCronOctober,
-	"NOV": awsCronNovember,
-	"DEC": awsCronDecember,
-}
 
 //go:embed html_template.html
 var htmlTemplate string
@@ -548,166 +492,7 @@ func scheduleExpectedInWindow(expression, expressionTimezone string, windowStart
 }
 
 func matchAWSCronExpression(fields []string, t time.Time) bool {
-	if len(fields) != awsCronFieldCount {
-		return false
-	}
-
-	minute := t.Minute()
-	hour := t.Hour()
-	dayOfMonth := t.Day()
-	month := int(t.Month())
-	dayOfWeek := int(t.Weekday())
-	if dayOfWeek == 0 {
-		dayOfWeek = awsCronSunday
-	} else {
-		dayOfWeek++
-	}
-	year := t.Year()
-
-	if !matchAWSField(fields[0], minute, 0, awsCronMinuteMax, nil) {
-		return false
-	}
-	if !matchAWSField(fields[1], hour, 0, awsCronHourMax, nil) {
-		return false
-	}
-	if !matchAWSField(fields[3], month, awsCronMonthMin, awsCronMonthMax, awsCronMonthAliases) {
-		return false
-	}
-	if !matchAWSField(fields[5], year, awsCronYearMin, awsCronYearMax, nil) {
-		return false
-	}
-
-	domField := strings.TrimSpace(fields[2])
-	dowField := strings.TrimSpace(fields[4])
-	domMatch := matchAWSField(domField, dayOfMonth, awsCronDayOfMonthMin, awsCronDayOfMonthMax, nil)
-	dowMatch := matchAWSField(dowField, dayOfWeek, awsCronSunday, awsCronSaturday, awsCronDayAliases)
-
-	if domField == awsCronNoSpecific {
-		return dowMatch
-	}
-	if dowField == awsCronNoSpecific {
-		return domMatch
-	}
-	return domMatch && dowMatch
-}
-
-func matchAWSField(field string, value, minValue, maxValue int, aliases map[string]int) bool {
-	f := strings.ToUpper(strings.TrimSpace(field))
-	if f == "" {
-		return false
-	}
-	if f == "*" || f == awsCronNoSpecific {
-		return true
-	}
-
-	for _, rawPart := range strings.Split(f, ",") {
-		part := strings.TrimSpace(rawPart)
-		if part == "" {
-			continue
-		}
-		if matchAWSFieldPart(part, value, minValue, maxValue, aliases) {
-			return true
-		}
-	}
-
-	return false
-}
-
-// matchAWSFieldPart evaluates if a single AWS cron expression field part matches a value.
-// Supports ranges, steps, and aliases with wrapping range support (e.g., "FRI-MON" or "50-10").
-// Note: Similar logic exists in resources/scheduler_next_invocation.go as matchCronPart().
-// These functions are kept separate to avoid circular package dependencies (exporter depends on resources).
-// A future refactoring should consolidate this logic in a shared cron utilities package.
-func matchAWSFieldPart(part string, value, minValue, maxValue int, aliases map[string]int) bool {
-	if strings.Contains(part, "/") {
-		pieces := strings.SplitN(part, "/", awsCronSplitParts)
-		if len(pieces) != awsCronSplitParts {
-			return false
-		}
-		step, ok := parseAWSAtom(pieces[1], aliases)
-		if !ok || step <= 0 {
-			return false
-		}
-
-		start := minValue
-		end := maxValue
-		base := strings.TrimSpace(pieces[0])
-		if base != "*" && base != awsCronNoSpecific {
-			if strings.Contains(base, awsCronDashSeparator) {
-				rangeParts := strings.SplitN(base, awsCronDashSeparator, awsCronSplitParts)
-				if len(rangeParts) != awsCronSplitParts {
-					return false
-				}
-				startValue, okStart := parseAWSAtom(rangeParts[0], aliases)
-				endValue, okEnd := parseAWSAtom(rangeParts[1], aliases)
-				if !okStart || !okEnd {
-					return false
-				}
-				start = startValue
-				end = endValue
-			} else {
-				startValue, okStart := parseAWSAtom(base, aliases)
-				if !okStart {
-					return false
-				}
-				start = startValue
-			}
-		}
-
-		if start <= end {
-			if value < start || value > end {
-				return false
-			}
-			return ((value - start) % step) == 0
-		}
-
-		if value >= start {
-			return ((value - start) % step) == 0
-		}
-		if value <= end {
-			return (((maxValue - start + 1) + (value - minValue)) % step) == 0
-		}
-		return false
-	}
-
-	if strings.Contains(part, awsCronDashSeparator) {
-		rangeParts := strings.SplitN(part, awsCronDashSeparator, awsCronSplitParts)
-		if len(rangeParts) != awsCronSplitParts {
-			return false
-		}
-		startValue, okStart := parseAWSAtom(rangeParts[0], aliases)
-		endValue, okEnd := parseAWSAtom(rangeParts[1], aliases)
-		if !okStart || !okEnd {
-			return false
-		}
-		if startValue > endValue {
-			return value >= startValue || value <= endValue
-		}
-		return value >= startValue && value <= endValue
-	}
-
-	v, ok := parseAWSAtom(part, aliases)
-	if !ok {
-		return false
-	}
-	return value == v
-}
-
-func parseAWSAtom(atom string, aliases map[string]int) (int, bool) {
-	a := strings.ToUpper(strings.TrimSpace(atom))
-	if a == "" {
-		return 0, false
-	}
-	if aliases != nil {
-		if mapped, ok := aliases[a]; ok {
-			return mapped, true
-		}
-	}
-	v, err := strconv.Atoi(a)
-	if err != nil {
-		return 0, false
-	}
-	return v, true
+	return helpers.MatchAWSCronExpression(fields, t)
 }
 
 func buildSlotLabel(windowStart time.Time, slotIndex int) string {
@@ -838,15 +623,7 @@ func runOverlapsScheduledSlots(run *Run, slots []int, windowStart time.Time) boo
 // convertRFC3339ToLocation converts canonical UTC/offset timestamps into
 // the user-selected CLI timezone for output rendering.
 func convertRFC3339ToLocation(value string, loc *time.Location) string {
-	v := strings.TrimSpace(value)
-	if v == "" {
-		return ""
-	}
-	t, err := time.Parse(time.RFC3339, v)
-	if err != nil {
-		return value
-	}
-	return t.In(loc).Format(time.RFC3339)
+	return helpers.ConvertRFC3339ToLocation(value, loc)
 }
 
 func remapSlotsToLocation(slots []int, now time.Time, srcLoc, dstLoc *time.Location) []int {
@@ -876,15 +653,7 @@ func remapSlotsToLocation(slots []int, now time.Time, srcLoc, dstLoc *time.Locat
 }
 
 func scheduleSourceLocation(exprTZ string) *time.Location {
-	tz := strings.TrimSpace(exprTZ)
-	if tz == "" {
-		return time.UTC
-	}
-	loc, err := time.LoadLocation(tz)
-	if err != nil {
-		return time.UTC
-	}
-	return loc
+	return helpers.LoadLocationOrUTC(exprTZ)
 }
 
 func scheduleTimezoneLabel(exprTZ string, reference time.Time) string {
@@ -902,15 +671,7 @@ func scheduleTimezoneLabel(exprTZ string, reference time.Time) string {
 }
 
 func formatUTCOffset(offsetSeconds int) string {
-	sign := "+"
-	absOffsetSeconds := offsetSeconds
-	if absOffsetSeconds < 0 {
-		sign = "-"
-		absOffsetSeconds = -absOffsetSeconds
-	}
-	hours := absOffsetSeconds / secondsPerHour
-	minutes := (absOffsetSeconds % secondsPerHour) / secondsPerMinute
-	return fmt.Sprintf("UTC%s%02d:%02d", sign, hours, minutes)
+	return helpers.FormatUTCOffset(offsetSeconds)
 }
 
 func WriteHTML(path string, out *Output) (retErr error) {
