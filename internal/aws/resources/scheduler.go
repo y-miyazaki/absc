@@ -87,7 +87,8 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 			hints := runs.TargetHints{}
 			if detail.Target != nil {
 				targetARN = aws.ToString(detail.Target.Arn)
-				resolved := resolveSchedulerRunTarget(targetARN, aws.ToString(detail.Target.Input))
+				targetInput := aws.ToString(detail.Target.Input)
+				resolved := resolveSchedulerRunTarget(targetARN, targetInput)
 				runTargetARN = resolved.runTargetARN
 				runJobName = resolved.runJobName
 				hasBatchParameters = resolved.hasBatchParameters
@@ -96,13 +97,37 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 				if runTargetARN == "" {
 					runTargetARN = targetARN
 				}
+				targetKind := detectTargetKind(targetARN, hasBatchParameters)
+				targetService := detectTargetService(targetARN)
+				targetAction := detectTargetAction(targetARN)
+				targetName := resolveSchedulerTargetName(targetARN, targetInput, runTargetARN)
+				nextInvocationAt := computeSchedulerNextInvocation(detail, nowUTC)
+				s := Schedule{
+					ID:                         fmt.Sprintf("eventbridge_scheduler:%s:%s", c.region, aws.ToString(detail.Name)),
+					Service:                    "eventbridge_scheduler",
+					ScheduleName:               aws.ToString(detail.Name),
+					ScheduleExpression:         aws.ToString(detail.ScheduleExpression),
+					ScheduleExpressionTimezone: aws.ToString(detail.ScheduleExpressionTimezone),
+					Enabled:                    enabled,
+					Region:                     c.region,
+					TargetARN:                  targetARN,
+					TargetKind:                 targetKind,
+					TargetAction:               targetAction,
+					TargetService:              targetService,
+					TargetName:                 targetName,
+					NextInvocationAt:           nextInvocationAt,
+					Slots:                      buildSlots(aws.ToString(detail.ScheduleExpression)),
+					Runs:                       make([]Run, 0),
+				}
+				if runErr := resolver.PopulateScheduleRuns(ctx, &s, runTargetARN, runJobName, hints, opts); runErr != nil {
+					errs = append(errs, *runErr)
+				}
+				schedules = append(schedules, s)
+				continue
 			}
 			targetKind := detectTargetKind(targetARN, hasBatchParameters)
 			targetService := detectTargetService(targetARN)
-			targetName := resourceNameFromARN(targetARN)
-			if (targetKind == "lambda" || targetKind == "stepfunctions" || targetKind == "glue") && runTargetARN != "" {
-				targetName = resourceNameFromARN(runTargetARN)
-			}
+			targetName := resolveSchedulerTargetName(targetARN, "", runTargetARN)
 			targetAction := detectTargetAction(targetARN)
 			nextInvocationAt := computeSchedulerNextInvocation(detail, nowUTC)
 			s := Schedule{
@@ -131,40 +156,155 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 	return schedules, errs
 }
 
+// sdkTargetResolver bundles all per-service resolution logic for aws-sdk scheduler targets.
+// runTarget extracts the downstream run target (for run history lookup); nil for terminal resources.
+// displayName extracts the human-readable resource name; nil means fall back to resourceNameFromARN.
+type sdkTargetResolver struct {
+	runTarget   func(string) runTargetResolution
+	displayName func(string, string) (string, bool)
+}
+
+// schedulerSDKResolvers maps an AWS SDK service name (lowercase) to its per-service resolver.
+// Add a new entry here to support additional aws-sdk target services.
+var schedulerSDKResolvers = map[string]sdkTargetResolver{
+	"batch": {
+		runTarget: func(input string) runTargetResolution {
+			return runTargetResolution{
+				runTargetARN:       getStringFromJSON(input, "JobQueue"),
+				runJobName:         getStringFromJSON(input, "JobName"),
+				hasBatchParameters: true,
+			}
+		},
+		displayName: func(input, runTargetARN string) (string, bool) {
+			_ = runTargetARN
+			v := getStringFromJSON(input, "JobName")
+			return v, v != ""
+		},
+	},
+	"ec2": {
+		displayName: func(input, runTargetARN string) (string, bool) {
+			_ = runTargetARN
+			ids := getStringSliceFromJSON(input, "InstanceIds")
+			if len(ids) == 1 {
+				return ids[0], true
+			}
+			return "", false
+		},
+	},
+	"ecs": {
+		runTarget: func(input string) runTargetResolution {
+			resolved := runTargetResolution{}
+			if v := getStringFromJSON(input, "Cluster"); v != "" {
+				resolved.runTargetARN = v
+			}
+			resolved.hints.ECSTaskDefinitionARN = getStringFromJSON(input, "TaskDefinition")
+			resolved.hints.ECSStartedBy = getStringFromJSON(input, "StartedBy")
+			return resolved
+		},
+		displayName: func(input, runTargetARN string) (string, bool) {
+			_ = input
+			if runTargetARN != "" {
+				return resourceNameFromARN(runTargetARN), true
+			}
+			return "", false
+		},
+	},
+	"glue": {
+		runTarget: func(input string) runTargetResolution {
+			if v := getStringFromJSON(input, "JobName"); v != "" {
+				return runTargetResolution{runTargetARN: v}
+			}
+			return runTargetResolution{}
+		},
+		displayName: func(input, runTargetARN string) (string, bool) {
+			_ = input
+			if runTargetARN != "" {
+				return resourceNameFromARN(runTargetARN), true
+			}
+			return "", false
+		},
+	},
+	"lambda": {
+		runTarget: func(input string) runTargetResolution {
+			if v := getStringFromJSON(input, "FunctionName"); v != "" {
+				return runTargetResolution{runTargetARN: v}
+			}
+			return runTargetResolution{}
+		},
+		displayName: func(input, runTargetARN string) (string, bool) {
+			_ = input
+			if runTargetARN != "" {
+				return resourceNameFromARN(runTargetARN), true
+			}
+			return "", false
+		},
+	},
+	"rds": {
+		displayName: func(input, runTargetARN string) (string, bool) {
+			_ = runTargetARN
+			v := getStringFromJSON(input, "DbClusterIdentifier", "DbInstanceIdentifier")
+			return v, v != ""
+		},
+	},
+	"redshift": {
+		displayName: func(input, runTargetARN string) (string, bool) {
+			_ = runTargetARN
+			v := getStringFromJSON(input, "ClusterIdentifier", "WorkgroupName")
+			return v, v != ""
+		},
+	},
+	"sfn": {
+		runTarget: func(input string) runTargetResolution {
+			if v := getStringFromJSON(input, "StateMachineArn"); v != "" {
+				return runTargetResolution{runTargetARN: v}
+			}
+			return runTargetResolution{}
+		},
+		displayName: func(input, runTargetARN string) (string, bool) {
+			_ = input
+			if runTargetARN != "" {
+				return resourceNameFromARN(runTargetARN), true
+			}
+			return "", false
+		},
+	},
+}
+
+// awsSDKServiceFromARN extracts the service name from an aws-sdk scheduler target ARN.
+// For an ARN containing ":aws-sdk:SERVICE:ACTION", returns "service" (lowercase).
+func awsSDKServiceFromARN(lowerARN string) string {
+	const marker = ":aws-sdk:"
+	idx := strings.Index(lowerARN, marker)
+	if idx < 0 {
+		return ""
+	}
+	rest := lowerARN[idx+len(marker):]
+	if colon := strings.Index(rest, ":"); colon >= 0 {
+		return rest[:colon]
+	}
+	return rest
+}
+
+func resolveSchedulerTargetName(targetARN, input, runTargetARN string) string {
+	lowerARN := strings.ToLower(targetARN)
+	if svc := awsSDKServiceFromARN(lowerARN); svc != "" {
+		if r, ok := schedulerSDKResolvers[svc]; ok && r.displayName != nil {
+			if name, extracted := r.displayName(input, runTargetARN); extracted {
+				return name
+			}
+		}
+	}
+	return resourceNameFromARN(targetARN)
+}
+
 // resolveSchedulerRunTarget extracts the real downstream target from SDK inputs.
 func resolveSchedulerRunTarget(targetARN, input string) runTargetResolution {
 	lowerARN := strings.ToLower(targetARN)
-	if strings.Contains(lowerARN, ":aws-sdk:sfn:startexecution") {
-		if v := getStringFromJSON(input, "StateMachineArn", "stateMachineArn", "state_machine_arn"); v != "" {
-			return runTargetResolution{runTargetARN: v}
+	if svc := awsSDKServiceFromARN(lowerARN); svc != "" {
+		if r, ok := schedulerSDKResolvers[svc]; ok && r.runTarget != nil {
+			return r.runTarget(input)
 		}
 		return runTargetResolution{}
-	}
-	if strings.Contains(lowerARN, ":aws-sdk:batch:submitjob") {
-		queue := getStringFromJSON(input, "JobQueue", "jobQueue", "job_queue")
-		name := getStringFromJSON(input, "JobName", "jobName", "job_name")
-		return runTargetResolution{runTargetARN: queue, runJobName: name, hasBatchParameters: true}
-	}
-	if strings.Contains(lowerARN, ":aws-sdk:lambda:invoke") {
-		if v := getStringFromJSON(input, "FunctionName", "functionName", "function_name"); v != "" {
-			return runTargetResolution{runTargetARN: v}
-		}
-		return runTargetResolution{}
-	}
-	if strings.Contains(lowerARN, ":aws-sdk:glue:") {
-		if v := getStringFromJSON(input, "JobName", "jobName", "job_name"); v != "" {
-			return runTargetResolution{runTargetARN: v}
-		}
-		return runTargetResolution{}
-	}
-	if strings.Contains(lowerARN, ":aws-sdk:ecs:") {
-		resolved := runTargetResolution{}
-		if v := getStringFromJSON(input, "Cluster", "cluster"); v != "" {
-			resolved.runTargetARN = v
-		}
-		resolved.hints.ECSTaskDefinitionARN = getStringFromJSON(input, "TaskDefinition", "taskDefinition", "task_definition")
-		resolved.hints.ECSStartedBy = getStringFromJSON(input, "StartedBy", "startedBy", "started_by")
-		return resolved
 	}
 	return runTargetResolution{hasBatchParameters: strings.Contains(lowerARN, ":batch:")}
 }
@@ -186,4 +326,36 @@ func getStringFromJSON(raw string, keys ...string) string {
 		}
 	}
 	return ""
+}
+
+func getStringSliceFromJSON(raw string, keys ...string) []string {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	var m map[string]any
+	if err := json.Unmarshal([]byte(raw), &m); err != nil {
+		return nil
+	}
+	for _, key := range keys {
+		value, ok := m[key]
+		if !ok {
+			continue
+		}
+		array, ok := value.([]any)
+		if !ok {
+			continue
+		}
+		result := make([]string, 0, len(array))
+		for _, item := range array {
+			text, okCast := item.(string)
+			if !okCast || strings.TrimSpace(text) == "" {
+				continue
+			}
+			result = append(result, text)
+		}
+		if len(result) > 0 {
+			return result
+		}
+	}
+	return nil
 }

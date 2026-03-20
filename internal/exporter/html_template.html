@@ -252,6 +252,67 @@ function targetTypeLabel(schedule) {
   return schedule.target_action || '-';
 }
 
+function serviceConsoleURL(service, region, scheduleName) {
+  const safeRegion = encodeURIComponent(region || 'us-east-1');
+  const safeName = encodeURIComponent(scheduleName || '');
+
+  if (service === 'eventbridge_rule') {
+    return 'https://console.aws.amazon.com/events/home?region=' + safeRegion + '#/rules/' + safeName + '?eventBus=default';
+  }
+  if (service === 'eventbridge_scheduler') {
+    return 'https://console.aws.amazon.com/scheduler/home?region=' + safeRegion + '#/schedules/default/' + safeName;
+  }
+  return '';
+}
+
+function targetConsoleURL(schedule) {
+  const region = encodeURIComponent(schedule.region || 'us-east-1');
+  const targetService = String(schedule.target_service || 'Other');
+  const targetName = String(schedule.target_name || '');
+  const targetArn = String(schedule.target_arn || '');
+  const targetAction = String(schedule.target_action || '').toLowerCase();
+
+  if (targetService === 'Lambda' && targetName) {
+    return 'https://console.aws.amazon.com/lambda/home?region=' + region + '#/functions/' + encodeURIComponent(targetName);
+  }
+  if (targetService === 'Step Functions' && targetArn) {
+    return 'https://console.aws.amazon.com/states/home?region=' + region + '#/statemachines/view/' + encodeURIComponent(targetArn);
+  }
+  if (targetService === 'Glue' && targetName) {
+    return 'https://console.aws.amazon.com/gluestudio/home?region=' + region + '#/job/' + encodeURIComponent(targetName) + '/run';
+  }
+  if (targetService === 'ECS') {
+    return 'https://console.aws.amazon.com/ecs/v2/clusters?region=' + region;
+  }
+  if (targetService === 'Batch') {
+    return 'https://console.aws.amazon.com/batch/home?region=' + region;
+  }
+  if (targetService === 'EC2') {
+    if (/^i-[a-z0-9]+$/i.test(targetName)) {
+      return 'https://console.aws.amazon.com/ec2/home?region=' + region + '#InstanceDetails:instanceId=' + encodeURIComponent(targetName);
+    }
+    return 'https://console.aws.amazon.com/ec2/home?region=' + region;
+  }
+  if (targetService === 'RDS') {
+    if (targetName) {
+      const isCluster = targetAction.includes('dbcluster');
+      return 'https://console.aws.amazon.com/rds/home?region=' + region + '#database:id=' + encodeURIComponent(targetName) + ';is-cluster=' + (isCluster ? 'true' : 'false');
+    }
+    return 'https://console.aws.amazon.com/rds/home?region=' + region;
+  }
+  if (targetService === 'Redshift') {
+    if (targetName) {
+      return 'https://' + region + '.console.aws.amazon.com/redshiftv2/home?region=' + region + '#/cluster-details?cluster=' + encodeURIComponent(targetName);
+    }
+    return 'https://' + region + '.console.aws.amazon.com/redshiftv2/home?region=' + region;
+  }
+
+  if (targetArn) {
+    return 'https://console.aws.amazon.com/resource-groups/global/resources?region=' + region + '&query=' + encodeURIComponent(targetArn);
+  }
+  return '';
+}
+
 function compareSchedules(a, b) {
   const servicePriority = {
     eventbridge_rule: 0,
@@ -401,8 +462,18 @@ function render() {
     const name = document.createElement('div');
     name.className = 'name';
     name.title = s.schedule_name;
-    name.appendChild(makeIcon(s.service));
-    name.appendChild(makeIcon(s.target_service || 'Other'));
+    const scheduleConsoleURL = serviceConsoleURL(s.service, s.region, s.schedule_name);
+    name.appendChild(makeIcon(s.service, {
+      href: scheduleConsoleURL,
+      altText: 'Schedule/Rule: ' + (s.schedule_name || '-')
+    }));
+
+    const targetDisplayName = s.target_name || s.target_arn || '-';
+    const targetAltText = (s.target_service || 'Other') + ': ' + targetDisplayName;
+    name.appendChild(makeIcon(s.target_service || 'Other', {
+      href: targetConsoleURL(s),
+      altText: targetAltText
+    }));
     const nameText = document.createElement('span');
     nameText.style.marginLeft = '3px';
     nameText.textContent = s.schedule_name;
@@ -530,16 +601,24 @@ const AWS_ICONS = {
   'Other':               { label: 'Other', src: 'assets/icons/eventbridge.svg' }
 };
 
-function makeIcon(key) {
+function makeIcon(key, options) {
+  const opts = options || {};
   const data = AWS_ICONS[key] || AWS_ICONS.Other;
-  const wrap = document.createElement('span');
+  const wrap = opts.href ? document.createElement('a') : document.createElement('span');
   wrap.className = 'svc-icon';
-  wrap.setAttribute('role', 'img');
-  wrap.setAttribute('aria-label', data.label);
-  wrap.title = data.label;
+  const iconLabel = opts.altText || data.label;
+  wrap.setAttribute('aria-label', iconLabel);
+  wrap.title = iconLabel;
+  if (opts.href) {
+    wrap.href = opts.href;
+    wrap.target = '_blank';
+    wrap.rel = 'noopener noreferrer';
+  } else {
+    wrap.setAttribute('role', 'img');
+  }
   const img = document.createElement('img');
   img.src = data.src;
-  img.alt = data.label;
+  img.alt = iconLabel;
   img.loading = 'lazy';
   wrap.appendChild(img);
   return wrap;
