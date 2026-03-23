@@ -65,6 +65,12 @@ func detectTargetKind(arn string, batchParametersPresent bool) string {
 	if strings.Contains(s, ":aws-sdk:batch:submitjob") {
 		return "batch"
 	}
+	if strings.Contains(s, ":aws-sdk:ec2:") {
+		return "ec2"
+	}
+	if strings.Contains(s, ":aws-sdk:rds:") {
+		return "rds"
+	}
 	if strings.Contains(s, ":aws-sdk:lambda:") {
 		return "lambda"
 	}

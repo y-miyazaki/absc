@@ -337,12 +337,14 @@ function runSeverity(status) {
   const s = String(status || '').toUpperCase();
   if (!s) return 2;
   if (s === 'SUCCEEDED' || s === 'COMPLETED' || s === 'STOPPED' || s === 'SUCCESS') return 1;
+  if (s === 'START_REQUESTED' || s === 'STOP_REQUESTED' || s === 'REBOOT_REQUESTED' || s === 'ACTION_REQUESTED') return 1;
   if (s === 'STARTED' || s === 'RUN_TASK' || s === 'RUNNING' || s === 'PENDING' || s === 'PROVISIONING') return 1;
   return 2;
 }
 
 function displayRunStatus(status) {
   const s = String(status || '').toUpperCase();
+  if (s === 'START_REQUESTED' || s === 'STOP_REQUESTED' || s === 'REBOOT_REQUESTED' || s === 'ACTION_REQUESTED') return s;
   if (s === 'STARTED' || s === 'RUN_TASK') return 'STARTED';
   if (s === 'RUNNING' || s === 'PENDING' || s === 'PROVISIONING') return 'IN_PROGRESS';
   return runSeverity(status) === 1 ? 'COMPLETED' : 'FAILED';
@@ -376,6 +378,7 @@ function targetConsoleURL(schedule) {
   const region = encodeURIComponent(schedule.region || 'us-east-1');
   const targetService = String(schedule.target_service || 'Other');
   const targetName = String(schedule.target_name || '');
+  const targetId = String(schedule.target_id || '');
   const targetArn = String(schedule.target_arn || '');
   const targetAction = String(schedule.target_action || '').toLowerCase();
 
@@ -383,20 +386,24 @@ function targetConsoleURL(schedule) {
     return 'https://console.aws.amazon.com/lambda/home?region=' + region + '#/functions/' + encodeURIComponent(targetName);
   }
   if (targetService === 'Step Functions' && targetArn) {
-    return 'https://console.aws.amazon.com/states/home?region=' + region + '#/statemachines/view/' + encodeURIComponent(targetArn);
+    return 'https://' + region + '.console.aws.amazon.com/states/home?region=' + region + '#/statemachines/view/' + encodeURIComponent(targetArn);
   }
   if (targetService === 'Glue' && targetName) {
-    return 'https://console.aws.amazon.com/gluestudio/home?region=' + region + '#/job/' + encodeURIComponent(targetName) + '/run';
+    return 'https://' + region + '.console.aws.amazon.com/gluestudio/home?region=' + region + '#/editor/job/' + encodeURIComponent(targetName) + '/details';
   }
   if (targetService === 'ECS') {
-    return 'https://console.aws.amazon.com/ecs/v2/clusters?region=' + region;
+    if (targetName) {
+      return 'https://' + region + '.console.aws.amazon.com/ecs/v2/clusters/' + encodeURIComponent(targetName) + '/services?region=' + region;
+    }
+    return 'https://' + region + '.console.aws.amazon.com/ecs/v2/clusters?region=' + region;
   }
   if (targetService === 'Batch') {
     return 'https://console.aws.amazon.com/batch/home?region=' + region;
   }
   if (targetService === 'EC2') {
-    if (/^i-[a-z0-9]+$/i.test(targetName)) {
-      return 'https://console.aws.amazon.com/ec2/home?region=' + region + '#InstanceDetails:instanceId=' + encodeURIComponent(targetName);
+    const instanceId = targetId || (/^i-[a-z0-9]+$/i.test(targetName) ? targetName : '');
+    if (instanceId) {
+      return 'https://console.aws.amazon.com/ec2/home?region=' + region + '#InstanceDetails:instanceId=' + encodeURIComponent(instanceId);
     }
     return 'https://console.aws.amazon.com/ec2/home?region=' + region;
   }
@@ -414,9 +421,7 @@ function targetConsoleURL(schedule) {
     return 'https://' + region + '.console.aws.amazon.com/redshiftv2/home?region=' + region;
   }
 
-  if (targetArn) {
-    return 'https://console.aws.amazon.com/resource-groups/global/resources?region=' + region + '&query=' + encodeURIComponent(targetArn);
-  }
+  // Unknown target service: do not provide a link when console URL is indeterminate
   return '';
 }
 
@@ -651,18 +656,20 @@ function render() {
       }
     });
 
+    const displaySlots = s.display_slots || s.slots || [];
+
     for(let i=0;i<144;i++) {
       const cell = document.createElement('div');
       let cls = 'cell';
-      if((s.slots || [])[i] === 1) {
-        cls += (s.run_in_slot_category === 'not_scheduled_today') ? ' sch-outday' : ' sch';
+      if(displaySlots[i] === 1) {
+        cls += (!s.expected_in_window) ? ' sch-outday' : ' sch';
       }
       const runSlot = runSlots.get(i);
       if(runSlot) cls += ' ' + runSlot.className;
       cell.className = cls;
       cell.onmousemove = (e) => {
         const bounds = slotBounds(i);
-        const scheduled = ((s.slots || [])[i] === 1);
+        const scheduled = (displaySlots[i] === 1);
         const slotIssue = slotIssueByIndex.get(i);
         const slotRuns = (s.runs || []).filter(r => runOverlapsSlot(r, bounds));
         const shownRuns = slotRuns.slice(0, 20);

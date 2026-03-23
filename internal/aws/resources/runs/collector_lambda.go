@@ -25,6 +25,7 @@ const (
 	lambdaFilterPatternPlatformReport = "\"platform.report\""
 	lambdaFilterPatternReportLine     = "\"REPORT RequestId\""
 	lambdaFloatBitSize                = 64
+	lambdaPatternFetchMultiplier      = 2
 	lambdaPlatformReportType          = "platform.report"
 	lambdaSplitParts                  = 2
 	lambdaStatusCompleted             = "COMPLETED"
@@ -34,6 +35,11 @@ const (
 var lambdaDurationPattern = regexp.MustCompile(`Duration:\s*(\d+(?:\.\d+)?)\s*ms`)
 var lambdaErrorTypePattern = regexp.MustCompile(`Error Type:\s*([A-Za-z0-9._-]+)`)
 var lambdaStatusPattern = regexp.MustCompile(`Status:\s*([A-Za-z_]+)`)
+
+type lambdaCollector struct {
+	caches *runCollectorCaches
+	svc    *cloudwatchlogs.Client
+}
 
 type lambdaPlatformReport struct {
 	Type   string                     `json:"type"`
@@ -51,32 +57,55 @@ type lambdaPlatformReportRecord struct {
 	Metrics   lambdaPlatformReportMetrics `json:"metrics"`
 }
 
-func collectLambdaRuns(ctx context.Context, svc *cloudwatchlogs.Client, functionTarget string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
-	functionName := lambdaFunctionName(functionTarget)
+func newLambdaCollector(svc *cloudwatchlogs.Client, caches *runCollectorCaches) *lambdaCollector {
+	return &lambdaCollector{caches: caches, svc: svc}
+}
+
+func (*lambdaCollector) Service() string { return "lambda" }
+
+//nolint:gocritic // CollectOptions is shared as a value object across collectors.
+func (c *lambdaCollector) Collect(ctx context.Context, schedule *resourcescore.Schedule, targetARN, runJobName string, hints TargetHints, opts resourcescore.CollectOptions) ([]resourcescore.Run, error) {
+	_ = schedule
+	_ = runJobName
+	_ = hints
+	description := fmt.Sprintf("Lambda function=%s", c.functionName(targetARN))
+	runs, err := getCachedRuns(c.caches.lambdaRunsCache, c.caches.lambdaErrCache, targetARN, description, func() ([]resourcescore.Run, error) {
+		return c.collectRuns(ctx, targetARN, opts.Since, opts.Until, opts.MaxResults)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("collect lambda runs for target %s: %w", targetARN, err)
+	}
+	return runs, nil
+}
+
+func (c *lambdaCollector) collectRuns(ctx context.Context, functionTarget string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
+	functionName := c.functionName(functionTarget)
 	if functionName == "" {
 		return make([]resourcescore.Run, 0), nil
 	}
 
-	runs := make([]resourcescore.Run, 0, maxResults)
-	seen := make(map[string]struct{}, maxResults)
+	// Use a map to deduplicate runs by RequestID across both filter patterns.
+	// RequestID is stable and reliable (Lambda Request IDs are unique per invocation).
+	runsByID := make(map[string]resourcescore.Run)
 	for _, filterPattern := range []string{lambdaFilterPatternReportLine, lambdaFilterPatternPlatformReport} {
-		matchedRuns, err := collectLambdaRunsWithPattern(ctx, svc, functionName, since, until, maxResults, filterPattern)
+		matchedRuns, err := c.collectRunsWithPattern(ctx, functionName, since, until, maxResults*lambdaPatternFetchMultiplier, filterPattern)
 		if err != nil {
 			return nil, fmt.Errorf("collect lambda runs with filter %s for %s: %w", filterPattern, functionName, err)
 		}
 		for runIndex := range matchedRuns {
 			run := matchedRuns[runIndex]
-			key := run.RunID + "|" + run.StartAt + "|" + run.EndAt
-			if _, ok := seen[key]; ok {
-				continue
-			}
-			seen[key] = struct{}{}
-			runs = append(runs, run)
+			// Use RunID (RequestID) as the deduplication key; if not present, time-based fallback is already in RunID
+			runsByID[run.RunID] = run
 		}
 	}
 
+	runs := make([]resourcescore.Run, 0, len(runsByID))
+	for runID := range runsByID {
+		runs = append(runs, runsByID[runID])
+	}
+
 	slices.SortStableFunc(runs, func(left, right resourcescore.Run) int {
-		return lambdaRunSortTime(&right).Compare(lambdaRunSortTime(&left))
+		return c.runSortTime(&right).Compare(c.runSortTime(&left))
 	})
 	if len(runs) > maxResults {
 		return runs[:maxResults], nil
@@ -84,13 +113,13 @@ func collectLambdaRuns(ctx context.Context, svc *cloudwatchlogs.Client, function
 	return runs, nil
 }
 
-func collectLambdaRunsWithPattern(ctx context.Context, svc *cloudwatchlogs.Client, functionName string, since, until time.Time, maxResults int, filterPattern string) ([]resourcescore.Run, error) {
+func (c *lambdaCollector) collectRunsWithPattern(ctx context.Context, functionName string, since, until time.Time, maxResults int, filterPattern string) ([]resourcescore.Run, error) {
 	pageSize := pageSizeForLimit(maxResults, cloudWatchLogsFilterEventsPageSizeMax)
 	input := &cloudwatchlogs.FilterLogEventsInput{LogGroupName: aws.String("/aws/lambda/" + functionName), StartTime: aws.Int64(since.UnixMilli()), FilterPattern: aws.String(filterPattern), Limit: &pageSize}
 	if !until.IsZero() {
 		input.EndTime = aws.Int64(until.UnixMilli())
 	}
-	p := cloudwatchlogs.NewFilterLogEventsPaginator(svc, input)
+	p := cloudwatchlogs.NewFilterLogEventsPaginator(c.svc, input)
 	runs := make([]resourcescore.Run, 0, maxResults)
 	for p.HasMorePages() {
 		page, err := p.NextPage(ctx)
@@ -98,7 +127,7 @@ func collectLambdaRunsWithPattern(ctx context.Context, svc *cloudwatchlogs.Clien
 			return nil, fmt.Errorf("filter lambda logs for %s: %w", functionName, err)
 		}
 		for eventIndex := range page.Events {
-			run, ok := lambdaRunFromLogEvent(page.Events[eventIndex], since)
+			run, ok := c.runFromLogEvent(page.Events[eventIndex], since)
 			if !ok {
 				continue
 			}
@@ -111,7 +140,7 @@ func collectLambdaRunsWithPattern(ctx context.Context, svc *cloudwatchlogs.Clien
 	return runs, nil
 }
 
-func lambdaRunFromLogEvent(event cloudwatchlogstypes.FilteredLogEvent, since time.Time) (resourcescore.Run, bool) {
+func (c *lambdaCollector) runFromLogEvent(event cloudwatchlogstypes.FilteredLogEvent, since time.Time) (resourcescore.Run, bool) {
 	if event.Timestamp == nil || event.Message == nil {
 		return resourcescore.Run{}, false
 	}
@@ -120,13 +149,13 @@ func lambdaRunFromLogEvent(event cloudwatchlogstypes.FilteredLogEvent, since tim
 		return resourcescore.Run{}, false
 	}
 
-	durationSec := lambdaDurationSec(*event.Message)
+	durationSec := c.durationSec(*event.Message)
 	start := end
 	if durationSec > 0 {
 		start = end.Add(-time.Duration(durationSec) * time.Second)
 	}
 
-	run := resourcescore.Run{RunID: eventIDOrTime(event.EventId, end), Status: lambdaRunStatus(*event.Message), StartAt: helpers.FormatRFC3339UTC(start), EndAt: helpers.FormatRFC3339UTC(end), SourceService: "lambda"}
+	run := resourcescore.Run{RunID: c.eventIDOrTime(event.EventId, end), Status: c.runStatus(*event.Message), StartAt: helpers.FormatRFC3339UTC(start), EndAt: helpers.FormatRFC3339UTC(end), SourceService: "lambda"}
 	if durationSec > 0 {
 		duration := durationSec
 		run.DurationSec = &duration
@@ -134,7 +163,7 @@ func lambdaRunFromLogEvent(event cloudwatchlogstypes.FilteredLogEvent, since tim
 	return run, true
 }
 
-func lambdaFunctionName(functionTarget string) string {
+func (*lambdaCollector) functionName(functionTarget string) string {
 	trimmed := strings.TrimSpace(functionTarget)
 	if trimmed == "" {
 		return ""
@@ -151,8 +180,8 @@ func lambdaFunctionName(functionTarget string) string {
 	return trimmed
 }
 
-func lambdaDurationSec(message string) int64 {
-	if report, ok := parseLambdaPlatformReport(message); ok {
+func (c *lambdaCollector) durationSec(message string) int64 {
+	if report, ok := c.parsePlatformReport(message); ok {
 		if report.Record.Metrics.DurationMs <= 0 {
 			return 0
 		}
@@ -169,16 +198,16 @@ func lambdaDurationSec(message string) int64 {
 	return int64(math.Ceil(milliseconds / 1000.0))
 }
 
-func lambdaRunStatus(message string) string {
-	if lambdaRunStatusDetail(message) == lambdaStatusCompleted {
+func (c *lambdaCollector) runStatus(message string) string {
+	if c.runStatusDetail(message) == lambdaStatusCompleted {
 		return lambdaStatusCompleted
 	}
 	return lambdaStatusFailed
 }
 
-func lambdaRunStatusDetail(message string) string {
-	if report, ok := parseLambdaPlatformReport(message); ok {
-		return lambdaStatusDetailFromFields(report.Record.Status, report.Record.ErrorType)
+func (c *lambdaCollector) runStatusDetail(message string) string {
+	if report, ok := c.parsePlatformReport(message); ok {
+		return c.statusDetailFromFields(report.Record.Status, report.Record.ErrorType)
 	}
 	lower := strings.ToLower(message)
 	if strings.Contains(lower, "task timed out") || strings.Contains(lower, "status: timeout") {
@@ -192,12 +221,12 @@ func lambdaRunStatusDetail(message string) string {
 		if errorMatch := lambdaErrorTypePattern.FindStringSubmatch(message); len(errorMatch) == lambdaSplitParts {
 			errorType = errorMatch[1]
 		}
-		return lambdaStatusDetailFromFields(match[1], errorType)
+		return c.statusDetailFromFields(match[1], errorType)
 	}
 	return lambdaStatusCompleted
 }
 
-func lambdaRunSortTime(run *resourcescore.Run) time.Time {
+func (*lambdaCollector) runSortTime(run *resourcescore.Run) time.Time {
 	if parsed, err := time.Parse(time.RFC3339, run.EndAt); err == nil {
 		return parsed
 	}
@@ -207,7 +236,7 @@ func lambdaRunSortTime(run *resourcescore.Run) time.Time {
 	return time.Time{}
 }
 
-func lambdaStatusDetailFromFields(status, errorType string) string {
+func (*lambdaCollector) statusDetailFromFields(status, errorType string) string {
 	normalizedStatus := strings.ToUpper(strings.TrimSpace(status))
 	normalizedErrorType := strings.ToUpper(strings.TrimSpace(errorType))
 	if strings.Contains(normalizedErrorType, "OUTOFMEMORY") {
@@ -222,7 +251,7 @@ func lambdaStatusDetailFromFields(status, errorType string) string {
 	return lambdaStatusCompleted
 }
 
-func parseLambdaPlatformReport(message string) (lambdaPlatformReport, bool) {
+func (*lambdaCollector) parsePlatformReport(message string) (lambdaPlatformReport, bool) {
 	var report lambdaPlatformReport
 	if err := json.Unmarshal([]byte(strings.TrimSpace(message)), &report); err != nil {
 		return lambdaPlatformReport{}, false
@@ -233,7 +262,7 @@ func parseLambdaPlatformReport(message string) (lambdaPlatformReport, bool) {
 	return report, true
 }
 
-func eventIDOrTime(eventID *string, timestamp time.Time) string {
+func (*lambdaCollector) eventIDOrTime(eventID *string, timestamp time.Time) string {
 	if eventID != nil && *eventID != "" {
 		return *eventID
 	}

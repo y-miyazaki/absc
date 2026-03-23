@@ -18,11 +18,10 @@ func pageSizeForLimit(limit int, serviceMax int32) int32 {
 	if serviceMax < 1 {
 		return 1
 	}
-	effectiveLimit := limit
-	if effectiveLimit < 1 {
-		effectiveLimit = defaultMaxResults
+	if limit < 1 {
+		return serviceMax
 	}
-	pageSize := helpers.SafeInt32(effectiveLimit)
+	pageSize := helpers.SafeInt32(limit)
 	if pageSize < 1 {
 		return 1
 	}
@@ -37,7 +36,7 @@ func remainingPageSize(limit, collected int, serviceMax int32) int32 {
 		return 1
 	}
 	if limit < 1 {
-		return pageSizeForLimit(limit, serviceMax)
+		return serviceMax
 	}
 	remaining := limit - collected
 	if remaining < 1 {

@@ -15,7 +15,33 @@ import (
 	"github.com/y-miyazaki/absc/internal/helpers"
 )
 
-func collectBatchRuns(ctx context.Context, svc *batch.Client, targetARN, jobName string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
+type batchCollector struct {
+	caches *runCollectorCaches
+	svc    *batch.Client
+}
+
+func newBatchCollector(svc *batch.Client, caches *runCollectorCaches) *batchCollector {
+	return &batchCollector{caches: caches, svc: svc}
+}
+
+func (*batchCollector) Service() string { return "batch" }
+
+//nolint:gocritic // CollectOptions is shared as a value object across collectors.
+func (c *batchCollector) Collect(ctx context.Context, schedule *resourcescore.Schedule, targetARN, runJobName string, hints TargetHints, opts resourcescore.CollectOptions) ([]resourcescore.Run, error) {
+	_ = schedule
+	_ = hints
+	cacheKey := targetARN + cacheKeySeparator + runJobName
+	description := fmt.Sprintf("batch job queue=%s job=%s", helpers.ResourceNameFromARN(targetARN), runJobName)
+	runs, err := getCachedRuns(c.caches.batchRunsCache, c.caches.batchErrCache, cacheKey, description, func() ([]resourcescore.Run, error) {
+		return c.collectRuns(ctx, targetARN, runJobName, opts.Since, opts.Until, opts.MaxResults)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("collect batch runs for target %s: %w", targetARN, err)
+	}
+	return runs, nil
+}
+
+func (c *batchCollector) collectRuns(ctx context.Context, targetARN, jobName string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
 	queueName := helpers.ResourceNameFromARN(targetARN)
 	if queueName == "" {
 		queueName = targetARN
@@ -28,7 +54,7 @@ func collectBatchRuns(ctx context.Context, svc *batch.Client, targetARN, jobName
 			break
 		}
 		input := &batch.ListJobsInput{JobQueue: aws.String(queueName), JobStatus: status, MaxResults: &pageSize}
-		p := batch.NewListJobsPaginator(svc, input)
+		p := batch.NewListJobsPaginator(c.svc, input)
 		for p.HasMorePages() {
 			page, err := p.NextPage(ctx)
 			if err != nil {

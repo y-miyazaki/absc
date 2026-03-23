@@ -12,13 +12,13 @@ Collect  →  Build  →  Export
 
 **Collect** fans out AWS API calls per region and per collector, merges schedules and soft errors, and returns them to the caller. Partial failures from one region or collector do not stop the full run.
 
-**Build** accepts the collected schedules and transforms them into the output domain. It anchors the timeline window, remaps cron slots from the source timezone to the display timezone, filters and classifies runs, and emits slot issues.
+**Build** accepts the collected schedules and transforms them into the output domain. It anchors the timeline window, evaluates each cron expression minute-by-minute over the actual window dates to determine which slots fire (respecting weekday, day, month, and year constraints), remaps the time-of-day template to the display timezone for visual rendering, filters and classifies runs, and emits slot issues.
 
 **Export** writes four output files from the built result: a JSON payload, an HTML timeline viewer, an errors HTML page, and a slot issue CSV.
 
 ## CLI Defaults
 
-The following constants are applied when a flag is omitted.
+The following constants are applied when a flag is omitted.で
 
 | Flag                      | Default          | Notes                                   |
 | ------------------------- | ---------------- | --------------------------------------- |
@@ -61,7 +61,13 @@ The slot granularity constants are:
 - `minutesPerSlot = 10`
 - `slotsPerHour = 6`
 
-Slots are first computed in the timezone of the schedule expression (see `ScheduleExpressionTimezone`). They are then remapped to the display timezone by the Build stage before being written to the output. This means the `slots` array in the JSON output is always relative to the display timezone window start.
+The Build stage produces two slot arrays per schedule.
+
+**`slots`** is the window-accurate slot array. For `cron()` expressions, the Build stage evaluates the expression minute-by-minute over the actual display window dates in the schedule expression timezone. Only minutes that match the cron fields (including weekday, day, month, and year) set the corresponding slot to `1`. This means a schedule with `cron(0 1 ? * MON-FRI *)` will have all-zero `slots` when the display window falls on a Saturday or Sunday. For `rate()` and `at()` expressions, the collector-supplied slot template is timezone-remapped to the display timezone. `slots` is used for slot issue detection, run alignment, and `expected_in_window` computation.
+
+**`display_slots`** is the time-of-day template used for visual rendering. It is always the timezone-remapped collector slot template regardless of the display window date. It carries `1` at the positions where the schedule is scheduled to fire each day, regardless of weekday or date constraints. The HTML timeline uses `display_slots` to render cell markers; cells are colored blue when `expected_in_window = true` and gray when `expected_in_window = false`.
+
+Both arrays contain 144 integers and are always relative to the display timezone window start.
 
 ## Schedule Collection Model
 
@@ -86,12 +92,13 @@ Disabled schedules are included in the output. They still carry runs collected w
 
 Run enrichment is the optional phase where collectors fetch recent execution history and attach it to each schedule.
 
-Observable target kinds that support run enrichment are defined in [internal/exporter/slot_issue_policy.json](internal/exporter/slot_issue_policy.json):
+Observable target kinds that support run enrichment are defined in the `observableTargetKinds` variable in [internal/exporter/cron.go](../internal/exporter/cron.go):
 
 - `batch`
 - `ecs`
 - `glue`
 - `lambda`
+- `redshift`
 - `stepfunctions`
 
 For all other target kinds, the schedule is displayed with empty runs. The `run_in_slot_category` field is set to `not_observable_target` in that case.
@@ -105,6 +112,12 @@ Each collector enforces `maxResults` independently. When a collector returns exa
 ECS stopped task history from the ECS API is limited to approximately 1 hour after the task stops. For longer lookback windows, the collector supplements results by reading CloudTrail management events with event source `ecs.amazonaws.com` and event name `RunTask`.
 
 When both sources return entries for the same task, ECS API records are preferred over CloudTrail-only records (merge policy: ECS record wins).
+
+### EC2 and RDS CloudTrail Semantics
+
+EC2 and RDS operation history collected from CloudTrail management events represents action requests, not authoritative completion states. ABSC records these runs using request-oriented statuses such as `START_REQUESTED` and `STOP_REQUESTED` to indicate that the API call was observed.
+
+ABSC does not derive start or stop duration from CloudTrail alone for these target kinds. If completion timing is required, it must be sourced from state-change events or service-specific describe APIs outside the current CloudTrail-only enrichment flow.
 
 ## Output Files
 

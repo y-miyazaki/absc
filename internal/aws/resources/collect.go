@@ -12,7 +12,6 @@ import (
 type CollectOptions = resourcescore.CollectOptions
 
 const defaultMaxConcurrency = 5
-const defaultMaxResults = 144
 
 // Collector is implemented by each AWS-backed schedule source.
 type Collector interface {
@@ -24,7 +23,8 @@ type Collector interface {
 
 // Collect fans out per-region collectors and merges their schedules and errors.
 // It keeps partial failures so one region or service does not stop the full run.
-// Default concurrency and max-results values are applied when callers omit them.
+// Default concurrency is applied when callers omit it.
+// MaxResults is expected to be set by the caller.
 //
 //nolint:gocritic // CollectOptions is intentionally passed by value to preserve the public API.
 func Collect(ctx context.Context, cfg *aws.Config, opts CollectOptions) ([]Schedule, []ErrorRecord) {
@@ -33,9 +33,6 @@ func Collect(ctx context.Context, cfg *aws.Config, opts CollectOptions) ([]Sched
 	concurrency := opts.MaxConcurrency
 	if concurrency <= 0 {
 		concurrency = defaultMaxConcurrency
-	}
-	if opts.MaxResults < 1 {
-		opts.MaxResults = defaultMaxResults
 	}
 
 	type collectResult struct {

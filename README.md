@@ -147,6 +147,10 @@ absc --max-results 100
 absc --output-dir /path/to/output
 ```
 
+`--lookback-hours` does not create a trailing `now - N hours` window. ABSC first subtracts the requested hours, then anchors the display and CloudTrail collection window to the start of that calendar day in the selected timezone. With the default `--lookback-hours 24` and `--timezone UTC`, the output covers the previous full UTC day (`00:00:00` to `24:00:00`), not the most recent rolling 24 hours.
+
+See [docs/SPECIFICATION.md](docs/SPECIFICATION.md) for the exact timeline window model.
+
 ### Command-Line Options
 
 ```text

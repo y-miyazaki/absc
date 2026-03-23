@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/glue"
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
 	resourcescore "github.com/y-miyazaki/absc/internal/aws/resources/core"
 	"github.com/y-miyazaki/absc/internal/helpers"
@@ -22,50 +21,35 @@ const (
 	stepFunctionRetryBaseDelay   = 200 * time.Millisecond
 )
 
-func collectGlueRuns(ctx context.Context, svc *glue.Client, jobNameOrARN string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
-	jobName := jobNameOrARN
-	if strings.Contains(jobNameOrARN, ":") {
-		jobName = helpers.ResourceNameFromARN(jobNameOrARN)
-	}
-	if jobName == "" {
-		return make([]resourcescore.Run, 0), nil
-	}
+type stepFunctionsCollector struct {
+	caches *runCollectorCaches
+	svc    *sfn.Client
+}
 
-	runs := make([]resourcescore.Run, 0, maxResults)
-	var nextToken *string
-	for len(runs) < maxResults {
-		pageSize := remainingPageSize(maxResults, len(runs), glueGetJobRunsPageSizeMax)
-		out, err := svc.GetJobRuns(ctx, &glue.GetJobRunsInput{JobName: aws.String(jobName), MaxResults: &pageSize, NextToken: nextToken})
-		if err != nil {
-			return nil, fmt.Errorf("get glue job runs for %s: %w", jobName, err)
-		}
-		for jobRunIndex := range out.JobRuns {
-			jobRun := out.JobRuns[jobRunIndex]
-			if jobRun.StartedOn == nil || jobRun.StartedOn.Before(since) || (!until.IsZero() && jobRun.StartedOn.After(until)) {
-				continue
-			}
-			run := resourcescore.Run{RunID: aws.ToString(jobRun.Id), Status: string(jobRun.JobRunState), StartAt: helpers.FormatRFC3339UTC(*jobRun.StartedOn), SourceService: "glue"}
-			if jobRun.CompletedOn != nil {
-				run.EndAt = helpers.FormatRFC3339UTC(*jobRun.CompletedOn)
-				duration := int64(jobRun.CompletedOn.Sub(*jobRun.StartedOn).Seconds())
-				run.DurationSec = &duration
-			}
-			runs = append(runs, run)
-			if len(runs) >= maxResults {
-				break
-			}
-		}
-		if out.NextToken == nil {
-			break
-		}
-		nextToken = out.NextToken
+func newStepFunctionsCollector(svc *sfn.Client, caches *runCollectorCaches) *stepFunctionsCollector {
+	return &stepFunctionsCollector{caches: caches, svc: svc}
+}
+
+func (*stepFunctionsCollector) Service() string { return "stepfunctions" }
+
+//nolint:gocritic // CollectOptions is shared as a value object across collectors.
+func (c *stepFunctionsCollector) Collect(ctx context.Context, schedule *resourcescore.Schedule, targetARN, runJobName string, hints TargetHints, opts resourcescore.CollectOptions) ([]resourcescore.Run, error) {
+	_ = schedule
+	_ = runJobName
+	_ = hints
+	description := fmt.Sprintf("Step Function state machine=%s", helpers.ResourceNameFromARN(targetARN))
+	runs, err := getCachedRuns(c.caches.stepRunsCache, c.caches.stepErrCache, targetARN, description, func() ([]resourcescore.Run, error) {
+		return c.collectRuns(ctx, targetARN, opts.Since, opts.Until, opts.MaxResults)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("collect step function runs for target %s: %w", targetARN, err)
 	}
 	return runs, nil
 }
 
-func collectStepFunctionRuns(ctx context.Context, svc *sfn.Client, stateMachineARN string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
+func (c *stepFunctionsCollector) collectRuns(ctx context.Context, stateMachineARN string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
 	input := &sfn.ListExecutionsInput{StateMachineArn: aws.String(stateMachineARN), MaxResults: pageSizeForLimit(maxResults, stepFunctionsListExecutionsPageSizeMax)}
-	p := sfn.NewListExecutionsPaginator(svc, input)
+	p := sfn.NewListExecutionsPaginator(c.svc, input)
 	runs := make([]resourcescore.Run, 0)
 	for p.HasMorePages() {
 		var (

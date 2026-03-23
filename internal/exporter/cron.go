@@ -42,9 +42,6 @@ var htmlTemplate string
 //go:embed assets/icons/*.svg
 var iconAssets embed.FS
 
-//go:embed slot_issue_policy.json
-var slotIssuePolicyJSON string
-
 //nolint:tagliatelle // Output is a stable external snake_case JSON schema.
 type Output struct {
 	Version     string           `json:"version"`
@@ -60,11 +57,6 @@ type Output struct {
 
 type BuildOutputOptions struct {
 	IncludeNonSlotRuns bool
-}
-
-//nolint:tagliatelle // slotIssuePolicy reads a stable snake_case JSON file.
-type slotIssuePolicy struct {
-	ObservableTargetKinds []string `json:"observable_target_kinds"`
 }
 
 //nolint:tagliatelle // SlotRunIssue is a stable external snake_case JSON schema.
@@ -107,6 +99,7 @@ type Schedule struct {
 	NextInvocationLabel        string         `json:"next_invocation_label,omitempty"`
 	Service                    string         `json:"service"`
 	TargetKind                 string         `json:"target_kind"`
+	TargetID                   string         `json:"target_id,omitempty"`
 	TargetName                 string         `json:"target_name,omitempty"`
 	TargetService              string         `json:"target_service"`
 	Region                     string         `json:"region"`
@@ -114,6 +107,7 @@ type Schedule struct {
 	RunInSlotCategory          string         `json:"run_in_slot_category"`
 	Runs                       []Run          `json:"runs"`
 	SlotRunIssues              []SlotRunIssue `json:"slot_run_issues,omitempty"`
+	DisplaySlots               []int          `json:"display_slots,omitempty"`
 	Slots                      []int          `json:"slots"`
 	ExpectedInWindow           bool           `json:"expected_in_window"`
 	Enabled                    bool           `json:"enabled"`
@@ -295,12 +289,10 @@ func BuildOutputWithOptions(accountID string, now, since time.Time, loc *time.Lo
 		Errors:    make([]ErrRecord, 0, len(errs)),
 	}
 
-	observableTargetKinds := loadObservableTargetKinds()
-
 	for scheduleIndex := range schedules {
 		s := schedules[scheduleIndex]
-		sourceLoc := scheduleSourceLocation(s.ScheduleExpressionTimezone)
-		slots := remapSlotsToLocation(s.Slots, dayStart, sourceLoc, loc)
+		displaySlots := remapFallbackSlots(s.Slots, dayStart, scheduleSourceLocation(s.ScheduleExpressionTimezone), loc)
+		slots := scheduleSlotsInWindow(s.ScheduleExpression, s.ScheduleExpressionTimezone, s.Slots, dayStart, windowEnd, loc)
 		windowRuns := make([]Run, 0, len(s.Runs))
 		for runIndex := range s.Runs {
 			r := s.Runs[runIndex]
@@ -372,9 +364,11 @@ func BuildOutputWithOptions(accountID string, now, since time.Time, loc *time.Lo
 			TargetKind:                 s.TargetKind,
 			TargetAction:               s.TargetAction,
 			TargetService:              s.TargetService,
+			TargetID:                   s.TargetID,
 			TargetName:                 s.TargetName,
 			NextInvocationAt:           nextInvocationAt,
 			NextInvocationLabel:        formatDisplayTimestamp(nextInvocationAt, loc),
+			DisplaySlots:               displaySlots,
 			Slots:                      slots,
 			SlotRunIssues:              slotIssues,
 			ExpectedInWindow:           expectedInWindow,
@@ -437,67 +431,58 @@ func isObservableTargetKind(targetKind string, observableKinds map[string]struct
 	return ok
 }
 
-func loadObservableTargetKinds() map[string]struct{} {
-	defaults := map[string]struct{}{
-		"batch":         {},
-		"ecs":           {},
-		"glue":          {},
-		"lambda":        {},
-		"stepfunctions": {},
-	}
-
-	raw := strings.TrimSpace(slotIssuePolicyJSON)
-	if raw == "" {
-		return defaults
-	}
-
-	var policy slotIssuePolicy
-	if err := json.Unmarshal([]byte(raw), &policy); err != nil {
-		return defaults
-	}
-
-	set := make(map[string]struct{}, len(policy.ObservableTargetKinds))
-	for i := range policy.ObservableTargetKinds {
-		kind := strings.ToLower(strings.TrimSpace(policy.ObservableTargetKinds[i]))
-		if kind == "" {
-			continue
-		}
-		set[kind] = struct{}{}
-	}
-
-	if len(set) == 0 {
-		return defaults
-	}
-
-	return set
+var observableTargetKinds = map[string]struct{}{
+	"batch":         {},
+	"ecs":           {},
+	"glue":          {},
+	"lambda":        {},
+	"redshift":      {},
+	"stepfunctions": {},
 }
 
 func scheduleExpectedInWindow(expression, expressionTimezone string, windowStart, windowEnd time.Time) bool {
+	return hasActiveSlot(scheduleSlotsInWindow(expression, expressionTimezone, nil, windowStart, windowEnd, windowStart.Location()))
+}
+
+func matchAWSCronExpression(fields []string, t time.Time) bool {
+	return helpers.MatchAWSCronExpression(fields, t)
+}
+
+func scheduleSlotsInWindow(expression, expressionTimezone string, fallbackSlots []int, windowStart, windowEnd time.Time, displayLoc *time.Location) []int {
 	expr := strings.TrimSpace(expression)
 	if !strings.HasPrefix(expr, "cron(") || !strings.HasSuffix(expr, ")") {
-		return true
+		return remapFallbackSlots(fallbackSlots, windowStart, scheduleSourceLocation(expressionTimezone), displayLoc)
 	}
 
 	inside := strings.TrimSuffix(strings.TrimPrefix(expr, "cron("), ")")
 	fields := strings.Fields(inside)
 	if len(fields) != awsCronFieldCount {
-		return true
+		return remapFallbackSlots(fallbackSlots, windowStart, scheduleSourceLocation(expressionTimezone), displayLoc)
 	}
 
-	loc := scheduleSourceLocation(expressionTimezone)
-	start := windowStart.In(loc).Truncate(time.Minute)
-	end := windowEnd.In(loc)
-	for candidate := start; candidate.Before(end); candidate = candidate.Add(time.Minute) {
-		if matchAWSCronExpression(fields, candidate) {
-			return true
+	windowStartInDisplay := windowStart.In(displayLoc)
+	windowEndInDisplay := windowEnd.In(displayLoc)
+	result := make([]int, slotsPerTimelineDay)
+	for candidate := windowStartInDisplay; candidate.Before(windowEndInDisplay); candidate = candidate.Add(time.Minute) {
+		if !matchAWSCronExpression(fields, candidate.In(scheduleSourceLocation(expressionTimezone))) {
+			continue
+		}
+		idx := int(candidate.Sub(windowStartInDisplay) / (time.Duration(slotMinutes) * time.Minute))
+		if idx >= 0 && idx < len(result) {
+			result[idx] = 1
 		}
 	}
 
-	return false
+	return result
 }
 
-func matchAWSCronExpression(fields []string, t time.Time) bool {
-	return helpers.MatchAWSCronExpression(fields, t)
+func hasActiveSlot(slots []int) bool {
+	for i := range slots {
+		if slots[i] == 1 {
+			return true
+		}
+	}
+	return false
 }
 
 func buildSlotLabel(windowStart time.Time, slotIndex int) string {
@@ -631,7 +616,7 @@ func convertRFC3339ToLocation(value string, loc *time.Location) string {
 	return helpers.ConvertRFC3339ToLocation(value, loc)
 }
 
-func remapSlotsToLocation(slots []int, now time.Time, srcLoc, dstLoc *time.Location) []int {
+func remapFallbackSlots(slots []int, now time.Time, srcLoc, dstLoc *time.Location) []int {
 	if len(slots) != slotsPerTimelineDay {
 		return slots
 	}

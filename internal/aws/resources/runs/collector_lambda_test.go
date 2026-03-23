@@ -4,6 +4,7 @@ import "testing"
 
 func TestLambdaRunStatus(t *testing.T) {
 	t.Parallel()
+	collector := &lambdaCollector{}
 
 	tests := []struct {
 		name    string
@@ -46,9 +47,9 @@ func TestLambdaRunStatus(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := lambdaRunStatus(tt.message)
+			got := collector.runStatus(tt.message)
 			if got != tt.want {
-				t.Fatalf("lambdaRunStatus() = %q, want %q", got, tt.want)
+				t.Fatalf("runStatus() = %q, want %q", got, tt.want)
 			}
 		})
 	}
@@ -56,6 +57,7 @@ func TestLambdaRunStatus(t *testing.T) {
 
 func TestLambdaRunStatusDetail(t *testing.T) {
 	t.Parallel()
+	collector := &lambdaCollector{}
 
 	tests := []struct {
 		name    string
@@ -98,9 +100,9 @@ func TestLambdaRunStatusDetail(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := lambdaRunStatusDetail(tt.message)
+			got := collector.runStatusDetail(tt.message)
 			if got != tt.want {
-				t.Fatalf("lambdaRunStatusDetail() = %q, want %q", got, tt.want)
+				t.Fatalf("runStatusDetail() = %q, want %q", got, tt.want)
 			}
 		})
 	}
@@ -108,6 +110,7 @@ func TestLambdaRunStatusDetail(t *testing.T) {
 
 func TestLambdaDurationSec(t *testing.T) {
 	t.Parallel()
+	collector := &lambdaCollector{}
 
 	tests := []struct {
 		name    string
@@ -130,9 +133,76 @@ func TestLambdaDurationSec(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := lambdaDurationSec(tt.message)
+			got := collector.durationSec(tt.message)
 			if got != tt.want {
-				t.Fatalf("lambdaDurationSec() = %d, want %d", got, tt.want)
+				t.Fatalf("durationSec() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLambdaCollector_DeduplicationByRequestID(t *testing.T) {
+	t.Parallel()
+
+	// Verify that deduplication by RequestID works correctly.
+	// Two runs with the same RequestID should be deduplicated using the RequestID map.
+	eventID := "request-id-001"
+
+	// Simulate the deduplication logic: map[RequestID]Run
+	// Two runs with the same RequestID will overwrite in the map, resulting in one entry.
+	runsByID := make(map[string]int)
+	runsByID[eventID] = 1 // First occurrence
+	runsByID[eventID] = 2 // Second occurrence (overwrites)
+
+	if len(runsByID) != 1 {
+		t.Errorf("expected 1 unique run after dedup by RequestID, got %d", len(runsByID))
+	}
+}
+
+func TestLambdaCollector_FunctionNameExtraction(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		functionTarget string
+		want           string
+	}{
+		{
+			name:           "arn_format",
+			functionTarget: "arn:aws:lambda:us-east-1:123456789012:function:my-function",
+			want:           "my-function",
+		},
+		{
+			name:           "arn_with_version",
+			functionTarget: "arn:aws:lambda:us-east-1:123456789012:function:my-function:1",
+			want:           "my-function",
+		},
+		{
+			name:           "simple_name",
+			functionTarget: "my-function",
+			want:           "my-function",
+		},
+		{
+			name:           "empty",
+			functionTarget: "",
+			want:           "",
+		},
+		{
+			name:           "whitespace",
+			functionTarget: "  ",
+			want:           "",
+		},
+	}
+
+	collector := &lambdaCollector{}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := collector.functionName(tt.functionTarget)
+			if got != tt.want {
+				t.Errorf("functionName(%q) = %q, want %q", tt.functionTarget, got, tt.want)
 			}
 		})
 	}

@@ -538,6 +538,12 @@ func TestBuildOutput_SlotRunIssues_WeeklyCronOutsideWindowDay_NoIssues(t *testin
 	if got, want := out.Schedules[0].ExpectedInWindow, false; got != want {
 		t.Fatalf("expected_in_window = %v, want %v", got, want)
 	}
+	if got, want := activeSlotCount(out.Schedules[0].DisplaySlots), 1; got != want {
+		t.Fatalf("display slot count = %d, want %d", got, want)
+	}
+	if got, want := activeSlotCount(out.Schedules[0].Slots), 0; got != want {
+		t.Fatalf("active slot count = %d, want %d", got, want)
+	}
 }
 
 func TestBuildOutput_SlotRunIssues_WeeklyCronOnWindowDay_Issue(t *testing.T) {
@@ -684,4 +690,110 @@ func TestBuildOutput_SlotRunIssues_WraparoundWeekdayOnWindowDay_Issue(t *testing
 	if got, want := out.Schedules[0].ExpectedInWindow, true; got != want {
 		t.Fatalf("expected_in_window = %v, want %v", got, want)
 	}
+}
+
+func TestBuildOutput_SlotGeneration_RespectsWeekdayConstraints(t *testing.T) {
+	t.Parallel()
+
+	loc := time.UTC
+	now := time.Date(2026, 3, 23, 10, 0, 0, 0, loc)
+	since := now.Add(-24 * time.Hour) // 2026-03-22 (Sunday)
+
+	out := BuildOutput(
+		"123456789012",
+		now,
+		since,
+		loc,
+		[]resources.Schedule{{
+			ScheduleName:               "weekday-schedule",
+			ScheduleExpression:         "cron(0 1 ? * MON-FRI *)",
+			ScheduleExpressionTimezone: "UTC",
+			Service:                    "eventbridge_scheduler",
+			TargetKind:                 "other",
+			TargetAction:               "ec2:startInstances",
+			ID:                         "id-weekday",
+			TargetService:              "EC2",
+			TargetARN:                  "arn:aws:scheduler:::aws-sdk:ec2:startInstances",
+			Enabled:                    true,
+			Slots: func() []int {
+				slots := make([]int, 144)
+				slots[6] = 1
+				return slots
+			}(),
+			Runs: nil,
+		}},
+		nil,
+	)
+
+	if got, want := out.Schedules[0].ExpectedInWindow, false; got != want {
+		t.Fatalf("expected_in_window = %v, want %v", got, want)
+	}
+	if got, want := activeSlotCount(out.Schedules[0].DisplaySlots), 1; got != want {
+		t.Fatalf("display slot count = %d, want %d", got, want)
+	}
+	if got, want := activeSlotCount(out.Schedules[0].Slots), 0; got != want {
+		t.Fatalf("active slot count = %d, want %d", got, want)
+	}
+	if got, want := out.Schedules[0].RunInSlotCategory, "not_observable_target"; got != want {
+		t.Fatalf("run_in_slot_category = %q, want %q", got, want)
+	}
+}
+
+func TestBuildOutput_SlotGeneration_RespectsDayMonthYearConstraints(t *testing.T) {
+	t.Parallel()
+
+	loc := time.UTC
+	now := time.Date(2026, 3, 23, 10, 0, 0, 0, loc)
+	since := now.Add(-24 * time.Hour) // 2026-03-22
+
+	out := BuildOutput(
+		"123456789012",
+		now,
+		since,
+		loc,
+		[]resources.Schedule{{
+			ScheduleName:               "dated-schedule",
+			ScheduleExpression:         "cron(0 12 23 3 ? 2026)",
+			ScheduleExpressionTimezone: "UTC",
+			Service:                    "eventbridge_rule",
+			TargetKind:                 "lambda",
+			ID:                         "id-dated",
+			TargetService:              "Lambda",
+			TargetARN:                  "arn:aws:lambda:ap-northeast-1:123456789012:function:example",
+			Enabled:                    true,
+			Slots: func() []int {
+				slots := make([]int, 144)
+				slots[72] = 1
+				return slots
+			}(),
+			Runs: nil,
+		}},
+		nil,
+	)
+
+	if got, want := out.Schedules[0].ExpectedInWindow, false; got != want {
+		t.Fatalf("expected_in_window = %v, want %v", got, want)
+	}
+	if got, want := activeSlotCount(out.Schedules[0].DisplaySlots), 1; got != want {
+		t.Fatalf("display slot count = %d, want %d", got, want)
+	}
+	if got, want := activeSlotCount(out.Schedules[0].Slots), 0; got != want {
+		t.Fatalf("active slot count = %d, want %d", got, want)
+	}
+	if got, want := len(out.Schedules[0].SlotRunIssues), 0; got != want {
+		t.Fatalf("len(slot_run_issues) = %d, want %d", got, want)
+	}
+	if got, want := out.Schedules[0].RunInSlotCategory, "not_scheduled_today"; got != want {
+		t.Fatalf("run_in_slot_category = %q, want %q", got, want)
+	}
+}
+
+func activeSlotCount(slots []int) int {
+	count := 0
+	for i := range slots {
+		if slots[i] == 1 {
+			count++
+		}
+	}
+	return count
 }

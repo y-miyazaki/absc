@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/batch"
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/glue"
 	"github.com/aws/aws-sdk-go-v2/service/scheduler"
@@ -23,6 +24,7 @@ type SchedulerCollector struct {
 	batchSvc *batch.Client
 	ctSvc    *cloudtrail.Client
 	cwlSvc   *cloudwatchlogs.Client
+	ec2Svc   *ec2.Client
 	ecsSvc   *ecs.Client
 	glueSvc  *glue.Client
 	svc      *scheduler.Client
@@ -31,9 +33,9 @@ type SchedulerCollector struct {
 }
 
 type runTargetResolution struct {
-	hints              runs.TargetHints
 	runJobName         string
 	runTargetARN       string
+	hints              runs.TargetHints
 	hasBatchParameters bool
 }
 
@@ -46,6 +48,7 @@ func NewSchedulerCollector(cfg *aws.Config, region string) (*SchedulerCollector,
 		batchSvc: batch.NewFromConfig(*cfg, func(o *batch.Options) { o.Region = region }),
 		ctSvc:    cloudtrail.NewFromConfig(*cfg, func(o *cloudtrail.Options) { o.Region = region }),
 		cwlSvc:   cloudwatchlogs.NewFromConfig(*cfg, func(o *cloudwatchlogs.Options) { o.Region = region }),
+		ec2Svc:   ec2.NewFromConfig(*cfg, func(o *ec2.Options) { o.Region = region }),
 		ecsSvc:   ecs.NewFromConfig(*cfg, func(o *ecs.Options) { o.Region = region }),
 		glueSvc:  glue.NewFromConfig(*cfg, func(o *glue.Options) { o.Region = region }),
 	}, nil
@@ -84,6 +87,7 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 			runTargetARN := ""
 			runJobName := ""
 			hasBatchParameters := false
+			accountID := extractAccountIDFromRoleARN(aws.ToString(detail.Target.RoleArn))
 			hints := runs.TargetHints{}
 			if detail.Target != nil {
 				targetARN = aws.ToString(detail.Target.Arn)
@@ -101,6 +105,19 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 				targetService := detectTargetService(targetARN)
 				targetAction := detectTargetAction(targetARN)
 				targetName := resolveSchedulerTargetName(targetARN, targetInput, runTargetARN)
+				targetID := ""
+				if targetService == "EC2" {
+					if ids := getStringSliceFromJSON(targetInput, "InstanceIds"); len(ids) == 1 {
+						targetID = ids[0]
+						if ec2Name := lookupEC2InstanceName(ctx, c.ec2Svc, ids[0]); ec2Name != "" {
+							targetName = ec2Name
+						}
+					}
+				}
+				// Fallback: for Step Functions, if runTargetARN was not resolved from input, build it from targetName
+				if targetService == "Step Functions" && runTargetARN == targetARN && targetName != "" && accountID != "" {
+					runTargetARN = fmt.Sprintf("arn:aws:states:%s:%s:stateMachine:%s", c.region, accountID, targetName)
+				}
 				nextInvocationAt := computeSchedulerNextInvocation(detail, nowUTC)
 				s := Schedule{
 					ID:                         fmt.Sprintf("eventbridge_scheduler:%s:%s", c.region, aws.ToString(detail.Name)),
@@ -112,10 +129,11 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 					ScheduleExpressionTimezone: aws.ToString(detail.ScheduleExpressionTimezone),
 					Enabled:                    enabled,
 					Region:                     c.region,
-					TargetARN:                  targetARN,
+					TargetARN:                  runTargetARN,
 					TargetKind:                 targetKind,
 					TargetAction:               targetAction,
 					TargetService:              targetService,
+					TargetID:                   targetID,
 					TargetName:                 targetName,
 					NextInvocationAt:           nextInvocationAt,
 					Slots:                      buildSlots(aws.ToString(detail.ScheduleExpression)),
@@ -142,10 +160,11 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 				ScheduleExpressionTimezone: aws.ToString(detail.ScheduleExpressionTimezone),
 				Enabled:                    enabled,
 				Region:                     c.region,
-				TargetARN:                  targetARN,
+				TargetARN:                  runTargetARN,
 				TargetKind:                 targetKind,
 				TargetAction:               targetAction,
 				TargetService:              targetService,
+				TargetID:                   "",
 				TargetName:                 targetName,
 				NextInvocationAt:           nextInvocationAt,
 				Slots:                      buildSlots(aws.ToString(detail.ScheduleExpression)),
@@ -186,6 +205,13 @@ var schedulerSDKResolvers = map[string]sdkTargetResolver{
 		},
 	},
 	"ec2": {
+		runTarget: func(input string) runTargetResolution {
+			return runTargetResolution{
+				hints: runs.TargetHints{
+					EC2InstanceIDs: getStringSliceFromJSON(input, "InstanceIds"),
+				},
+			}
+		},
 		displayName: func(input, runTargetARN string) (string, bool) {
 			_ = runTargetARN
 			ids := getStringSliceFromJSON(input, "InstanceIds")
@@ -244,6 +270,17 @@ var schedulerSDKResolvers = map[string]sdkTargetResolver{
 		},
 	},
 	"rds": {
+		runTarget: func(input string) runTargetResolution {
+			identifier := getStringFromJSON(input, "DbClusterIdentifier", "DbInstanceIdentifier")
+			if identifier == "" {
+				return runTargetResolution{}
+			}
+			return runTargetResolution{
+				hints: runs.TargetHints{
+					RDSResourceIDs: []string{identifier},
+				},
+			}
+		},
 		displayName: func(input, runTargetARN string) (string, bool) {
 			_ = runTargetARN
 			v := getStringFromJSON(input, "DbClusterIdentifier", "DbInstanceIdentifier")
@@ -313,6 +350,20 @@ func resolveSchedulerRunTarget(targetARN, input string) runTargetResolution {
 	return runTargetResolution{hasBatchParameters: strings.Contains(lowerARN, ":batch:")}
 }
 
+// extractAccountIDFromRoleARN extracts the AWS account ID from an IAM role ARN.
+// ARN format: arn:aws:iam::123456789012:role/...
+func extractAccountIDFromRoleARN(roleARN string) string {
+	if roleARN == "" {
+		return ""
+	}
+	const arnAccountIDIndex = 4
+	parts := strings.Split(roleARN, ":")
+	if len(parts) > arnAccountIDIndex {
+		return parts[arnAccountIDIndex]
+	}
+	return ""
+}
+
 // getStringFromJSON returns the first matching string field from a JSON object.
 func getStringFromJSON(raw string, keys ...string) string {
 	if strings.TrimSpace(raw) == "" {
@@ -362,4 +413,21 @@ func getStringSliceFromJSON(raw string, keys ...string) []string {
 		}
 	}
 	return nil
+}
+
+// lookupEC2InstanceName returns the Name tag value for the given EC2 instance ID.
+// Returns an empty string if the Name tag is not set or the lookup fails.
+func lookupEC2InstanceName(ctx context.Context, svc *ec2.Client, instanceID string) string {
+	out, err := svc.DescribeInstances(ctx, &ec2.DescribeInstancesInput{
+		InstanceIds: []string{instanceID},
+	})
+	if err != nil || len(out.Reservations) == 0 || len(out.Reservations[0].Instances) == 0 {
+		return ""
+	}
+	for _, tag := range out.Reservations[0].Instances[0].Tags {
+		if aws.ToString(tag.Key) == "Name" {
+			return aws.ToString(tag.Value)
+		}
+	}
+	return ""
 }

@@ -79,10 +79,11 @@ func TestFilterECSCloudTrailRuns(t *testing.T) {
 		},
 	}
 
-	filtered := filterECSCloudTrailRuns(allRuns, "arn:aws:ecs:ap-northeast-1:582064665348:cluster/prd-recommend-cluster", TargetHints{
+	hints := &TargetHints{
 		ECSRoleARN:           "arn:aws:iam::582064665348:role/prd-recommend-batch-st-cw-role",
 		ECSTaskDefinitionARN: "arn:aws:ecs:ap-northeast-1:582064665348:task-definition/prd-recommend-batch-td",
-	}, 10)
+	}
+	filtered := filterECSCloudTrailRuns(allRuns, "arn:aws:ecs:ap-northeast-1:582064665348:cluster/prd-recommend-cluster", hints, 10)
 
 	if got, want := len(filtered), 1; got != want {
 		t.Fatalf("len(filtered) = %d, want %d", got, want)
