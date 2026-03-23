@@ -38,7 +38,7 @@ func (c *stepFunctionsCollector) Collect(ctx context.Context, schedule *resource
 	_ = runJobName
 	_ = hints
 	description := fmt.Sprintf("Step Function state machine=%s", helpers.ResourceNameFromARN(targetARN))
-	runs, err := getCachedRuns(c.caches.stepRunsCache, c.caches.stepErrCache, targetARN, description, func() ([]resourcescore.Run, error) {
+	runs, err := getCachedRunsForCollector(c.caches, c, targetARN, description, func() ([]resourcescore.Run, error) {
 		return c.collectRuns(ctx, targetARN, opts.Since, opts.Until, opts.MaxResults)
 	})
 	if err != nil {

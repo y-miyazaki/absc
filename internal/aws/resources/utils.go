@@ -71,6 +71,9 @@ func detectTargetKind(arn string, batchParametersPresent bool) string {
 	if strings.Contains(s, ":aws-sdk:rds:") {
 		return "rds"
 	}
+	if strings.Contains(s, ":aws-sdk:redshift:") {
+		return "redshift"
+	}
 	if strings.Contains(s, ":aws-sdk:lambda:") {
 		return "lambda"
 	}
@@ -94,6 +97,9 @@ func detectTargetKind(arn string, batchParametersPresent bool) string {
 	}
 	if strings.Contains(s, ":lambda:") {
 		return "lambda"
+	}
+	if strings.Contains(s, ":redshift:") {
+		return "redshift"
 	}
 	return "other"
 }

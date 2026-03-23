@@ -65,6 +65,12 @@ var runCollectorRegistrations = []struct {
 			return newStepFunctionsCollector(deps.stepSvc, deps.caches)
 		},
 	},
+	{
+		targetKind: "redshift",
+		build: func(deps runCollectorDeps) runCollector {
+			return newRedshiftCollector(deps.ctSvc, deps.caches)
+		},
+	},
 }
 
 var supportedRunTargetKinds = func() []string {
@@ -81,6 +87,7 @@ type TargetHints struct {
 	ECSStartedBy         string
 	ECSTaskDefinitionARN string
 	RDSResourceIDs       []string
+	RedshiftClusterIDs   []string
 }
 
 type runCollectorDeps struct {

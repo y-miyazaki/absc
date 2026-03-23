@@ -115,3 +115,16 @@ func TestResolveSchedulerTargetName_RedshiftClusterIdentifier(t *testing.T) {
 		t.Fatalf("target name = %q, want %q", got, "prd-cluster")
 	}
 }
+
+func TestResolveSchedulerRunTarget_RedshiftClusterIdentifier(t *testing.T) {
+	t.Parallel()
+
+	got := resolveSchedulerRunTarget(
+		"arn:aws:scheduler:::aws-sdk:redshift:pauseCluster",
+		`{"ClusterIdentifier":"prd-cluster"}`,
+	)
+
+	if len(got.hints.RedshiftClusterIDs) != 1 || got.hints.RedshiftClusterIDs[0] != "prd-cluster" {
+		t.Fatalf("RedshiftClusterIDs = %#v, want [\"prd-cluster\"]", got.hints.RedshiftClusterIDs)
+	}
+}

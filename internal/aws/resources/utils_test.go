@@ -31,3 +31,12 @@ func TestBuildSlots_CronWraparoundMinuteStepRange(t *testing.T) {
 		t.Fatalf("slots[2] = %d, want 0", slots[2])
 	}
 }
+
+func TestDetectTargetKind_AwsSDKRedshift(t *testing.T) {
+	t.Parallel()
+
+	got := detectTargetKind("arn:aws:scheduler:::aws-sdk:redshift:pauseCluster", false)
+	if got != "redshift" {
+		t.Fatalf("target kind = %q, want %q", got, "redshift")
+	}
+}

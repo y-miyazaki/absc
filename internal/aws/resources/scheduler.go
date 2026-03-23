@@ -288,6 +288,17 @@ var schedulerSDKResolvers = map[string]sdkTargetResolver{
 		},
 	},
 	"redshift": {
+		runTarget: func(input string) runTargetResolution {
+			identifier := getStringFromJSON(input, "ClusterIdentifier")
+			if identifier == "" {
+				return runTargetResolution{}
+			}
+			return runTargetResolution{
+				hints: runs.TargetHints{
+					RedshiftClusterIDs: []string{identifier},
+				},
+			}
+		},
 		displayName: func(input, runTargetARN string) (string, bool) {
 			_ = runTargetARN
 			v := getStringFromJSON(input, "ClusterIdentifier", "WorkgroupName")

@@ -14,10 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	resourcescore "github.com/y-miyazaki/absc/internal/aws/resources/core"
-	"github.com/y-miyazaki/absc/internal/helpers"
 )
-
-const rdsResourceIDCapacity = 2
 
 type rdsCollector struct {
 	caches *runCollectorCaches
@@ -43,7 +40,7 @@ func (c *rdsCollector) Collect(ctx context.Context, schedule *resourcescore.Sche
 	_ = runJobName
 	cacheKey := strings.Join(append([]string{schedule.TargetAction}, hints.RDSResourceIDs...), cacheKeySeparator)
 	description := fmt.Sprintf("RDS action=%s resources=%d", schedule.TargetAction, len(hints.RDSResourceIDs))
-	runs, err := getCachedRuns(c.caches.rdsRunsCache, c.caches.rdsErrCache, cacheKey, description, func() ([]resourcescore.Run, error) {
+	runs, err := getCachedRunsForCollector(c.caches, c, cacheKey, description, func() ([]resourcescore.Run, error) {
 		return c.collectRuns(ctx, schedule.TargetAction, hints.RDSResourceIDs, opts.Since, opts.Until, opts.MaxResults)
 	})
 	if err != nil {
@@ -52,11 +49,11 @@ func (c *rdsCollector) Collect(ctx context.Context, schedule *resourcescore.Sche
 	return runs, nil
 }
 func (c *rdsCollector) collectRuns(ctx context.Context, targetAction string, resourceIDs []string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
-	allRuns, err := collectCloudTrailActionRuns(ctx, c.ctSvc, targetAction, since, until, c.caches, c.runsFromEvent)
+	runs, err := collectCloudTrailFilteredRuns(ctx, c.ctSvc, targetAction, resourceIDs, since, until, maxResults, c.caches, c.runsFromEvent, c.Service())
 	if err != nil {
 		return nil, fmt.Errorf("collect rds cloudtrail runs: %w", err)
 	}
-	return filterCloudTrailActionRuns(allRuns, resourceIDs, maxResults), nil
+	return runs, nil
 }
 
 func (c *rdsCollector) runsFromEvent(event *cloudtrailtypes.Event, since time.Time) []cloudTrailActionRun {
@@ -69,14 +66,7 @@ func (c *rdsCollector) runsFromEvent(event *cloudtrailtypes.Event, since time.Ti
 		return nil
 	}
 
-	resourceIDs := make([]string, 0, rdsResourceIDCapacity)
-	for _, key := range []string{"dBClusterIdentifier", "dbClusterIdentifier", "DbClusterIdentifier", "dBInstanceIdentifier", "dbInstanceIdentifier", "DbInstanceIdentifier"} {
-		if value, found := envelope.RequestParameters[key]; found {
-			if text, textOK := value.(string); textOK && strings.TrimSpace(text) != "" {
-				resourceIDs = append(resourceIDs, text)
-			}
-		}
-	}
+	resourceIDs := cloudTrailResourceIDsFromMap(envelope.RequestParameters, []string{"dBClusterIdentifier", "dbClusterIdentifier", "DbClusterIdentifier", "dBInstanceIdentifier", "dbInstanceIdentifier", "DbInstanceIdentifier"})
 	if len(resourceIDs) == 0 {
 		resourceIDs = append(resourceIDs, cloudTrailResourceNames(event, "")...)
 	}
@@ -84,15 +74,10 @@ func (c *rdsCollector) runsFromEvent(event *cloudtrailtypes.Event, since time.Ti
 		return nil
 	}
 
-	runID := firstNonEmpty(aws.ToString(event.EventId), envelope.EventID, helpers.FormatRFC3339NanoUTC(*event.EventTime))
+	status := c.runStatus(aws.ToString(event.EventName), c.responseState(&envelope))
 	return []cloudTrailActionRun{{
 		resourceIDs: resourceIDs,
-		run: resourcescore.Run{
-			RunID:         runID,
-			StartAt:       helpers.FormatRFC3339UTC(*event.EventTime),
-			SourceService: "cloudtrail",
-			Status:        c.runStatus(aws.ToString(event.EventName), c.responseState(&envelope)),
-		},
+		run:         cloudTrailRunFromEvent(event, envelope.EventID, status),
 	}}
 }
 
@@ -100,14 +85,7 @@ func (*rdsCollector) responseState(envelope *rdsCloudTrailEventEnvelope) string 
 	if envelope == nil {
 		return ""
 	}
-	for _, key := range []string{"status", "dBClusterStatus", "dbClusterStatus", "dBInstanceStatus", "dbInstanceStatus"} {
-		if value, found := envelope.ResponseElements[key]; found {
-			if text, textOK := value.(string); textOK && strings.TrimSpace(text) != "" {
-				return text
-			}
-		}
-	}
-	return ""
+	return cloudTrailResponseStateFromMap(envelope.ResponseElements, []string{"status", "dBClusterStatus", "dbClusterStatus", "dBInstanceStatus", "dbInstanceStatus"})
 }
 
 func (*rdsCollector) runStatus(eventName, responseState string) string {

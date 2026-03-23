@@ -6,7 +6,9 @@ package runs
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	resourcescore "github.com/y-miyazaki/absc/internal/aws/resources/core"
 )
@@ -18,43 +20,60 @@ type runCollector interface {
 }
 
 type runCollectorCaches struct {
-	batchErrCache           map[string]error
-	batchRunsCache          map[string][]resourcescore.Run
 	cloudTrailEventErrCache map[string]error
 	cloudTrailEventsCache   map[string][]cloudtrailtypes.Event
-	ec2ErrCache             map[string]error
-	ec2RunsCache            map[string][]resourcescore.Run
-	ecsErrCache             map[string]error
-	ecsRunsCache            map[string][]resourcescore.Run
-	glueErrCache            map[string]error
-	glueRunsCache           map[string][]resourcescore.Run
-	lambdaErrCache          map[string]error
-	lambdaRunsCache         map[string][]resourcescore.Run
-	rdsErrCache             map[string]error
-	rdsRunsCache            map[string][]resourcescore.Run
-	stepErrCache            map[string]error
-	stepRunsCache           map[string][]resourcescore.Run
+	runErrCache             map[string]map[string]error
+	runResultsCache         map[string]map[string][]resourcescore.Run
 }
 
 func newRunCollectorCaches() *runCollectorCaches {
 	return &runCollectorCaches{
-		batchErrCache:           make(map[string]error),
-		batchRunsCache:          make(map[string][]resourcescore.Run),
 		cloudTrailEventErrCache: make(map[string]error),
 		cloudTrailEventsCache:   make(map[string][]cloudtrailtypes.Event),
-		ec2ErrCache:             make(map[string]error),
-		ec2RunsCache:            make(map[string][]resourcescore.Run),
-		ecsErrCache:             make(map[string]error),
-		ecsRunsCache:            make(map[string][]resourcescore.Run),
-		glueErrCache:            make(map[string]error),
-		glueRunsCache:           make(map[string][]resourcescore.Run),
-		lambdaErrCache:          make(map[string]error),
-		lambdaRunsCache:         make(map[string][]resourcescore.Run),
-		rdsErrCache:             make(map[string]error),
-		rdsRunsCache:            make(map[string][]resourcescore.Run),
-		stepErrCache:            make(map[string]error),
-		stepRunsCache:           make(map[string][]resourcescore.Run),
+		runErrCache:             make(map[string]map[string]error),
+		runResultsCache:         make(map[string]map[string][]resourcescore.Run),
 	}
+}
+
+func ensureServiceRunCaches(caches *runCollectorCaches, service string) (map[string][]resourcescore.Run, map[string]error) {
+	runsCache, ok := caches.runResultsCache[service]
+	if !ok {
+		runsCache = make(map[string][]resourcescore.Run)
+		caches.runResultsCache[service] = runsCache
+	}
+	errCache, ok := caches.runErrCache[service]
+	if !ok {
+		errCache = make(map[string]error)
+		caches.runErrCache[service] = errCache
+	}
+	return runsCache, errCache
+}
+
+func getCachedRunsForCollector(caches *runCollectorCaches, collector runCollector, key, description string, collectFn func() ([]resourcescore.Run, error)) ([]resourcescore.Run, error) {
+	runsCache, errCache := ensureServiceRunCaches(caches, collector.Service())
+	runs, err := getCachedRuns(runsCache, errCache, key, description, collectFn)
+	if err != nil {
+		return nil, fmt.Errorf("collect cached runs for service %s: %w", collector.Service(), err)
+	}
+	return runs, nil
+}
+
+func collectCloudTrailFilteredRuns(
+	ctx context.Context,
+	svc *cloudtrail.Client,
+	targetAction string,
+	resourceIDs []string,
+	since, until time.Time,
+	maxResults int,
+	caches *runCollectorCaches,
+	parser func(*cloudtrailtypes.Event, time.Time) []cloudTrailActionRun,
+	serviceName string,
+) ([]resourcescore.Run, error) {
+	allRuns, err := collectCloudTrailActionRuns(ctx, svc, targetAction, since, until, caches, parser)
+	if err != nil {
+		return nil, fmt.Errorf("collect %s cloudtrail runs: %w", serviceName, err)
+	}
+	return filterCloudTrailActionRuns(allRuns, resourceIDs, maxResults), nil
 }
 
 // getCachedRuns retrieves cached runs or executes collectFn to populate the cache.

@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	resourcescore "github.com/y-miyazaki/absc/internal/aws/resources/core"
+	"github.com/y-miyazaki/absc/internal/helpers"
 )
 
 const (
@@ -175,4 +176,41 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func cloudTrailResourceIDsFromMap(values map[string]any, keys []string) []string {
+	if len(values) == 0 || len(keys) == 0 {
+		return nil
+	}
+	resourceIDs := make([]string, 0, len(keys))
+	for _, key := range keys {
+		value, found := values[key]
+		if !found {
+			continue
+		}
+		text, textOK := value.(string)
+		if !textOK || strings.TrimSpace(text) == "" {
+			continue
+		}
+		resourceIDs = append(resourceIDs, text)
+	}
+	return resourceIDs
+}
+
+func cloudTrailResponseStateFromMap(values map[string]any, keys []string) string {
+	resourceIDs := cloudTrailResourceIDsFromMap(values, keys)
+	if len(resourceIDs) == 0 {
+		return ""
+	}
+	return resourceIDs[0]
+}
+
+func cloudTrailRunFromEvent(event *cloudtrailtypes.Event, envelopeEventID, status string) resourcescore.Run {
+	runID := firstNonEmpty(aws.ToString(event.EventId), envelopeEventID, helpers.FormatRFC3339NanoUTC(*event.EventTime))
+	return resourcescore.Run{
+		RunID:         runID,
+		StartAt:       helpers.FormatRFC3339UTC(*event.EventTime),
+		SourceService: "cloudtrail",
+		Status:        status,
+	}
 }

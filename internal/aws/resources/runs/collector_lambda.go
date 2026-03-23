@@ -69,7 +69,7 @@ func (c *lambdaCollector) Collect(ctx context.Context, schedule *resourcescore.S
 	_ = runJobName
 	_ = hints
 	description := fmt.Sprintf("Lambda function=%s", c.functionName(targetARN))
-	runs, err := getCachedRuns(c.caches.lambdaRunsCache, c.caches.lambdaErrCache, targetARN, description, func() ([]resourcescore.Run, error) {
+	runs, err := getCachedRunsForCollector(c.caches, c, targetARN, description, func() ([]resourcescore.Run, error) {
 		return c.collectRuns(ctx, targetARN, opts.Since, opts.Until, opts.MaxResults)
 	})
 	if err != nil {

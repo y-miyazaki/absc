@@ -94,7 +94,7 @@ func (c *ecsCollector) Collect(ctx context.Context, schedule *resourcescore.Sche
 	_ = runJobName
 	cacheKey := targetARN + cacheKeySeparator + hints.ECSTaskDefinitionARN + cacheKeySeparator + hints.ECSStartedBy + cacheKeySeparator + hints.ECSRoleARN
 	description := fmt.Sprintf("ECS cluster=%s taskDef=%s startedBy=%s", helpers.ResourceNameFromARN(targetARN), helpers.ResourceNameFromARN(hints.ECSTaskDefinitionARN), hints.ECSStartedBy)
-	runs, err := getCachedRuns(c.caches.ecsRunsCache, c.caches.ecsErrCache, cacheKey, description, func() ([]resourcescore.Run, error) {
+	runs, err := getCachedRunsForCollector(c.caches, c, cacheKey, description, func() ([]resourcescore.Run, error) {
 		return c.collectRuns(ctx, targetARN, &hints, opts.Since, opts.Until, opts.MaxResults)
 	})
 	if err != nil {

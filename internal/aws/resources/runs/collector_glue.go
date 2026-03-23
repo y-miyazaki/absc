@@ -32,7 +32,7 @@ func (c *glueCollector) Collect(ctx context.Context, schedule *resourcescore.Sch
 	_ = runJobName
 	_ = hints
 	description := fmt.Sprintf("Glue job=%s", helpers.ResourceNameFromARN(targetARN))
-	runs, err := getCachedRuns(c.caches.glueRunsCache, c.caches.glueErrCache, targetARN, description, func() ([]resourcescore.Run, error) {
+	runs, err := getCachedRunsForCollector(c.caches, c, targetARN, description, func() ([]resourcescore.Run, error) {
 		return c.collectRuns(ctx, targetARN, opts.Since, opts.Until, opts.MaxResults)
 	})
 	if err != nil {

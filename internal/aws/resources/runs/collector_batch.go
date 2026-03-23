@@ -32,7 +32,7 @@ func (c *batchCollector) Collect(ctx context.Context, schedule *resourcescore.Sc
 	_ = hints
 	cacheKey := targetARN + cacheKeySeparator + runJobName
 	description := fmt.Sprintf("batch job queue=%s job=%s", helpers.ResourceNameFromARN(targetARN), runJobName)
-	runs, err := getCachedRuns(c.caches.batchRunsCache, c.caches.batchErrCache, cacheKey, description, func() ([]resourcescore.Run, error) {
+	runs, err := getCachedRunsForCollector(c.caches, c, cacheKey, description, func() ([]resourcescore.Run, error) {
 		return c.collectRuns(ctx, targetARN, runJobName, opts.Since, opts.Until, opts.MaxResults)
 	})
 	if err != nil {

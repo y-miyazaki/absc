@@ -14,7 +14,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	resourcescore "github.com/y-miyazaki/absc/internal/aws/resources/core"
-	"github.com/y-miyazaki/absc/internal/helpers"
 )
 
 type ec2Collector struct {
@@ -24,37 +23,15 @@ type ec2Collector struct {
 
 type ec2CloudTrailEventEnvelope struct {
 	//nolint:tagliatelle // CloudTrail event payload uses eventID.
-	EventID           string                         `json:"eventID"`
-	RequestParameters ec2CloudTrailRequestParameters `json:"requestParameters"`
-	ResponseElements  ec2CloudTrailResponseElements  `json:"responseElements"`
-}
-
-type ec2CloudTrailInstanceItem struct {
-	InstanceID string `json:"instanceId"`
-}
-
-type ec2CloudTrailInstancesSet struct {
-	Items []ec2CloudTrailInstanceItem `json:"items"`
-}
-
-type ec2CloudTrailRequestParameters struct {
-	InstancesSet ec2CloudTrailInstancesSet `json:"instancesSet"`
-}
-
-type ec2CloudTrailResponseElements struct {
-	InstancesSet ec2CloudTrailResponseInstancesSet `json:"instancesSet"`
-}
-
-type ec2CloudTrailResponseInstanceItem struct {
-	CurrentState ec2CloudTrailState `json:"currentState"`
-}
-
-type ec2CloudTrailResponseInstancesSet struct {
-	Items []ec2CloudTrailResponseInstanceItem `json:"items"`
-}
-
-type ec2CloudTrailState struct {
-	Name string `json:"name"`
+	EventID string `json:"eventID"`
+	//nolint:revive // Nested CloudTrail payload struct is intentional to avoid one-off type noise.
+	RequestParameters struct {
+		InstancesSet struct {
+			Items []struct {
+				InstanceID string `json:"instanceId"`
+			} `json:"items"`
+		} `json:"instancesSet"`
+	} `json:"requestParameters"`
 }
 
 func newEC2Collector(ctSvc *cloudtrail.Client, caches *runCollectorCaches) *ec2Collector {
@@ -69,7 +46,7 @@ func (c *ec2Collector) Collect(ctx context.Context, schedule *resourcescore.Sche
 	_ = runJobName
 	cacheKey := strings.Join(append([]string{schedule.TargetAction}, hints.EC2InstanceIDs...), cacheKeySeparator)
 	description := fmt.Sprintf("EC2 action=%s instances=%d", schedule.TargetAction, len(hints.EC2InstanceIDs))
-	runs, err := getCachedRuns(c.caches.ec2RunsCache, c.caches.ec2ErrCache, cacheKey, description, func() ([]resourcescore.Run, error) {
+	runs, err := getCachedRunsForCollector(c.caches, c, cacheKey, description, func() ([]resourcescore.Run, error) {
 		return c.collectRuns(ctx, schedule.TargetAction, hints.EC2InstanceIDs, opts.Since, opts.Until, opts.MaxResults)
 	})
 	if err != nil {
@@ -79,11 +56,11 @@ func (c *ec2Collector) Collect(ctx context.Context, schedule *resourcescore.Sche
 }
 
 func (c *ec2Collector) collectRuns(ctx context.Context, targetAction string, instanceIDs []string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
-	allRuns, err := collectCloudTrailActionRuns(ctx, c.ctSvc, targetAction, since, until, c.caches, c.runsFromEvent)
+	runs, err := collectCloudTrailFilteredRuns(ctx, c.ctSvc, targetAction, instanceIDs, since, until, maxResults, c.caches, c.runsFromEvent, c.Service())
 	if err != nil {
 		return nil, fmt.Errorf("collect ec2 cloudtrail runs: %w", err)
 	}
-	return filterCloudTrailActionRuns(allRuns, instanceIDs, maxResults), nil
+	return runs, nil
 }
 
 func (c *ec2Collector) runsFromEvent(event *cloudtrailtypes.Event, since time.Time) []cloudTrailActionRun {
@@ -110,15 +87,10 @@ func (c *ec2Collector) runsFromEvent(event *cloudtrailtypes.Event, since time.Ti
 		return nil
 	}
 
-	runID := firstNonEmpty(aws.ToString(event.EventId), envelope.EventID, helpers.FormatRFC3339NanoUTC(*event.EventTime))
+	status := c.runStatus(aws.ToString(event.EventName))
 	return []cloudTrailActionRun{{
 		resourceIDs: resourceIDs,
-		run: resourcescore.Run{
-			RunID:         runID,
-			StartAt:       helpers.FormatRFC3339UTC(*event.EventTime),
-			SourceService: "cloudtrail",
-			Status:        c.runStatus(aws.ToString(event.EventName)),
-		},
+		run:         cloudTrailRunFromEvent(event, envelope.EventID, status),
 	}}
 }
 
