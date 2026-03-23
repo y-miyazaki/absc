@@ -189,8 +189,6 @@ func TestAccountIDFromARN(t *testing.T) {
 }
 
 func TestFetchAccountName(t *testing.T) {
-	t.Parallel()
-
 	defer restoreCommandDeps()()
 
 	newAccountClient = func(_ *awssdk.Config) accountInformationAPI {
@@ -214,8 +212,6 @@ func TestFetchAccountName(t *testing.T) {
 }
 
 func TestFetchAccountName_Error(t *testing.T) {
-	t.Parallel()
-
 	defer restoreCommandDeps()()
 
 	newAccountClient = func(_ *awssdk.Config) accountInformationAPI {
