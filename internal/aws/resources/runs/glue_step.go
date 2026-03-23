@@ -31,15 +31,11 @@ func collectGlueRuns(ctx context.Context, svc *glue.Client, jobNameOrARN string,
 		return make([]resourcescore.Run, 0), nil
 	}
 
-	maxRes := helpers.SafeInt32(maxResults)
-	if maxRes == 0 {
-		maxRes = helpers.SafeInt32(defaultMaxResults)
-	}
-
 	runs := make([]resourcescore.Run, 0, maxResults)
 	var nextToken *string
 	for len(runs) < maxResults {
-		out, err := svc.GetJobRuns(ctx, &glue.GetJobRunsInput{JobName: aws.String(jobName), MaxResults: &maxRes, NextToken: nextToken})
+		pageSize := remainingPageSize(maxResults, len(runs), glueGetJobRunsPageSizeMax)
+		out, err := svc.GetJobRuns(ctx, &glue.GetJobRunsInput{JobName: aws.String(jobName), MaxResults: &pageSize, NextToken: nextToken})
 		if err != nil {
 			return nil, fmt.Errorf("get glue job runs for %s: %w", jobName, err)
 		}
@@ -68,7 +64,7 @@ func collectGlueRuns(ctx context.Context, svc *glue.Client, jobNameOrARN string,
 }
 
 func collectStepFunctionRuns(ctx context.Context, svc *sfn.Client, stateMachineARN string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
-	input := &sfn.ListExecutionsInput{StateMachineArn: aws.String(stateMachineARN), MaxResults: helpers.SafeInt32(maxResults)}
+	input := &sfn.ListExecutionsInput{StateMachineArn: aws.String(stateMachineARN), MaxResults: pageSizeForLimit(maxResults, stepFunctionsListExecutionsPageSizeMax)}
 	p := sfn.NewListExecutionsPaginator(svc, input)
 	runs := make([]resourcescore.Run, 0)
 	for p.HasMorePages() {

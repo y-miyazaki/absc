@@ -22,12 +22,12 @@ func collectBatchRuns(ctx context.Context, svc *batch.Client, targetARN, jobName
 	}
 	statuses := []batchtypes.JobStatus{batchtypes.JobStatusSubmitted, batchtypes.JobStatusPending, batchtypes.JobStatusRunnable, batchtypes.JobStatusStarting, batchtypes.JobStatusRunning, batchtypes.JobStatusSucceeded, batchtypes.JobStatusFailed}
 	runs := make([]resourcescore.Run, 0)
+	pageSize := pageSizeForLimit(maxResults, batchListJobsPageSizeMax)
 	for _, status := range statuses {
 		if len(runs) >= maxResults {
 			break
 		}
-		maxResults32 := helpers.SafeInt32(maxResults)
-		input := &batch.ListJobsInput{JobQueue: aws.String(queueName), JobStatus: status, MaxResults: &maxResults32}
+		input := &batch.ListJobsInput{JobQueue: aws.String(queueName), JobStatus: status, MaxResults: &pageSize}
 		p := batch.NewListJobsPaginator(svc, input)
 		for p.HasMorePages() {
 			page, err := p.NextPage(ctx)

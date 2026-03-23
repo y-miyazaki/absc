@@ -85,7 +85,8 @@ func collectLambdaRuns(ctx context.Context, svc *cloudwatchlogs.Client, function
 }
 
 func collectLambdaRunsWithPattern(ctx context.Context, svc *cloudwatchlogs.Client, functionName string, since, until time.Time, maxResults int, filterPattern string) ([]resourcescore.Run, error) {
-	input := &cloudwatchlogs.FilterLogEventsInput{LogGroupName: aws.String("/aws/lambda/" + functionName), StartTime: aws.Int64(since.UnixMilli()), FilterPattern: aws.String(filterPattern)}
+	pageSize := pageSizeForLimit(maxResults, cloudWatchLogsFilterEventsPageSizeMax)
+	input := &cloudwatchlogs.FilterLogEventsInput{LogGroupName: aws.String("/aws/lambda/" + functionName), StartTime: aws.Int64(since.UnixMilli()), FilterPattern: aws.String(filterPattern), Limit: &pageSize}
 	if !until.IsZero() {
 		input.EndTime = aws.Int64(until.UnixMilli())
 	}

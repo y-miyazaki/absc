@@ -16,7 +16,10 @@ import (
 	"github.com/y-miyazaki/absc/internal/helpers"
 )
 
-const ecsDescribeTasksBatchSize = 100
+const (
+	ecsDescribeTasksBatchSize      = 100
+	ecsListTasksResourceMultiplier = 2 // Account for both TaskARN collection and subsequent DescribeTasks batch
+)
 
 func collectECSRuns(ctx context.Context, ecsSvc *ecs.Client, ctSvc *cloudtrail.Client, clusterARN string, hints TargetHints, since, until time.Time, maxResults int, caches *runCollectorCaches) ([]resourcescore.Run, error) {
 	ecsRuns, ecsErr := collectECSRunsFromAPI(ctx, ecsSvc, clusterARN, hints.ECSTaskDefinitionARN, hints.ECSStartedBy, since, until, maxResults)
@@ -49,10 +52,11 @@ func collectECSRuns(ctx context.Context, ecsSvc *ecs.Client, ctSvc *cloudtrail.C
 
 func collectECSRunsFromAPI(ctx context.Context, svc *ecs.Client, clusterARN, taskDefinitionARN, startedBy string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
 	var taskARNs []string
+	listPageSize := pageSizeForLimit(maxResults*ecsListTasksResourceMultiplier, ecsListTasksPageSizeMax)
 	for _, desired := range []ecstypes.DesiredStatus{ecstypes.DesiredStatusStopped, ecstypes.DesiredStatusRunning} {
 		var nextToken *string
 		for {
-			out, err := svc.ListTasks(ctx, &ecs.ListTasksInput{Cluster: aws.String(clusterARN), DesiredStatus: desired, NextToken: nextToken})
+			out, err := svc.ListTasks(ctx, &ecs.ListTasksInput{Cluster: aws.String(clusterARN), DesiredStatus: desired, MaxResults: &listPageSize, NextToken: nextToken})
 			if err != nil {
 				return nil, fmt.Errorf("list ecs tasks for cluster %s: %w", clusterARN, err)
 			}
