@@ -56,9 +56,9 @@ go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 ### Create a Feature Branch
 
 ```bash
-# Update your local main/develop branch
-git checkout develop
-git pull upstream develop
+# Update your local main branch
+git checkout main
+git pull upstream main
 
 # Create a new feature branch
 git checkout -b feature/your-feature-name
@@ -69,7 +69,7 @@ git checkout -b feature/your-feature-name
 1. Write your code following the [Code Style](#code-style) guidelines
 2. Add or update tests as needed
 3. Update documentation if necessary
-4. Run tests and linting locally
+4. Run validation locally
 
 ### Commit Your Changes
 
@@ -90,15 +90,11 @@ git commit -m "feat: add support for AWS Service X
 ### Run All Tests
 
 ```bash
-# Run all tests
-go test ./...
+# Run repository validation
+bash scripts/go/validate.sh
 
-# Run tests with coverage
-go test -cover ./...
-
-# Generate coverage report
-go test -coverprofile=coverage.out ./...
-go tool cover -html=coverage.out
+# Run validation for a focused directory while iterating
+bash scripts/go/validate.sh -f ./internal/aws/resources/runs
 ```
 
 ### Run Specific Tests
@@ -174,14 +170,14 @@ func (*EC2Collector) Name() string {
 
 ### Before Submitting
 
-1. Ensure all tests pass: `go test ./...`
-2. Run linters: `golangci-lint run`
+1. Ensure validation passes: `bash scripts/go/validate.sh`
+2. Update tests and docs for behavior changes
 3. Update documentation if needed
-4. Rebase your branch on the latest develop branch
+4. Rebase your branch on the latest main branch
 
 ```bash
 git fetch upstream
-git rebase upstream/develop
+git rebase upstream/main
 ```
 
 ### Create a Pull Request
@@ -207,50 +203,25 @@ git push origin feature/your-feature-name
 
 ## Adding New Service Collectors
 
-See [docs/02_implementation_guide.md](docs/02_implementation_guide.md) for detailed guidelines on implementing new AWS service collectors.
+Use [docs/SPECIFICATION.md](docs/SPECIFICATION.md) for product behavior and [docs/MAINTENANCE_NOTES.md](docs/MAINTENANCE_NOTES.md) for collector design rules before adding a new service collector.
 
 ### Quick Overview
 
-1. Create a new file in `internal/aws/resources/` (e.g., `servicename.go`)
-2. Implement the collector interface
-3. Add tests in `servicename_test.go`
-4. Register the collector in the main collection logic
-5. Update documentation
+1. Identify whether the new target kind has a measurable primary action or only CloudTrail-observable request history.
+2. Add or extend the collector under `internal/aws/resources/runs/` and prefer shared helpers in that package before introducing service-specific parsing.
+3. Register the collector in [internal/aws/resources/runs/resolver.go](internal/aws/resources/runs/resolver.go) and add scheduler hints only when the collector needs them.
+4. Add or update tests for action classification, resource ID extraction, and run parsing.
+5. Update [README.md](README.md), [docs/SPECIFICATION.md](docs/SPECIFICATION.md), and [docs/MAINTENANCE_NOTES.md](docs/MAINTENANCE_NOTES.md) when behavior changes.
 
-Example structure:
+Collector guidance:
 
 ```go
-package resources
+type exampleCollector struct{}
 
-// ServiceNameCollector collects resources from AWS ServiceName.
-type ServiceNameCollector struct{}
+func (*exampleCollector) Service() string { return "example" }
 
-// Name returns the resource name of the collector.
-func (*ServiceNameCollector) Name() string {
-    return "servicename"
-}
-
-// ShouldSort returns whether the collected resources should be sorted.
-func (*ServiceNameCollector) ShouldSort() bool {
-    return true
-}
-
-// GetColumns returns the CSV columns for the collector.
-func (*ServiceNameCollector) GetColumns() []Column {
-    return []Column{
-        {Name: "Category", Sort: false},
-        {Name: "SubCategory", Sort: false},
-        {Name: "SubSubCategory", Sort: false},
-        {Name: "Name", Sort: true},
-        {Name: "Region", Sort: false},
-        // Add service-specific columns here
-    }
-}
-
-// Collect retrieves all ServiceName resources.
-func (c *ServiceNameCollector) Collect(ctx context.Context, cfg *aws.Config, region string) ([]Resource, error) {
-    // Implementation
-    return []Resource{}, nil
+func (c *exampleCollector) runsFromCloudTrailEvent(event *cloudtrailtypes.Event, since time.Time) []cloudTrailActionRun {
+    return genericCloudTrailRunsFromEvent(event, since, exampleCloudTrailRequestResourceKeys, nil, nil)
 }
 ```
 

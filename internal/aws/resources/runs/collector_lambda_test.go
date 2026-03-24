@@ -207,3 +207,40 @@ func TestLambdaCollector_FunctionNameExtraction(t *testing.T) {
 		})
 	}
 }
+
+func TestLambdaCloudTrailResourceIDs(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		functionTarget string
+		want           []string
+	}{
+		{
+			name:           "arn target includes arn and name",
+			functionTarget: "arn:aws:lambda:ap-northeast-1:123456789012:function:my-function",
+			want:           []string{"arn:aws:lambda:ap-northeast-1:123456789012:function:my-function", "my-function"},
+		},
+		{
+			name:           "name target includes only name",
+			functionTarget: "my-function",
+			want:           []string{"my-function"},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := (&lambdaCollector{}).cloudTrailResourceIDs(tt.functionTarget)
+			if len(got) != len(tt.want) {
+				t.Fatalf("len(resourceIDs) = %d, want %d", len(got), len(tt.want))
+			}
+			for idx := range tt.want {
+				if got[idx] != tt.want[idx] {
+					t.Fatalf("resourceIDs[%d] = %q, want %q", idx, got[idx], tt.want[idx])
+				}
+			}
+		})
+	}
+}

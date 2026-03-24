@@ -11,29 +11,33 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/batch"
 	batchtypes "github.com/aws/aws-sdk-go-v2/service/batch/types"
+	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
+	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	resourcescore "github.com/y-miyazaki/absc/internal/aws/resources/core"
 	"github.com/y-miyazaki/absc/internal/helpers"
 )
 
+const batchCloudTrailResourceIDsCapacity = 3
+
 type batchCollector struct {
 	caches *runCollectorCaches
+	ctSvc  *cloudtrail.Client
 	svc    *batch.Client
 }
 
-func newBatchCollector(svc *batch.Client, caches *runCollectorCaches) *batchCollector {
-	return &batchCollector{caches: caches, svc: svc}
+func newBatchCollector(svc *batch.Client, ctSvc *cloudtrail.Client, caches *runCollectorCaches) *batchCollector {
+	return &batchCollector{caches: caches, ctSvc: ctSvc, svc: svc}
 }
 
 func (*batchCollector) Service() string { return "batch" }
 
 //nolint:gocritic // CollectOptions is shared as a value object across collectors.
 func (c *batchCollector) Collect(ctx context.Context, schedule *resourcescore.Schedule, targetARN, runJobName string, hints TargetHints, opts resourcescore.CollectOptions) ([]resourcescore.Run, error) {
-	_ = schedule
 	_ = hints
 	cacheKey := targetARN + cacheKeySeparator + runJobName
 	description := fmt.Sprintf("batch job queue=%s job=%s", helpers.ResourceNameFromARN(targetARN), runJobName)
 	runs, err := getCachedRunsForCollector(c.caches, c, cacheKey, description, func() ([]resourcescore.Run, error) {
-		return c.collectRuns(ctx, targetARN, runJobName, opts.Since, opts.Until, opts.MaxResults)
+		return c.collectRuns(ctx, schedule.TargetAction, targetARN, runJobName, opts.Since, opts.Until, opts.MaxResults)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("collect batch runs for target %s: %w", targetARN, err)
@@ -41,7 +45,15 @@ func (c *batchCollector) Collect(ctx context.Context, schedule *resourcescore.Sc
 	return runs, nil
 }
 
-func (c *batchCollector) collectRuns(ctx context.Context, targetARN, jobName string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
+func (c *batchCollector) collectRuns(ctx context.Context, targetAction, targetARN, jobName string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
+	if !isMeasurableAction(c.Service(), targetAction) {
+		runs, err := c.collectCloudTrailRuns(ctx, targetAction, targetARN, jobName, since, until, maxResults)
+		if err != nil {
+			return nil, fmt.Errorf("collect non-measurable batch action via cloudtrail: %w", err)
+		}
+		return runs, nil
+	}
+
 	queueName := helpers.ResourceNameFromARN(targetARN)
 	if queueName == "" {
 		queueName = targetARN
@@ -90,4 +102,27 @@ func (c *batchCollector) collectRuns(ctx context.Context, targetARN, jobName str
 		}
 	}
 	return runs, nil
+}
+
+func (c *batchCollector) collectCloudTrailRuns(ctx context.Context, targetAction, targetARN, jobName string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
+	runs, err := collectCloudTrailRunsForResources(ctx, c.ctSvc, targetAction, c.cloudTrailResourceIDs(targetARN, jobName), since, until, maxResults, c.caches, c.runsFromCloudTrailEvent)
+	if err != nil {
+		return nil, fmt.Errorf("collect batch cloudtrail runs: %w", err)
+	}
+	return runs, nil
+}
+
+func (*batchCollector) runsFromCloudTrailEvent(event *cloudtrailtypes.Event, since time.Time) []cloudTrailActionRun {
+	return genericCloudTrailRunsFromEvent(
+		event,
+		since,
+		batchCloudTrailRequestResourceKeys,
+	)
+}
+
+func (*batchCollector) cloudTrailResourceIDs(targetARN, jobName string) []string {
+	ids := make([]string, 0, batchCloudTrailResourceIDsCapacity)
+	ids = appendUniqueTrimmedResourceIDs(ids, targetARN)
+	ids = appendResourceNameFromARN(ids, targetARN)
+	return appendUniqueTrimmedResourceIDs(ids, jobName)
 }

@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
+	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	cloudwatchlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	resourcescore "github.com/y-miyazaki/absc/internal/aws/resources/core"
@@ -38,6 +40,7 @@ var lambdaStatusPattern = regexp.MustCompile(`Status:\s*([A-Za-z_]+)`)
 
 type lambdaCollector struct {
 	caches *runCollectorCaches
+	ctSvc  *cloudtrail.Client
 	svc    *cloudwatchlogs.Client
 }
 
@@ -57,20 +60,19 @@ type lambdaPlatformReportRecord struct {
 	Metrics   lambdaPlatformReportMetrics `json:"metrics"`
 }
 
-func newLambdaCollector(svc *cloudwatchlogs.Client, caches *runCollectorCaches) *lambdaCollector {
-	return &lambdaCollector{caches: caches, svc: svc}
+func newLambdaCollector(svc *cloudwatchlogs.Client, ctSvc *cloudtrail.Client, caches *runCollectorCaches) *lambdaCollector {
+	return &lambdaCollector{caches: caches, ctSvc: ctSvc, svc: svc}
 }
 
 func (*lambdaCollector) Service() string { return "lambda" }
 
 //nolint:gocritic // CollectOptions is shared as a value object across collectors.
 func (c *lambdaCollector) Collect(ctx context.Context, schedule *resourcescore.Schedule, targetARN, runJobName string, hints TargetHints, opts resourcescore.CollectOptions) ([]resourcescore.Run, error) {
-	_ = schedule
 	_ = runJobName
 	_ = hints
 	description := fmt.Sprintf("Lambda function=%s", c.functionName(targetARN))
 	runs, err := getCachedRunsForCollector(c.caches, c, targetARN, description, func() ([]resourcescore.Run, error) {
-		return c.collectRuns(ctx, targetARN, opts.Since, opts.Until, opts.MaxResults)
+		return c.collectRuns(ctx, schedule.TargetAction, targetARN, opts.Since, opts.Until, opts.MaxResults)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("collect lambda runs for target %s: %w", targetARN, err)
@@ -78,7 +80,15 @@ func (c *lambdaCollector) Collect(ctx context.Context, schedule *resourcescore.S
 	return runs, nil
 }
 
-func (c *lambdaCollector) collectRuns(ctx context.Context, functionTarget string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
+func (c *lambdaCollector) collectRuns(ctx context.Context, targetAction, functionTarget string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
+	if !isMeasurableAction(c.Service(), targetAction) {
+		runs, err := c.collectCloudTrailRuns(ctx, targetAction, functionTarget, since, until, maxResults)
+		if err != nil {
+			return nil, fmt.Errorf("collect non-measurable lambda action via cloudtrail: %w", err)
+		}
+		return runs, nil
+	}
+
 	functionName := c.functionName(functionTarget)
 	if functionName == "" {
 		return make([]resourcescore.Run, 0), nil
@@ -109,6 +119,14 @@ func (c *lambdaCollector) collectRuns(ctx context.Context, functionTarget string
 	})
 	if len(runs) > maxResults {
 		return runs[:maxResults], nil
+	}
+	return runs, nil
+}
+
+func (c *lambdaCollector) collectCloudTrailRuns(ctx context.Context, targetAction, functionTarget string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
+	runs, err := collectCloudTrailRunsForResources(ctx, c.ctSvc, targetAction, c.cloudTrailResourceIDs(functionTarget), since, until, maxResults, c.caches, c.runsFromCloudTrailEvent)
+	if err != nil {
+		return nil, fmt.Errorf("collect lambda cloudtrail runs: %w", err)
 	}
 	return runs, nil
 }
@@ -178,6 +196,27 @@ func (*lambdaCollector) functionName(functionTarget string) string {
 		return helpers.ResourceNameFromARN(trimmed)
 	}
 	return trimmed
+}
+
+func (*lambdaCollector) runsFromCloudTrailEvent(event *cloudtrailtypes.Event, since time.Time) []cloudTrailActionRun {
+	runs := genericCloudTrailRunsFromEvent(
+		event,
+		since,
+		lambdaCloudTrailRequestResourceKeys,
+	)
+	for runIndex := range runs {
+		runs[runIndex].run.SourceService = "cloudtrail"
+	}
+	return runs
+}
+
+func (c *lambdaCollector) cloudTrailResourceIDs(functionTarget string) []string {
+	trimmed := strings.TrimSpace(functionTarget)
+	if trimmed == "" {
+		return nil
+	}
+	ids := appendUniqueTrimmedResourceIDs(nil, trimmed)
+	return appendUniqueTrimmedResourceIDs(ids, c.functionName(functionTarget))
 }
 
 func (c *lambdaCollector) durationSec(message string) int64 {

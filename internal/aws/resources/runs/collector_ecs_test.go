@@ -37,7 +37,8 @@ func TestECSCloudTrailRunsFromEvent(t *testing.T) {
 		}`),
 		EventTime: aws.Time(eventTime),
 	}
-	runs := ecsCloudTrailRunsFromEvent(&event, eventTime.Add(-time.Minute))
+	collector := &ecsCollector{}
+	runs := collector.cloudTrailRunsFromEvent(&event, eventTime.Add(-time.Minute))
 
 	if got, want := len(runs), 1; got != want {
 		t.Fatalf("len(runs) = %d, want %d", got, want)
@@ -83,7 +84,8 @@ func TestFilterECSCloudTrailRuns(t *testing.T) {
 		ECSRoleARN:           "arn:aws:iam::582064665348:role/prd-recommend-batch-st-cw-role",
 		ECSTaskDefinitionARN: "arn:aws:ecs:ap-northeast-1:582064665348:task-definition/prd-recommend-batch-td",
 	}
-	filtered := filterECSCloudTrailRuns(allRuns, "arn:aws:ecs:ap-northeast-1:582064665348:cluster/prd-recommend-cluster", hints, 10)
+	collector := &ecsCollector{}
+	filtered := collector.filterCloudTrailRuns(allRuns, "arn:aws:ecs:ap-northeast-1:582064665348:cluster/prd-recommend-cluster", hints, 10)
 
 	if got, want := len(filtered), 1; got != want {
 		t.Fatalf("len(filtered) = %d, want %d", got, want)
@@ -96,7 +98,8 @@ func TestFilterECSCloudTrailRuns(t *testing.T) {
 func TestMergeECSRunsPrefersDetailedRuns(t *testing.T) {
 	t.Parallel()
 
-	merged := mergeECSRuns(
+	collector := &ecsCollector{}
+	merged := collector.mergeRuns(
 		[]resourcescore.Run{{RunID: "same-task", StartAt: "2026-03-18T17:00:55Z", EndAt: "2026-03-18T17:05:00Z", Status: "STOPPED", SourceService: "ecs"}},
 		[]resourcescore.Run{{RunID: "same-task", StartAt: "2026-03-18T17:00:49Z", Status: ecsRunStatusStarted, SourceService: "cloudtrail"}},
 		10,
@@ -116,7 +119,8 @@ func TestMergeECSRunsPrefersDetailedRuns(t *testing.T) {
 func TestNormalizeTaskDefinitionARN(t *testing.T) {
 	t.Parallel()
 
-	if got, want := normalizeTaskDefinitionARN("arn:aws:ecs:ap-northeast-1:582064665348:task-definition/prd-recommend-batch-td:31"), "arn:aws:ecs:ap-northeast-1:582064665348:task-definition/prd-recommend-batch-td"; got != want {
+	collector := &ecsCollector{}
+	if got, want := collector.normalizeTaskDefinitionARN("arn:aws:ecs:ap-northeast-1:582064665348:task-definition/prd-recommend-batch-td:31"), "arn:aws:ecs:ap-northeast-1:582064665348:task-definition/prd-recommend-batch-td"; got != want {
 		t.Fatalf("normalizeTaskDefinitionARN() = %q, want %q", got, want)
 	}
 }

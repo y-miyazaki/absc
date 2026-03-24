@@ -227,6 +227,7 @@ var schedulerSDKResolvers = map[string]sdkTargetResolver{
 			if v := getStringFromJSON(input, "Cluster"); v != "" {
 				resolved.runTargetARN = v
 			}
+			resolved.hints.ECSService = getStringFromJSON(input, "Service")
 			resolved.hints.ECSTaskDefinitionARN = getStringFromJSON(input, "TaskDefinition")
 			resolved.hints.ECSStartedBy = getStringFromJSON(input, "StartedBy")
 			return resolved

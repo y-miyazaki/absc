@@ -103,6 +103,22 @@ Observable target kinds that support run enrichment are defined in the `observab
 
 For all other target kinds, the schedule is displayed with empty runs. The `run_in_slot_category` field is set to `not_observable_target` in that case.
 
+Run enrichment is action-capability based for known target kinds.
+
+- Measurable primary actions use service-native history sources.
+- Non-measurable actions for known target kinds fall back to CloudTrail management events.
+- Unknown or unsupported target kinds do not use generic CloudTrail fallback by default. They remain `not_observable_target`.
+
+The current primary measurable actions are:
+
+- `lambda:invoke` or direct Lambda targets without an explicit action label: CloudWatch Logs
+- `ecs:runTask` or direct ECS task targets without an explicit action label: ECS API, with CloudTrail backfill where required
+- `batch:submitJob` or direct Batch targets without an explicit action label: Batch API
+- `glue:startJobRun` or direct Glue targets without an explicit action label: Glue API
+- `sfn:startExecution` or direct Step Functions targets without an explicit action label: Step Functions API
+
+For known target kinds outside those primary actions, ABSC records CloudTrail request-oriented runs such as `UPDATE_REQUESTED`, `CREATE_REQUESTED`, or `ACTION_REQUESTED`. These CloudTrail-derived runs indicate that the action was observed, but they do not imply authoritative completion timing.
+
 ### maxResults
 
 Each collector enforces `maxResults` independently. When a collector returns exactly `maxResults` records, the schedule is marked `runs_capped = true`. This flag is exposed to callers and propagated to the slot issue reason.

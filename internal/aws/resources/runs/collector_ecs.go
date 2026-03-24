@@ -22,6 +22,7 @@ import (
 
 const (
 	ecsCloudTrailEventName         = "RunTask"
+	ecsCloudTrailResourceIDCap     = 4
 	ecsRunStatusStarted            = "STARTED"
 	ecsStoppedTaskRetentionApprox  = time.Hour
 	ecsTimelineWindowDuration      = 24 * time.Hour
@@ -90,12 +91,11 @@ func (*ecsCollector) Service() string { return "ecs" }
 
 //nolint:gocritic // CollectOptions is shared as a value object across collectors.
 func (c *ecsCollector) Collect(ctx context.Context, schedule *resourcescore.Schedule, targetARN, runJobName string, hints TargetHints, opts resourcescore.CollectOptions) ([]resourcescore.Run, error) {
-	_ = schedule
 	_ = runJobName
-	cacheKey := targetARN + cacheKeySeparator + hints.ECSTaskDefinitionARN + cacheKeySeparator + hints.ECSStartedBy + cacheKeySeparator + hints.ECSRoleARN
+	cacheKey := targetARN + cacheKeySeparator + hints.ECSService + cacheKeySeparator + hints.ECSTaskDefinitionARN + cacheKeySeparator + hints.ECSStartedBy + cacheKeySeparator + hints.ECSRoleARN
 	description := fmt.Sprintf("ECS cluster=%s taskDef=%s startedBy=%s", helpers.ResourceNameFromARN(targetARN), helpers.ResourceNameFromARN(hints.ECSTaskDefinitionARN), hints.ECSStartedBy)
 	runs, err := getCachedRunsForCollector(c.caches, c, cacheKey, description, func() ([]resourcescore.Run, error) {
-		return c.collectRuns(ctx, targetARN, &hints, opts.Since, opts.Until, opts.MaxResults)
+		return c.collectRuns(ctx, schedule.TargetAction, targetARN, &hints, opts.Since, opts.Until, opts.MaxResults)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("collect ecs runs for target %s: %w", targetARN, err)
@@ -103,9 +103,17 @@ func (c *ecsCollector) Collect(ctx context.Context, schedule *resourcescore.Sche
 	return runs, nil
 }
 
-func (c *ecsCollector) collectRuns(ctx context.Context, clusterARN string, hints *TargetHints, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
+func (c *ecsCollector) collectRuns(ctx context.Context, targetAction, clusterARN string, hints *TargetHints, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
+	if !isMeasurableAction(c.Service(), targetAction) {
+		runs, err := c.collectCloudTrailFallbackRuns(ctx, targetAction, clusterARN, hints, since, until, maxResults)
+		if err != nil {
+			return nil, fmt.Errorf("collect non-measurable ecs action via cloudtrail: %w", err)
+		}
+		return runs, nil
+	}
+
 	ecsRuns, ecsErr := c.collectRunsFromAPI(ctx, clusterARN, hints.ECSTaskDefinitionARN, hints.ECSStartedBy, since, until, maxResults)
-	if !ecsCloudTrailRequired(since, time.Now().UTC()) {
+	if !c.cloudTrailRequired(since, time.Now().UTC()) {
 		if ecsErr != nil {
 			return nil, fmt.Errorf("collect ecs runs from api: %w", ecsErr)
 		}
@@ -113,8 +121,8 @@ func (c *ecsCollector) collectRuns(ctx context.Context, clusterARN string, hints
 	}
 
 	cloudTrailRuns, cloudTrailErr := c.collectCloudTrailRuns(ctx, since)
-	filteredCloudTrailRuns := filterECSCloudTrailRuns(cloudTrailRuns, clusterARN, hints, maxResults)
-	mergedRuns := mergeECSRuns(ecsRuns, filteredCloudTrailRuns, maxResults)
+	filteredCloudTrailRuns := c.filterCloudTrailRuns(cloudTrailRuns, clusterARN, hints, maxResults)
+	mergedRuns := c.mergeRuns(ecsRuns, filteredCloudTrailRuns, maxResults)
 
 	switch {
 	case ecsErr == nil && cloudTrailErr == nil:
@@ -130,6 +138,15 @@ func (c *ecsCollector) collectRuns(ctx context.Context, clusterARN string, hints
 	default:
 		return nil, fmt.Errorf("collect ecs runs from cloudtrail: %w", cloudTrailErr)
 	}
+}
+
+func (c *ecsCollector) collectCloudTrailFallbackRuns(ctx context.Context, targetAction, clusterARN string, hints *TargetHints, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
+	resourceIDs := c.cloudTrailResourceIDs(clusterARN, hints)
+	runs, err := collectCloudTrailRunsForResources(ctx, c.ctSvc, targetAction, resourceIDs, since, until, maxResults, c.caches, c.runsFromGenericCloudTrailEvent)
+	if err != nil {
+		return nil, fmt.Errorf("collect ecs cloudtrail fallback runs: %w", err)
+	}
+	return runs, nil
 }
 
 func (c *ecsCollector) collectRunsFromAPI(ctx context.Context, clusterARN, taskDefinitionARN, startedBy string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
@@ -196,20 +213,20 @@ func (c *ecsCollector) collectCloudTrailRuns(ctx context.Context, since time.Tim
 	}
 	runs := make([]ecsCloudTrailRun, 0, len(events))
 	for eventIndex := range events {
-		runs = append(runs, ecsCloudTrailRunsFromEvent(&events[eventIndex], since)...)
+		runs = append(runs, c.cloudTrailRunsFromEvent(&events[eventIndex], since)...)
 	}
 	slices.SortStableFunc(runs, func(left, right ecsCloudTrailRun) int {
-		return ecsRunSortTime(&right.run).Compare(ecsRunSortTime(&left.run))
+		return c.runSortTime(&right.run).Compare(c.runSortTime(&left.run))
 	})
 	return runs, nil
 }
 
-func ecsCloudTrailRequired(since, now time.Time) bool {
+func (*ecsCollector) cloudTrailRequired(since, now time.Time) bool {
 	windowEnd := since.Add(ecsTimelineWindowDuration)
 	return windowEnd.Before(now.Add(-ecsStoppedTaskRetentionApprox))
 }
 
-func filterECSCloudTrailRuns(allRuns []ecsCloudTrailRun, clusterARN string, hints *TargetHints, maxResults int) []resourcescore.Run {
+func (c *ecsCollector) filterCloudTrailRuns(allRuns []ecsCloudTrailRun, clusterARN string, hints *TargetHints, maxResults int) []resourcescore.Run {
 	matches := make([]resourcescore.Run, 0, maxResults)
 	for runIndex := range allRuns {
 		candidate := allRuns[runIndex]
@@ -222,7 +239,7 @@ func filterECSCloudTrailRuns(allRuns []ecsCloudTrailRun, clusterARN string, hint
 		if hints.ECSStartedBy != "" && candidate.startedBy != hints.ECSStartedBy {
 			continue
 		}
-		if hints.ECSTaskDefinitionARN != "" && normalizeTaskDefinitionARN(candidate.taskDefinitionARN) != normalizeTaskDefinitionARN(hints.ECSTaskDefinitionARN) {
+		if hints.ECSTaskDefinitionARN != "" && c.normalizeTaskDefinitionARN(candidate.taskDefinitionARN) != c.normalizeTaskDefinitionARN(hints.ECSTaskDefinitionARN) {
 			continue
 		}
 		matches = append(matches, candidate.run)
@@ -233,7 +250,38 @@ func filterECSCloudTrailRuns(allRuns []ecsCloudTrailRun, clusterARN string, hint
 	return matches
 }
 
-func ecsCloudTrailRunsFromEvent(event *cloudtrailtypes.Event, since time.Time) []ecsCloudTrailRun {
+func (*ecsCollector) runsFromGenericCloudTrailEvent(event *cloudtrailtypes.Event, since time.Time) []cloudTrailActionRun {
+	return genericCloudTrailRunsFromEvent(
+		event,
+		since,
+		ecsCloudTrailRequestResourceKeys,
+	)
+}
+
+func (c *ecsCollector) cloudTrailResourceIDs(clusterARN string, hints *TargetHints) []string {
+	ids := make([]string, 0, ecsCloudTrailResourceIDCap)
+	trimmedClusterARN := strings.TrimSpace(clusterARN)
+	if trimmedClusterARN != "" {
+		ids = append(ids, trimmedClusterARN)
+		if clusterName := helpers.ResourceNameFromARN(trimmedClusterARN); clusterName != "" && clusterName != trimmedClusterARN {
+			ids = append(ids, clusterName)
+		}
+	}
+	if hints != nil {
+		if serviceName := strings.TrimSpace(hints.ECSService); serviceName != "" {
+			ids = append(ids, serviceName)
+		}
+		if taskDefinitionARN := strings.TrimSpace(hints.ECSTaskDefinitionARN); taskDefinitionARN != "" {
+			ids = append(ids, taskDefinitionARN)
+			if taskDefinitionName := c.normalizeTaskDefinitionARN(taskDefinitionARN); taskDefinitionName != "" && taskDefinitionName != taskDefinitionARN {
+				ids = append(ids, taskDefinitionName)
+			}
+		}
+	}
+	return ids
+}
+
+func (c *ecsCollector) cloudTrailRunsFromEvent(event *cloudtrailtypes.Event, since time.Time) []ecsCloudTrailRun {
 	if event.CloudTrailEvent == nil || event.EventTime == nil || event.EventTime.Before(since) {
 		return nil
 	}
@@ -247,9 +295,9 @@ func ecsCloudTrailRunsFromEvent(event *cloudtrailtypes.Event, since time.Time) [
 	if callerARN == "" {
 		callerARN = strings.TrimSpace(envelope.UserIdentity.ARN)
 	}
-	baseTaskDefinitionARN := firstNonEmpty(envelope.RequestParameters.TaskDefinition, firstTaskDefinitionARN(envelope.ResponseElements.Tasks))
-	baseClusterARN := firstNonEmpty(envelope.RequestParameters.Cluster, firstClusterARN(envelope.ResponseElements.Tasks))
-	baseStartedBy := firstNonEmpty(envelope.RequestParameters.StartedBy, firstStartedBy(envelope.ResponseElements.Tasks))
+	baseTaskDefinitionARN := firstNonEmpty(envelope.RequestParameters.TaskDefinition, c.firstTaskDefinitionARN(envelope.ResponseElements.Tasks))
+	baseClusterARN := firstNonEmpty(envelope.RequestParameters.Cluster, c.firstClusterARN(envelope.ResponseElements.Tasks))
+	baseStartedBy := firstNonEmpty(envelope.RequestParameters.StartedBy, c.firstStartedBy(envelope.ResponseElements.Tasks))
 
 	if len(envelope.ResponseElements.Tasks) == 0 {
 		return []ecsCloudTrailRun{{
@@ -289,7 +337,7 @@ func ecsCloudTrailRunsFromEvent(event *cloudtrailtypes.Event, since time.Time) [
 	return runs
 }
 
-func ecsRunSortTime(run *resourcescore.Run) time.Time {
+func (*ecsCollector) runSortTime(run *resourcescore.Run) time.Time {
 	if parsed, err := time.Parse(time.RFC3339, run.StartAt); err == nil {
 		return parsed
 	}
@@ -299,7 +347,7 @@ func ecsRunSortTime(run *resourcescore.Run) time.Time {
 	return time.Time{}
 }
 
-func firstClusterARN(tasks []ecsCloudTrailTask) string {
+func (*ecsCollector) firstClusterARN(tasks []ecsCloudTrailTask) string {
 	for taskIndex := range tasks {
 		if tasks[taskIndex].ClusterARN != "" {
 			return tasks[taskIndex].ClusterARN
@@ -308,7 +356,7 @@ func firstClusterARN(tasks []ecsCloudTrailTask) string {
 	return ""
 }
 
-func firstStartedBy(tasks []ecsCloudTrailTask) string {
+func (*ecsCollector) firstStartedBy(tasks []ecsCloudTrailTask) string {
 	for taskIndex := range tasks {
 		if tasks[taskIndex].StartedBy != "" {
 			return tasks[taskIndex].StartedBy
@@ -317,7 +365,7 @@ func firstStartedBy(tasks []ecsCloudTrailTask) string {
 	return ""
 }
 
-func firstTaskDefinitionARN(tasks []ecsCloudTrailTask) string {
+func (*ecsCollector) firstTaskDefinitionARN(tasks []ecsCloudTrailTask) string {
 	for taskIndex := range tasks {
 		if tasks[taskIndex].TaskDefinitionARN != "" {
 			return tasks[taskIndex].TaskDefinitionARN
@@ -326,7 +374,7 @@ func firstTaskDefinitionARN(tasks []ecsCloudTrailTask) string {
 	return ""
 }
 
-func mergeECSRuns(primaryRuns, fallbackRuns []resourcescore.Run, maxResults int) []resourcescore.Run {
+func (c *ecsCollector) mergeRuns(primaryRuns, fallbackRuns []resourcescore.Run, maxResults int) []resourcescore.Run {
 	merged := make([]resourcescore.Run, 0, len(primaryRuns)+len(fallbackRuns))
 	seen := make(map[string]struct{}, len(primaryRuns)+len(fallbackRuns))
 	appendUnique := func(runs []resourcescore.Run) {
@@ -346,7 +394,7 @@ func mergeECSRuns(primaryRuns, fallbackRuns []resourcescore.Run, maxResults int)
 	appendUnique(primaryRuns)
 	appendUnique(fallbackRuns)
 	slices.SortStableFunc(merged, func(left, right resourcescore.Run) int {
-		return ecsRunSortTime(&right).Compare(ecsRunSortTime(&left))
+		return c.runSortTime(&right).Compare(c.runSortTime(&left))
 	})
 	if len(merged) > maxResults {
 		return merged[:maxResults]
@@ -354,7 +402,7 @@ func mergeECSRuns(primaryRuns, fallbackRuns []resourcescore.Run, maxResults int)
 	return merged
 }
 
-func normalizeTaskDefinitionARN(taskDefinitionARN string) string {
+func (*ecsCollector) normalizeTaskDefinitionARN(taskDefinitionARN string) string {
 	trimmed := strings.TrimSpace(taskDefinitionARN)
 	if trimmed == "" {
 		return ""

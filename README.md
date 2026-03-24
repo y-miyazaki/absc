@@ -192,7 +192,7 @@ ABSC classifies targets for display in the HTML timeline. Common target services
 
 ### Execution History Enrichment
 
-Recent runs are collected only when the target type supports runtime lookup. Current enrichment coverage is:
+Run enrichment is action-capability based for known target kinds. Primary measurable actions use service-native history sources, and other known actions fall back to CloudTrail request history. Current native runtime coverage is:
 
 - Step Functions executions
 - AWS Batch jobs
@@ -200,12 +200,19 @@ Recent runs are collected only when the target type supports runtime lookup. Cur
 - Glue job runs
 - Lambda invocations derived from CloudWatch Logs
 
+Additional CloudTrail-backed request history is used for:
+
+- Non-primary actions on Lambda, ECS, Batch, Glue, and Step Functions targets
+- Request-oriented actions for EC2, RDS, and Redshift targets
+
 ECS note:
 
 - ECS stopped task history from ECS APIs is short-lived (approximately 1 hour).
 - ABSC backfills older ECS schedule windows by reading CloudTrail management events (`RunTask`) and merges them with ECS API results.
 
-If a target type is not supported for run enrichment, the timeline still shows scheduled slots, but the run list remains empty.
+CloudTrail-backed runs use request-oriented statuses such as `UPDATE_REQUESTED` and `ACTION_REQUESTED`; they indicate that ABSC observed the action request, not that the service exposes authoritative execution duration.
+
+If a target type is not supported for run enrichment, the timeline still shows scheduled slots, but the run list remains empty. ABSC does not apply a generic CloudTrail fallback to unknown target kinds.
 
 Disabled schedules keep previously executed runs inside the lookback window so the timeline can still show recent actual activity.
 

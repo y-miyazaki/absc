@@ -56,14 +56,14 @@ func (c *ec2Collector) Collect(ctx context.Context, schedule *resourcescore.Sche
 }
 
 func (c *ec2Collector) collectRuns(ctx context.Context, targetAction string, instanceIDs []string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
-	runs, err := collectCloudTrailFilteredRuns(ctx, c.ctSvc, targetAction, instanceIDs, since, until, maxResults, c.caches, c.runsFromEvent, c.Service())
+	runs, err := collectCloudTrailRunsForResources(ctx, c.ctSvc, targetAction, instanceIDs, since, until, maxResults, c.caches, c.runsFromEvent)
 	if err != nil {
 		return nil, fmt.Errorf("collect ec2 cloudtrail runs: %w", err)
 	}
 	return runs, nil
 }
 
-func (c *ec2Collector) runsFromEvent(event *cloudtrailtypes.Event, since time.Time) []cloudTrailActionRun {
+func (*ec2Collector) runsFromEvent(event *cloudtrailtypes.Event, since time.Time) []cloudTrailActionRun {
 	if event.CloudTrailEvent == nil || event.EventTime == nil || event.EventTime.Before(since) {
 		return nil
 	}
@@ -87,22 +87,8 @@ func (c *ec2Collector) runsFromEvent(event *cloudtrailtypes.Event, since time.Ti
 		return nil
 	}
 
-	status := c.runStatus(aws.ToString(event.EventName))
 	return []cloudTrailActionRun{{
 		resourceIDs: resourceIDs,
-		run:         cloudTrailRunFromEvent(event, envelope.EventID, status),
+		run:         cloudTrailRunFromEvent(event, envelope.EventID, cloudTrailRequestedStatus(aws.ToString(event.EventName))),
 	}}
-}
-
-func (*ec2Collector) runStatus(eventName string) string {
-	switch strings.TrimSpace(eventName) {
-	case "StartInstances":
-		return "START_REQUESTED"
-	case "StopInstances":
-		return "STOP_REQUESTED"
-	case "RebootInstances":
-		return "REBOOT_REQUESTED"
-	default:
-		return "ACTION_REQUESTED"
-	}
 }

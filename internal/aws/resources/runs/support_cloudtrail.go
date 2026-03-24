@@ -5,6 +5,7 @@ package runs
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
@@ -26,6 +27,13 @@ const (
 type cloudTrailActionRun struct {
 	run         resourcescore.Run
 	resourceIDs []string
+}
+
+type genericCloudTrailEventEnvelope struct {
+	RequestParameters map[string]any `json:"requestParameters"`
+	ResponseElements  map[string]any `json:"responseElements"`
+	//nolint:tagliatelle // CloudTrail event payload uses eventID.
+	EventID string `json:"eventID"`
 }
 
 func collectCloudTrailActionRuns(ctx context.Context, svc *cloudtrail.Client, targetAction string, since, until time.Time, caches *runCollectorCaches, parser func(*cloudtrailtypes.Event, time.Time) []cloudTrailActionRun) ([]cloudTrailActionRun, error) {
@@ -178,13 +186,43 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
+func appendUniqueTrimmedResourceIDs(resourceIDs []string, candidates ...string) []string {
+	result := append([]string(nil), resourceIDs...)
+	for _, candidate := range candidates {
+		trimmed := strings.TrimSpace(candidate)
+		if trimmed == "" {
+			continue
+		}
+		duplicate := false
+		for _, existing := range result {
+			if existing == trimmed {
+				duplicate = true
+				break
+			}
+		}
+		if duplicate {
+			continue
+		}
+		result = append(result, trimmed)
+	}
+	return result
+}
+
+func appendResourceNameFromARN(resourceIDs []string, arn string) []string {
+	return appendUniqueTrimmedResourceIDs(resourceIDs, helpers.ResourceNameFromARN(strings.TrimSpace(arn)))
+}
+
 func cloudTrailResourceIDsFromMap(values map[string]any, keys []string) []string {
 	if len(values) == 0 || len(keys) == 0 {
 		return nil
 	}
+	normalizedValues := make(map[string]any, len(values))
+	for key, value := range values {
+		normalizedValues[strings.ToLower(strings.TrimSpace(key))] = value
+	}
 	resourceIDs := make([]string, 0, len(keys))
 	for _, key := range keys {
-		value, found := values[key]
+		value, found := normalizedValues[strings.ToLower(strings.TrimSpace(key))]
 		if !found {
 			continue
 		}
@@ -197,12 +235,32 @@ func cloudTrailResourceIDsFromMap(values map[string]any, keys []string) []string
 	return resourceIDs
 }
 
-func cloudTrailResponseStateFromMap(values map[string]any, keys []string) string {
-	resourceIDs := cloudTrailResourceIDsFromMap(values, keys)
-	if len(resourceIDs) == 0 {
-		return ""
+func genericCloudTrailRunsFromEvent(
+	event *cloudtrailtypes.Event,
+	since time.Time,
+	requestResourceKeys []string,
+) []cloudTrailActionRun {
+	if event == nil || event.CloudTrailEvent == nil || event.EventTime == nil || event.EventTime.Before(since) {
+		return nil
 	}
-	return resourceIDs[0]
+
+	var envelope genericCloudTrailEventEnvelope
+	if err := json.Unmarshal([]byte(aws.ToString(event.CloudTrailEvent)), &envelope); err != nil {
+		return nil
+	}
+
+	resourceIDs := cloudTrailResourceIDsFromMap(envelope.RequestParameters, requestResourceKeys)
+	if len(resourceIDs) == 0 {
+		resourceIDs = append(resourceIDs, cloudTrailResourceNames(event, "")...)
+	}
+	if len(resourceIDs) == 0 {
+		return nil
+	}
+
+	return []cloudTrailActionRun{{
+		resourceIDs: resourceIDs,
+		run:         cloudTrailRunFromEvent(event, envelope.EventID, cloudTrailRequestedStatus(aws.ToString(event.EventName))),
+	}}
 }
 
 func cloudTrailRunFromEvent(event *cloudtrailtypes.Event, envelopeEventID, status string) resourcescore.Run {

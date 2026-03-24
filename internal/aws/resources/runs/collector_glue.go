@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
+	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	"github.com/aws/aws-sdk-go-v2/service/glue"
 	resourcescore "github.com/y-miyazaki/absc/internal/aws/resources/core"
 	"github.com/y-miyazaki/absc/internal/helpers"
@@ -17,23 +19,23 @@ import (
 
 type glueCollector struct {
 	caches *runCollectorCaches
+	ctSvc  *cloudtrail.Client
 	svc    *glue.Client
 }
 
-func newGlueCollector(svc *glue.Client, caches *runCollectorCaches) *glueCollector {
-	return &glueCollector{caches: caches, svc: svc}
+func newGlueCollector(svc *glue.Client, ctSvc *cloudtrail.Client, caches *runCollectorCaches) *glueCollector {
+	return &glueCollector{caches: caches, ctSvc: ctSvc, svc: svc}
 }
 
 func (*glueCollector) Service() string { return "glue" }
 
 //nolint:gocritic // CollectOptions is shared as a value object across collectors.
 func (c *glueCollector) Collect(ctx context.Context, schedule *resourcescore.Schedule, targetARN, runJobName string, hints TargetHints, opts resourcescore.CollectOptions) ([]resourcescore.Run, error) {
-	_ = schedule
 	_ = runJobName
 	_ = hints
 	description := fmt.Sprintf("Glue job=%s", helpers.ResourceNameFromARN(targetARN))
 	runs, err := getCachedRunsForCollector(c.caches, c, targetARN, description, func() ([]resourcescore.Run, error) {
-		return c.collectRuns(ctx, targetARN, opts.Since, opts.Until, opts.MaxResults)
+		return c.collectRuns(ctx, schedule.TargetAction, targetARN, opts.Since, opts.Until, opts.MaxResults)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("collect glue runs for target %s: %w", targetARN, err)
@@ -41,7 +43,15 @@ func (c *glueCollector) Collect(ctx context.Context, schedule *resourcescore.Sch
 	return runs, nil
 }
 
-func (c *glueCollector) collectRuns(ctx context.Context, jobNameOrARN string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
+func (c *glueCollector) collectRuns(ctx context.Context, targetAction, jobNameOrARN string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
+	if !isMeasurableAction(c.Service(), targetAction) {
+		runs, err := c.collectCloudTrailRuns(ctx, targetAction, jobNameOrARN, since, until, maxResults)
+		if err != nil {
+			return nil, fmt.Errorf("collect non-measurable glue action via cloudtrail: %w", err)
+		}
+		return runs, nil
+	}
+
 	jobName := jobNameOrARN
 	if strings.Contains(jobNameOrARN, ":") {
 		jobName = helpers.ResourceNameFromARN(jobNameOrARN)
@@ -80,4 +90,32 @@ func (c *glueCollector) collectRuns(ctx context.Context, jobNameOrARN string, si
 		nextToken = out.NextToken
 	}
 	return runs, nil
+}
+
+func (c *glueCollector) collectCloudTrailRuns(ctx context.Context, targetAction, jobNameOrARN string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
+	runs, err := collectCloudTrailRunsForResources(ctx, c.ctSvc, targetAction, c.cloudTrailResourceIDs(jobNameOrARN), since, until, maxResults, c.caches, c.runsFromCloudTrailEvent)
+	if err != nil {
+		return nil, fmt.Errorf("collect glue cloudtrail runs: %w", err)
+	}
+	return runs, nil
+}
+
+func (*glueCollector) runsFromCloudTrailEvent(event *cloudtrailtypes.Event, since time.Time) []cloudTrailActionRun {
+	return genericCloudTrailRunsFromEvent(
+		event,
+		since,
+		glueCloudTrailRequestResourceKeys,
+	)
+}
+
+func (*glueCollector) cloudTrailResourceIDs(jobNameOrARN string) []string {
+	trimmed := strings.TrimSpace(jobNameOrARN)
+	if trimmed == "" {
+		return nil
+	}
+	ids := appendUniqueTrimmedResourceIDs(nil, trimmed)
+	if strings.Contains(trimmed, ":") {
+		ids = appendResourceNameFromARN(ids, trimmed)
+	}
+	return ids
 }

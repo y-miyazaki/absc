@@ -96,6 +96,24 @@ Only service-specific behavior should remain in each collector:
 
 This keeps collectors consistent while preserving per-service semantics.
 
+### Helper Placement Rule
+
+Collector-local helpers should be methods on that collector when they are used only inside that collector, even if the receiver is not referenced today.
+
+- Keep collector-specific retry, filtering, normalization, and event-parsing helpers as unexported methods.
+- Move only genuinely shared pure helpers into package-level support files such as [internal/aws/resources/runs/support_actions.go](internal/aws/resources/runs/support_actions.go) and [internal/aws/resources/runs/support_cloudtrail.go](internal/aws/resources/runs/support_cloudtrail.go).
+- Avoid mixing collector-only free functions with shared package helpers because the ownership boundary becomes unclear.
+
+## Action Capability Model
+
+Run collection now follows a shared capability rule for known target kinds.
+
+1. Measurable primary actions use native service history sources.
+2. Non-measurable actions for known target kinds fall back to CloudTrail request history.
+3. Unknown or unsupported target kinds remain unsupported by default and continue to surface as `not_observable_target` in the exporter.
+
+This boundary is intentional. A fully generic CloudTrail fallback for unknown services was not adopted because event naming, resource identifier extraction, and status semantics remain service-specific. The shared helpers in [internal/aws/resources/runs/support_actions.go](internal/aws/resources/runs/support_actions.go) and [internal/aws/resources/runs/support_cloudtrail.go](internal/aws/resources/runs/support_cloudtrail.go) reduce duplication only for known target kinds where those mappings are explicitly modeled.
+
 ## Responsibility Boundary: Runs vs Exporter Links
 
 ### Current Rule

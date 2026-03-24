@@ -58,7 +58,7 @@ func getCachedRunsForCollector(caches *runCollectorCaches, collector runCollecto
 	return runs, nil
 }
 
-func collectCloudTrailFilteredRuns(
+func collectCloudTrailRunsForResources(
 	ctx context.Context,
 	svc *cloudtrail.Client,
 	targetAction string,
@@ -67,11 +67,10 @@ func collectCloudTrailFilteredRuns(
 	maxResults int,
 	caches *runCollectorCaches,
 	parser func(*cloudtrailtypes.Event, time.Time) []cloudTrailActionRun,
-	serviceName string,
 ) ([]resourcescore.Run, error) {
 	allRuns, err := collectCloudTrailActionRuns(ctx, svc, targetAction, since, until, caches, parser)
 	if err != nil {
-		return nil, fmt.Errorf("collect %s cloudtrail runs: %w", serviceName, err)
+		return nil, fmt.Errorf("collect cloudtrail action runs for %s: %w", targetAction, err)
 	}
 	return filterCloudTrailActionRuns(allRuns, resourceIDs, maxResults), nil
 }

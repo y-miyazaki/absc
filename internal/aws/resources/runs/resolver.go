@@ -26,7 +26,7 @@ var runCollectorRegistrations = []struct {
 	{
 		targetKind: "batch",
 		build: func(deps runCollectorDeps) runCollector {
-			return newBatchCollector(deps.batchSvc, deps.caches)
+			return newBatchCollector(deps.batchSvc, deps.ctSvc, deps.caches)
 		},
 	},
 	{
@@ -44,13 +44,13 @@ var runCollectorRegistrations = []struct {
 	{
 		targetKind: "glue",
 		build: func(deps runCollectorDeps) runCollector {
-			return newGlueCollector(deps.glueSvc, deps.caches)
+			return newGlueCollector(deps.glueSvc, deps.ctSvc, deps.caches)
 		},
 	},
 	{
 		targetKind: "lambda",
 		build: func(deps runCollectorDeps) runCollector {
-			return newLambdaCollector(deps.cwlSvc, deps.caches)
+			return newLambdaCollector(deps.cwlSvc, deps.ctSvc, deps.caches)
 		},
 	},
 	{
@@ -62,7 +62,7 @@ var runCollectorRegistrations = []struct {
 	{
 		targetKind: "stepfunctions",
 		build: func(deps runCollectorDeps) runCollector {
-			return newStepFunctionsCollector(deps.stepSvc, deps.caches)
+			return newStepFunctionsCollector(deps.stepSvc, deps.ctSvc, deps.caches)
 		},
 	},
 	{
@@ -84,6 +84,7 @@ var supportedRunTargetKinds = func() []string {
 type TargetHints struct {
 	EC2InstanceIDs       []string
 	ECSRoleARN           string
+	ECSService           string
 	ECSStartedBy         string
 	ECSTaskDefinitionARN string
 	RDSResourceIDs       []string
