@@ -103,6 +103,45 @@ func TestResolveSchedulerTargetName_BatchJobName(t *testing.T) {
 	}
 }
 
+func TestResolveSchedulerTargetName_ECSServiceAndTaskDefinition(t *testing.T) {
+	t.Parallel()
+
+	got := resolveSchedulerTargetName(
+		"arn:aws:scheduler:::aws-sdk:ecs:runTask",
+		`{"Cluster":"arn:aws:ecs:ap-northeast-1:123:cluster/prd-cluster","Service":"prd-api","TaskDefinition":"arn:aws:ecs:ap-northeast-1:123:task-definition/prd-api:31"}`,
+		"arn:aws:ecs:ap-northeast-1:123:cluster/prd-cluster",
+	)
+	if got != "prd-api (prd-api:31)" {
+		t.Fatalf("target name = %q, want %q", got, "prd-api (prd-api:31)")
+	}
+}
+
+func TestResolveSchedulerTargetName_ECSServiceOnly(t *testing.T) {
+	t.Parallel()
+
+	got := resolveSchedulerTargetName(
+		"arn:aws:scheduler:::aws-sdk:ecs:runTask",
+		`{"Cluster":"arn:aws:ecs:ap-northeast-1:123:cluster/prd-cluster","Service":"prd-api"}`,
+		"arn:aws:ecs:ap-northeast-1:123:cluster/prd-cluster",
+	)
+	if got != "prd-api" {
+		t.Fatalf("target name = %q, want %q", got, "prd-api")
+	}
+}
+
+func TestResolveSchedulerTargetName_ECSTaskDefinitionOnly(t *testing.T) {
+	t.Parallel()
+
+	got := resolveSchedulerTargetName(
+		"arn:aws:scheduler:::aws-sdk:ecs:runTask",
+		`{"Cluster":"arn:aws:ecs:ap-northeast-1:123:cluster/prd-cluster","TaskDefinition":"arn:aws:ecs:ap-northeast-1:123:task-definition/prd-api:31"}`,
+		"arn:aws:ecs:ap-northeast-1:123:cluster/prd-cluster",
+	)
+	if got != "prd-api:31" {
+		t.Fatalf("target name = %q, want %q", got, "prd-api:31")
+	}
+}
+
 func TestResolveSchedulerTargetName_RedshiftClusterIdentifier(t *testing.T) {
 	t.Parallel()
 

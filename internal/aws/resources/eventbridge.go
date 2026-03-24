@@ -113,6 +113,7 @@ func (c *EventBridgeCollector) Collect(ctx context.Context, opts CollectOptions)
 				targetARN := aws.ToString(t.Arn)
 				targetKind := detectTargetKind(targetARN, t.BatchParameters != nil)
 				targetService := detectTargetService(targetARN)
+				targetName, targetID := resolveEventBridgeTargetDisplay(&t, targetService, targetARN)
 				hints := runs.TargetHints{}
 				if t.EcsParameters != nil {
 					hints.ECSTaskDefinitionARN = aws.ToString(t.EcsParameters.TaskDefinitionArn)
@@ -132,7 +133,8 @@ func (c *EventBridgeCollector) Collect(ctx context.Context, opts CollectOptions)
 					TargetKind:         targetKind,
 					TargetAction:       detectTargetAction(targetARN),
 					TargetService:      targetService,
-					TargetName:         resourceNameFromARN(targetARN),
+					TargetID:           targetID,
+					TargetName:         targetName,
 					NextInvocationAt:   "",
 					Slots:              buildSlots(expr),
 					Runs:               make([]Run, 0),
@@ -156,4 +158,20 @@ func (c *EventBridgeCollector) Collect(ctx context.Context, opts CollectOptions)
 		nextToken = page.NextToken
 	}
 	return schedules, errs
+}
+
+func resolveEventBridgeTargetDisplay(target *eventbridgetypes.Target, targetService, targetARN string) (targetName, targetID string) {
+	targetName = resourceNameFromARN(targetARN)
+	if !strings.EqualFold(targetService, "ECS") {
+		return targetName, targetID
+	}
+
+	targetID = targetName
+	if target == nil || target.EcsParameters == nil {
+		return targetName, targetID
+	}
+	if taskDefinitionName := resourceNameFromARN(aws.ToString(target.EcsParameters.TaskDefinitionArn)); taskDefinitionName != "" {
+		targetName = taskDefinitionName
+	}
+	return targetName, targetID
 }

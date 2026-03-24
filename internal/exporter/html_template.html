@@ -392,8 +392,9 @@ function targetConsoleURL(schedule) {
     return 'https://' + region + '.console.aws.amazon.com/gluestudio/home?region=' + region + '#/editor/job/' + encodeURIComponent(targetName) + '/details';
   }
   if (targetService === 'ECS') {
-    if (targetName) {
-      return 'https://' + region + '.console.aws.amazon.com/ecs/v2/clusters/' + encodeURIComponent(targetName) + '/services?region=' + region;
+    const clusterName = targetId || targetName;
+    if (clusterName) {
+      return 'https://' + region + '.console.aws.amazon.com/ecs/v2/clusters/' + encodeURIComponent(clusterName) + '/services?region=' + region;
     }
     return 'https://' + region + '.console.aws.amazon.com/ecs/v2/clusters?region=' + region;
   }
@@ -591,7 +592,10 @@ function render() {
       altText: 'Schedule/Rule: ' + (s.schedule_name || '-')
     }));
 
-    const targetDisplayName = s.target_name || s.target_arn || '-';
+    let targetDisplayName = s.target_name || s.target_arn || '-';
+    if (s.target_service === 'ECS' && s.target_id && s.target_name && s.target_id !== s.target_name) {
+      targetDisplayName = s.target_id + ' / ' + s.target_name;
+    }
     const nameText = scheduleConsoleURL ? document.createElement('a') : document.createElement('span');
     nameText.className = 'schedule-link';
     if (scheduleConsoleURL) {
@@ -714,7 +718,7 @@ function render() {
           'state: ' + (s.enabled === false ? 'DISABLED' : 'ENABLED') + '<br/>' +
           'service: ' + (s.target_service || 'Other') + '<br/>' +
           'target type: ' + targetTypeLabel(s) + '<br/>' +
-          'target: ' + (s.target_name || s.target_arn) + '<br/>' +
+          'target: ' + targetDisplayName + '<br/>' +
           'expression: ' + s.schedule_expression + '<br/>' +
           'expression timezone: ' + (s.schedule_expression_timezone_label || s.schedule_expression_timezone || 'UTC') + '<br/>' +
           'display timezone: ' + (DATA.timezone || '-') + '<br/>' +

@@ -114,6 +114,9 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 						}
 					}
 				}
+				if targetService == "ECS" {
+					targetID = resourceNameFromARN(runTargetARN)
+				}
 				// Fallback: for Step Functions, if runTargetARN was not resolved from input, build it from targetName
 				if targetService == "Step Functions" && runTargetARN == targetARN && targetName != "" && accountID != "" {
 					runTargetARN = fmt.Sprintf("arn:aws:states:%s:%s:stateMachine:%s", c.region, accountID, targetName)
@@ -233,8 +236,17 @@ var schedulerSDKResolvers = map[string]sdkTargetResolver{
 			return resolved
 		},
 		displayName: func(input, runTargetARN string) (string, bool) {
-			_ = input
-			if runTargetARN != "" {
+			service := strings.TrimSpace(getStringFromJSON(input, "Service"))
+			taskDefinition := strings.TrimSpace(getStringFromJSON(input, "TaskDefinition"))
+			taskDefinitionName := resourceNameFromARN(taskDefinition)
+			switch {
+			case service != "" && taskDefinitionName != "":
+				return fmt.Sprintf("%s (%s)", service, taskDefinitionName), true
+			case service != "":
+				return service, true
+			case taskDefinitionName != "":
+				return taskDefinitionName, true
+			case runTargetARN != "":
 				return resourceNameFromARN(runTargetARN), true
 			}
 			return "", false
