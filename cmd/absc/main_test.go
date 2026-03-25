@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,9 +17,8 @@ import (
 
 	"github.com/y-miyazaki/absc/internal/aws/resources"
 	"github.com/y-miyazaki/absc/internal/exporter"
+	"github.com/y-miyazaki/go-common/pkg/logger"
 )
-
-type noopLogger struct{}
 
 type stubAccountClient struct {
 	getAccountInformation func(context.Context, *account.GetAccountInformationInput, ...func(*account.Options)) (*account.GetAccountInformationOutput, error)
@@ -32,14 +32,14 @@ func (s stubAccountClient) GetAccountInformation(
 	return s.getAccountInformation(ctx, in, optFns...)
 }
 
-func (noopLogger) Error(string, ...any) {}
-
-func (noopLogger) Info(string, ...any) {}
+func testLogger() *logger.SlogLogger {
+	return logger.NewSlogLogger(&logger.SlogConfig{Level: slog.LevelError, Format: "text"})
+}
 
 func newTestContext(t *testing.T, values map[string]string) *cli.Context {
 	t.Helper()
 
-	app := newApp(noopLogger{})
+	app := newApp(testLogger())
 	set := flag.NewFlagSet("test", flag.ContinueOnError)
 	for _, f := range app.Flags {
 		if err := f.Apply(set); err != nil {
@@ -230,15 +230,23 @@ func TestFetchAccountName_Error(t *testing.T) {
 
 func TestRunCommand_MaxResultsValidation(t *testing.T) {
 	ctx := newTestContext(t, map[string]string{maxResultsFlagName: "0"})
-	err := runCommand(ctx, noopLogger{})
+	err := runCommand(ctx, testLogger())
 	if !errors.Is(err, errInvalidMaxResults) {
 		t.Fatalf("runCommand() error = %v, want %v", err, errInvalidMaxResults)
 	}
 }
 
+func TestRunCommand_DaysAgoValidation(t *testing.T) {
+	ctx := newTestContext(t, map[string]string{daysAgoFlagName: "-1"})
+	err := runCommand(ctx, testLogger())
+	if !errors.Is(err, errInvalidDaysAgo) {
+		t.Fatalf("runCommand() error = %v, want %v", err, errInvalidDaysAgo)
+	}
+}
+
 func TestRunCommand_InvalidTimezone(t *testing.T) {
 	ctx := newTestContext(t, map[string]string{timezoneFlagName: "Mars/Phobos"})
-	err := runCommand(ctx, noopLogger{})
+	err := runCommand(ctx, testLogger())
 	if err == nil || !strings.Contains(err.Error(), "failed to load timezone") {
 		t.Fatalf("runCommand() error = %v, want timezone error", err)
 	}
@@ -252,7 +260,7 @@ func TestRunCommand_AWSConfigError(t *testing.T) {
 	}
 
 	ctx := newTestContext(t, map[string]string{})
-	err := runCommand(ctx, noopLogger{})
+	err := runCommand(ctx, testLogger())
 	if err == nil || !strings.Contains(err.Error(), "failed to initialize aws config") {
 		t.Fatalf("runCommand() error = %v, want config error", err)
 	}
@@ -317,7 +325,7 @@ func TestRunCommand_Success(t *testing.T) {
 		timezoneFlagName:  "UTC",
 	})
 
-	if err := runCommand(ctx, noopLogger{}); err != nil {
+	if err := runCommand(ctx, testLogger()); err != nil {
 		t.Fatalf("runCommand() unexpected error: %v", err)
 	}
 

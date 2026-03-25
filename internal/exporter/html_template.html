@@ -17,6 +17,7 @@
       --run-fail: #f85149;
       --scheduled: #2563eb;
       --schedule-col-width: 420px;
+      --region-col-width: 130px;
       --description-col-width: 280px;
       --target-col-width: 320px;
     }
@@ -45,20 +46,20 @@
     .timeline { position: relative; border: 1px solid #d7e0e7; background: var(--panel); border-radius: 12px; overflow: auto; flex: 1; min-height: 0; padding-bottom: 4px; box-sizing: border-box; }
     .row {
       display: grid;
-      grid-template-columns: var(--schedule-col-width) repeat(144, 14px);
+      grid-template-columns: var(--schedule-col-width) var(--region-col-width) repeat(144, 14px);
       border-bottom: 1px solid #eef2f5;
       min-height: 20px;
       width: max-content;
       min-width: max-content;
     }
     .timeline.show-description .row {
-      grid-template-columns: var(--schedule-col-width) var(--description-col-width) repeat(144, 14px);
+      grid-template-columns: var(--schedule-col-width) var(--region-col-width) var(--description-col-width) repeat(144, 14px);
     }
     .timeline.show-target .row {
-      grid-template-columns: var(--schedule-col-width) var(--target-col-width) repeat(144, 14px);
+      grid-template-columns: var(--schedule-col-width) var(--region-col-width) var(--target-col-width) repeat(144, 14px);
     }
     .timeline.show-description.show-target .row {
-      grid-template-columns: var(--schedule-col-width) var(--description-col-width) var(--target-col-width) repeat(144, 14px);
+      grid-template-columns: var(--schedule-col-width) var(--region-col-width) var(--description-col-width) var(--target-col-width) repeat(144, 14px);
     }
     .row.head { position: sticky; top: 0; background: #f3f8f8; z-index: 25; box-shadow: 0 1px 0 #dde3e7; }
     .left-col {
@@ -103,6 +104,21 @@
     .col-title { font-weight: 600; }
     .badge { display: inline-block; margin-left: 6px; padding: 1px 6px; font-size: 10px; border-radius: 999px; background: #eef2f5; color: #60717f; vertical-align: middle; }
     .badge.warn { background: #fff4e5; color: #9a5d1d; }
+    .status-alert {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      margin-left: 6px;
+      border-radius: 50%;
+      background: #f85149;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1;
+      vertical-align: middle;
+    }
     .hour { font-size: 10px; color: var(--sub); text-align: center; }
     .tooltip { position: fixed; background: #1f2d34; color: #fff; padding: 8px; border-radius: 8px; font-size: 12px; pointer-events: none; transform: translate(8px, 8px); display: none; max-width: 360px; z-index: 9999; }
     .svc-icon { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; vertical-align: middle; flex-shrink: 0; margin-right: 2px; }
@@ -117,6 +133,8 @@
     <label>Service <select id="serviceFilter"></select></label>
     <label>Region <select id="regionFilter"></select></label>
     <label>Schedule Width <input id="nameWidth" type="range" min="220" max="640" step="10" value="420" /> <span id="nameWidthValue">420px</span></label>
+    <label id="descriptionWidthWrap" style="display:none">Description Width <input id="descriptionWidth" type="range" min="180" max="720" step="10" value="280" /> <span id="descriptionWidthValue">280px</span></label>
+    <label id="targetWidthWrap" style="display:none">Target Width <input id="targetWidth" type="range" min="180" max="720" step="10" value="320" /> <span id="targetWidthValue">320px</span></label>
     <label id="descriptionToggleWrap" style="display:none"><input id="showDescription" type="checkbox" checked /> Show Description</label>
     <label id="targetToggleWrap" style="display:none"><input id="showTarget" type="checkbox" checked /> Show Target</label>
     <label><input id="hideDisabled" type="checkbox" /> Hide disabled schedules</label>
@@ -146,9 +164,6 @@ const tooltip = document.getElementById('tooltip');
 const diagnostics = document.getElementById('diagnostics');
 const WINDOW_START_MS = Date.parse(DATA.window.start);
 const SLOT_MINUTES = Number(DATA.window.slot_minutes) || 10;
-const DESCRIPTION_COLUMN_WIDTH = 280;
-const TARGET_COLUMN_WIDTH = 320;
-const TARGET_COLUMN_WIDTH_WITHOUT_DESCRIPTION = 320;
 const accountLabel = DATA.account_name ? DATA.account_name + '(' + DATA.account_id + ')' : DATA.account_id;
 document.getElementById('meta').textContent =
   'Account: ' + accountLabel +
@@ -169,17 +184,40 @@ function buildFilters() {
   region.onchange = render;
 }
 
-function setupNameWidthControl() {
-  const slider = document.getElementById('nameWidth');
-  const value = document.getElementById('nameWidthValue');
-  const apply = () => {
-    const width = Number(slider.value) || 420;
+function setupColumnWidthControls() {
+  const scheduleSlider = document.getElementById('nameWidth');
+  const scheduleValue = document.getElementById('nameWidthValue');
+  const descriptionSlider = document.getElementById('descriptionWidth');
+  const descriptionValue = document.getElementById('descriptionWidthValue');
+  const targetSlider = document.getElementById('targetWidth');
+  const targetValue = document.getElementById('targetWidthValue');
+
+  const applySchedule = () => {
+    const width = Number(scheduleSlider.value) || 420;
     document.documentElement.style.setProperty('--schedule-col-width', width + 'px');
-    value.textContent = width + 'px';
+    scheduleValue.textContent = width + 'px';
     applyStickyColumns();
   };
-  slider.oninput = apply;
-  apply();
+  const applyDescription = () => {
+    const width = Number(descriptionSlider.value) || 280;
+    document.documentElement.style.setProperty('--description-col-width', width + 'px');
+    descriptionValue.textContent = width + 'px';
+    applyStickyColumns();
+  };
+  const applyTarget = () => {
+    const width = Number(targetSlider.value) || 320;
+    document.documentElement.style.setProperty('--target-col-width', width + 'px');
+    targetValue.textContent = width + 'px';
+    applyStickyColumns();
+  };
+
+  scheduleSlider.oninput = applySchedule;
+  descriptionSlider.oninput = applyDescription;
+  targetSlider.oninput = applyTarget;
+
+  applySchedule();
+  applyDescription();
+  applyTarget();
 }
 
 function hasDescriptionData() {
@@ -205,11 +243,15 @@ function setupColumnVisibilityControls() {
   const hasTarget = hasTargetData();
   const descriptionWrap = document.getElementById('descriptionToggleWrap');
   const targetWrap = document.getElementById('targetToggleWrap');
+  const descriptionWidthWrap = document.getElementById('descriptionWidthWrap');
+  const targetWidthWrap = document.getElementById('targetWidthWrap');
   const descriptionToggle = document.getElementById('showDescription');
   const targetToggle = document.getElementById('showTarget');
 
   if (descriptionWrap) descriptionWrap.style.display = hasDescription ? '' : 'none';
   if (targetWrap) targetWrap.style.display = hasTarget ? '' : 'none';
+  if (descriptionWidthWrap) descriptionWidthWrap.style.display = hasDescription ? '' : 'none';
+  if (targetWidthWrap) targetWidthWrap.style.display = hasTarget ? '' : 'none';
   if (descriptionToggle) descriptionToggle.checked = hasDescription;
   if (targetToggle) targetToggle.checked = hasTarget;
   if (descriptionToggle) descriptionToggle.onchange = render;
@@ -218,25 +260,29 @@ function setupColumnVisibilityControls() {
 
 function applyStickyColumns() {
   const scheduleWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--schedule-col-width'), 10) || 420;
-  const descriptionWidth = DESCRIPTION_COLUMN_WIDTH;
+  const regionWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--region-col-width'), 10) || 130;
+  const descriptionWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--description-col-width'), 10) || 280;
+  const targetWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--target-col-width'), 10) || 320;
 
   const showDescription = showDescriptionColumn();
   const showTarget = showTargetColumn();
-  const targetWidth = showDescription ? TARGET_COLUMN_WIDTH : TARGET_COLUMN_WIDTH_WITHOUT_DESCRIPTION;
 
   timeline.classList.toggle('show-description', showDescription);
   timeline.classList.toggle('show-target', showTarget);
 
-  document.documentElement.style.setProperty('--description-col-width', (showDescription ? descriptionWidth : 0) + 'px');
-  document.documentElement.style.setProperty('--target-col-width', (showTarget ? targetWidth : 0) + 'px');
-
   const scheduleCols = timeline.querySelectorAll('.schedule-col');
+  const regionCols = timeline.querySelectorAll('.region-col');
   const descriptionCols = timeline.querySelectorAll('.description-col');
   const targetCols = timeline.querySelectorAll('.target-col');
 
   scheduleCols.forEach(el => {
     el.classList.remove('hidden');
     el.style.left = '0px';
+  });
+
+  regionCols.forEach(el => {
+    el.classList.remove('hidden');
+    el.style.left = scheduleWidth + 'px';
   });
 
   descriptionCols.forEach(el => {
@@ -246,7 +292,7 @@ function applyStickyColumns() {
       return;
     }
     el.classList.remove('hidden');
-    el.style.left = scheduleWidth + 'px';
+    el.style.left = (scheduleWidth + regionWidth) + 'px';
   });
 
   targetCols.forEach(el => {
@@ -256,7 +302,7 @@ function applyStickyColumns() {
       return;
     }
     el.classList.remove('hidden');
-    const left = scheduleWidth + (showDescription ? descriptionWidth : 0);
+    const left = scheduleWidth + regionWidth + (showDescription ? descriptionWidth : 0);
     el.style.left = left + 'px';
   });
 }
@@ -554,6 +600,11 @@ function render() {
   scheduleHead.textContent = 'Schedule';
   head.appendChild(scheduleHead);
 
+  const regionHead = document.createElement('div');
+  regionHead.className = 'left-col sticky-col region-col col-title';
+  regionHead.textContent = 'Region';
+  head.appendChild(regionHead);
+
   const descriptionHead = document.createElement('div');
   descriptionHead.className = 'left-col sticky-col description-col col-title';
   descriptionHead.textContent = 'Description';
@@ -583,6 +634,7 @@ function render() {
     const row = document.createElement('div');
     row.className = 'row';
     if (s.enabled === false) row.className += ' disabled';
+    const hasFailedRuns = (s.runs || []).some(r => runClass(r.status) === 'run-fail');
     const scheduleCol = document.createElement('div');
     scheduleCol.className = 'left-col sticky-col schedule-col';
     scheduleCol.title = s.schedule_name;
@@ -605,10 +657,13 @@ function render() {
     }
     nameText.textContent = s.schedule_name;
     scheduleCol.appendChild(nameText);
-    const regionBadge = document.createElement('span');
-    regionBadge.className = 'badge';
-    regionBadge.textContent = s.region;
-    scheduleCol.appendChild(regionBadge);
+    if (hasFailedRuns) {
+      const alertIcon = document.createElement('span');
+      alertIcon.className = 'status-alert';
+      alertIcon.textContent = '!';
+      alertIcon.title = 'Contains failed runs';
+      scheduleCol.appendChild(alertIcon);
+    }
     if (s.runs_capped) {
       const cap = document.createElement('span');
       cap.className = 'badge warn';
@@ -616,6 +671,12 @@ function render() {
       scheduleCol.appendChild(cap);
     }
     row.appendChild(scheduleCol);
+
+    const regionCol = document.createElement('div');
+    regionCol.className = 'left-col sticky-col region-col';
+    regionCol.title = s.region || '-';
+    regionCol.textContent = s.region || '-';
+    row.appendChild(regionCol);
 
     const descriptionCol = document.createElement('div');
     descriptionCol.className = 'left-col sticky-col description-col';
@@ -785,7 +846,7 @@ function makeIcon(key, options) {
 }
 
 buildFilters();
-setupNameWidthControl();
+setupColumnWidthControls();
 setupDisabledToggle();
 setupColumnVisibilityControls();
 setupErrorsLink();

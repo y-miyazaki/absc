@@ -48,12 +48,12 @@ ABSC generates an interactive HTML viewer that allows you to browse collected sc
 ### Using Go Install
 
 ```bash
-go install github.com/y-miyazaki/absc/cmd/absc@v1.0.10
+go install github.com/y-miyazaki/absc/cmd/absc@v1.0.11
 ```
 
 ### Using Release tar.gz
 
-You can download a prebuilt release tarball from the Releases page and install it quickly. The examples below use the `v1.0.10` release.
+You can download a prebuilt release tarball from the Releases page and install it quickly. The examples below use the `v1.0.11` release.
 
 Available platforms:
 
@@ -64,20 +64,20 @@ Available platforms:
 Linux (AMD64) example:
 
 ```bash
-VERSION=v1.0.10 && curl -L https://github.com/y-miyazaki/absc/releases/download/${VERSION}/absc-linux-amd64.tar.gz | tar -xzf - && sudo mv absc /usr/local/bin/ && sudo chmod +x /usr/local/bin/absc
+VERSION=v1.0.11 && curl -L https://github.com/y-miyazaki/absc/releases/download/${VERSION}/absc-linux-amd64.tar.gz | tar -xzf - && sudo mv absc /usr/local/bin/ && sudo chmod +x /usr/local/bin/absc
 ```
 
 macOS (ARM64) example:
 
 ```bash
-VERSION=v1.0.10 && curl -L https://github.com/y-miyazaki/absc/releases/download/${VERSION}/absc-darwin-arm64.tar.gz | tar -xzf - && sudo mv absc /usr/local/bin/ && sudo chmod +x /usr/local/bin/absc
+VERSION=v1.0.11 && curl -L https://github.com/y-miyazaki/absc/releases/download/${VERSION}/absc-darwin-arm64.tar.gz | tar -xzf - && sudo mv absc /usr/local/bin/ && sudo chmod +x /usr/local/bin/absc
 ```
 
 Notes:
 
 - The release typically ships an `absc-${VERSION}-checksums.txt` file. Verify the checksum before installing in production.
 - For Windows, download the `.zip` asset from the Releases page and extract the `absc.exe` binary.
-- `go install` is convenient for development. Release tarballs are preferable when you want a pinned binary such as `v1.0.10`.
+- `go install` is convenient for development. Release tarballs are preferable when you want a pinned binary such as `v1.0.11`.
 
 ### Build from Source
 
@@ -134,8 +134,8 @@ absc --profile production
 # Render in a specific timezone
 absc --timezone Asia/Tokyo
 
-# Change the execution history window
-absc --lookback-hours 72
+# Select an older calendar day window
+absc --days-ago 3
 
 # Increase collector concurrency
 absc --max-concurrency 10
@@ -147,7 +147,7 @@ absc --max-results 100
 absc --output-dir /path/to/output
 ```
 
-`--lookback-hours` does not create a trailing `now - N hours` window. ABSC first subtracts the requested hours, then anchors the display and CloudTrail collection window to the start of that calendar day in the selected timezone. With the default `--lookback-hours 24` and `--timezone UTC`, the output covers the previous full UTC day (`00:00:00` to `24:00:00`), not the most recent rolling 24 hours.
+`--days-ago` selects a calendar-day window in the chosen timezone (`0=today`, `1=yesterday`, `2=two days ago`). ABSC always anchors the display and CloudTrail collection window to that day's `00:00:00` and collects exactly one day (`00:00:00` to `24:00:00`).
 
 See [docs/SPECIFICATION.md](docs/SPECIFICATION.md) for the exact timeline window model.
 
@@ -160,7 +160,7 @@ OPTIONS:
    --regions value             Deprecated alias of --region
    --timezone value            IANA timezone (default: "UTC")
    --output-dir value, -D      Output base directory (default: "./output")
-   --lookback-hours value      Execution history lookback hours (default: 24)
+  --days-ago value            Calendar day offset (0=today, 1=yesterday) (default: 1)
    --max-concurrency value     Max concurrent resource collectors (default: 5)
     --max-results value         Max executions/jobs per target (default: 144)
    --help, -h                  show help
@@ -353,10 +353,10 @@ Notes:
 absc --region ap-northeast-1,us-east-1 --timezone Asia/Tokyo
 ```
 
-### Longer History Window
+### Older Calendar Day
 
 ```bash
-absc --lookback-hours 168 --max-results 200
+absc --days-ago 7 --max-results 200
 ```
 
 ### Separate Output by Profile
@@ -397,7 +397,7 @@ jobs:
       # if you want the generated pages to show accountName(accountID).
 
       - name: Install absc
-        run: go install github.com/y-miyazaki/absc/cmd/absc@v1.0.10
+        run: go install github.com/y-miyazaki/absc/cmd/absc@v1.0.11
 
       - name: Collect schedules
         run: absc --timezone Asia/Tokyo

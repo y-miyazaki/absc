@@ -24,7 +24,7 @@ The following constants are applied when a flag is omitted.で
 | ------------------------- | ---------------- | --------------------------------------- |
 | `--region`                | `ap-northeast-1` | Any single valid region                 |
 | `--timezone`              | `UTC`            | IANA location name                      |
-| `--lookback-hours`        | `24`             | Positive integer                        |
+| `--days-ago`              | `1`              | Integer, must be `>= 0`                 |
 | `--max-concurrency`       | `5`              | Bounded semaphore size                  |
 | `--max-results`           | `144`            | Equals `SlotsPerDay`                    |
 | `--output-dir`            | `./output`       | Relative path is allowed                |
@@ -39,14 +39,14 @@ The timeline window is a single 24-hour calendar day anchored to the display tim
 
 The computation proceeds as follows.
 
-1. `since = now - lookback-hours`, converted to the display timezone.
-2. The window start is the calendar-day start of `since` in the display timezone (hour 0, minute 0, second 0).
-3. The window end is always `window-start + 24 hours`.
-4. `until` passed to collectors is fixed at `window-start + 1 day` regardless of `lookback-hours`.
+1. Compute today's start (`00:00:00`) in the display timezone.
+2. `since = today-start - days-ago days`.
+3. The window end is always `since + 24 hours`.
+4. `until` passed to collectors is fixed at `since + 1 day`.
 
-With the default 24-hour lookback the window covers the previous full calendar day in the display timezone. Increasing `lookback-hours` beyond 24 shifts `since` further back, which moves the window start to an earlier calendar day.
+With the default `--days-ago 1`, the window covers the previous full calendar day in the display timezone.
 
-The run enrichment query range is defined by `since` and `until`, not by `now` and `now - lookback-hours`. Collectors receive only the clamped window interval.
+The run enrichment query range is defined by `since` and `until`. Collectors receive only this one-day clamped interval.
 
 ## Slot Model
 
