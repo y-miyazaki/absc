@@ -12,7 +12,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.296.0
 	github.com/aws/aws-sdk-go-v2/service/ecs v1.74.0
 	github.com/aws/aws-sdk-go-v2/service/eventbridge v1.45.22
-	github.com/aws/aws-sdk-go-v2/service/glue v1.138.0
+	github.com/aws/aws-sdk-go-v2/service/glue v1.139.0
 	github.com/aws/aws-sdk-go-v2/service/scheduler v1.17.21
 	github.com/aws/aws-sdk-go-v2/service/sfn v1.40.9
 	github.com/urfave/cli/v2 v2.27.7

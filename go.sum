@@ -32,8 +32,8 @@ github.com/aws/aws-sdk-go-v2/service/ecs v1.74.0 h1:YS5TXaEvzDb+sV+wdQFUtuCAk0Ge
 github.com/aws/aws-sdk-go-v2/service/ecs v1.74.0/go.mod h1:10kBgdaNJz0FO/+JWDUH+0rtSjkn5yafgavDDmmhFzs=
 github.com/aws/aws-sdk-go-v2/service/eventbridge v1.45.22 h1:cm/RiC6QzSQ8aM6q7jkNtwmionz3QqRgFT54dotIqXI=
 github.com/aws/aws-sdk-go-v2/service/eventbridge v1.45.22/go.mod h1:J2863TSn5IpQqTh7RgH8fFV+nnC4JNei47nq5PO/vhI=
-github.com/aws/aws-sdk-go-v2/service/glue v1.138.0 h1:NX8ZJ4NkVDc5ZFXONzIVs++WxcUTrCaGhr/hwxXki1k=
-github.com/aws/aws-sdk-go-v2/service/glue v1.138.0/go.mod h1:qxiAi9p9Vv/LsD7F8p+XnyaFCPHy/F77igUM1iT3abU=
+github.com/aws/aws-sdk-go-v2/service/glue v1.139.0 h1:yO8PcdOhX62FYXAGb6oULH8LGV8THi1bQg8/zJZQEG4=
+github.com/aws/aws-sdk-go-v2/service/glue v1.139.0/go.mod h1:qxiAi9p9Vv/LsD7F8p+XnyaFCPHy/F77igUM1iT3abU=
 github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.7 h1:5EniKhLZe4xzL7a+fU3C2tfUN4nWIqlLesfrjkuPFTY=
 github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.7/go.mod h1:x0nZssQ3qZSnIcePWLvcoFisRXJzcTVvYpAAdYX8+GI=
 github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.20 h1:2HvVAIq+YqgGotK6EkMf+KIEqTISmTYh5zLpYyeTo1Y=
