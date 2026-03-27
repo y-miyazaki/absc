@@ -23,9 +23,100 @@
     }
     body { margin: 0; font-family: "Noto Sans", "Segoe UI", sans-serif; color: var(--text); background: radial-gradient(circle at 10% 0%, #e4f4f3, var(--bg) 35%); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
     header { padding: 16px 20px; border-bottom: 1px solid #d5dde3; background: #ffffffcc; backdrop-filter: blur(6px); flex-shrink: 0; }
+    .header-main { display: flex; align-items: center; justify-content: flex-start; gap: 12px; }
+    .header-actions { margin-top: 8px; display: flex; align-items: center; gap: 8px; }
+    .search-wrapper { flex: 0 0 200px; width: 200px; min-width: 0; position: relative; }
+    .search-wrapper svg { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--sub); pointer-events: none; }
+    #scheduleSearch {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 6px 10px 6px 32px;
+      border: 1px solid #c9d2d9;
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--text);
+      font-size: 13px;
+    }
+    #scheduleSearch::placeholder { color: var(--sub); }
+    #scheduleSearch:focus { outline: none; border-color: #9eaab3; }
+    .settings-open {
+      flex-shrink: 0;
+      border: 1px solid #c9d2d9;
+      background: var(--panel);
+      color: var(--text);
+      border-radius: 50%;
+      width: 34px;
+      height: 34px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .settings-open:hover { border-color: #9eaab3; background: #f3f6f8; }
     .meta { color: var(--sub); font-size: 13px; }
-    .controls { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
-    .controls input[type="range"] { width: 170px; vertical-align: middle; }
+    .settings-dialog {
+      border: none;
+      border-radius: 12px;
+      width: min(940px, calc(100vw - 24px));
+      padding: 0;
+      box-shadow: 0 18px 50px rgba(15, 23, 42, 0.28);
+    }
+    .settings-dialog::backdrop { background: rgba(15, 23, 42, 0.45); }
+    .settings-content { margin: 0; padding: 14px 14px 16px; }
+    .settings-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+    .settings-head h3 { margin: 0; font-size: 14px; }
+    .settings-close {
+      border: 1px solid #c9d2d9;
+      background: var(--panel);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 5px 10px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .settings-sections { display: grid; gap: 10px; }
+    .settings-group {
+      border: 1px solid #dfe6eb;
+      border-radius: 10px;
+      padding: 10px;
+      background: #fbfcfd;
+    }
+    .settings-group h4 {
+      margin: 0 0 8px;
+      font-size: 12px;
+      color: #4b5965;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      align-items: stretch;
+    }
+    .control-row {
+      display: grid;
+      grid-template-columns: 170px minmax(0, 1fr);
+      gap: 10px;
+      align-items: center;
+      min-height: 32px;
+    }
+    .control-label {
+      font-size: 12px;
+      color: #4b5965;
+      white-space: nowrap;
+    }
+    .control-value {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .control-value input[type="range"] { width: 170px; vertical-align: middle; }
+    .control-value select { width: 100%; max-width: 320px; }
+    .control-row.checkbox-row .control-value { gap: 6px; }
     select { padding: 6px 10px; border: 1px solid #c9d2d9; border-radius: 8px; background: var(--panel); }
     main { padding: 14px; flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
     .legend { display: flex; gap: 12px; margin: 10px 0 0; font-size: 12px; color: var(--sub); flex-shrink: 0; }
@@ -127,18 +218,85 @@
 </head>
 <body>
 <header>
-  <h2 style="margin:0">@@INDEX_TITLE@@</h2>
-  <div class="meta" id="meta"></div>
-  <div class="controls">
-    <label>Service <select id="serviceFilter"></select></label>
-    <label>Region <select id="regionFilter"></select></label>
-    <label>Schedule Width <input id="nameWidth" type="range" min="220" max="640" step="10" value="420" /> <span id="nameWidthValue">420px</span></label>
-    <label id="descriptionWidthWrap" style="display:none">Description Width <input id="descriptionWidth" type="range" min="180" max="720" step="10" value="280" /> <span id="descriptionWidthValue">280px</span></label>
-    <label id="targetWidthWrap" style="display:none">Target Width <input id="targetWidth" type="range" min="180" max="720" step="10" value="320" /> <span id="targetWidthValue">320px</span></label>
-    <label id="descriptionToggleWrap" style="display:none"><input id="showDescription" type="checkbox" checked /> Show Description</label>
-    <label id="targetToggleWrap" style="display:none"><input id="showTarget" type="checkbox" checked /> Show Target</label>
-    <label><input id="hideDisabled" type="checkbox" /> Hide disabled schedules</label>
+  <div class="header-main">
+    <h2 style="margin:0;white-space:nowrap">@@INDEX_TITLE@@</h2>
   </div>
+  <div class="meta" id="meta"></div>
+  <div class="header-actions">
+    <div class="search-wrapper">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="scheduleSearch" type="search" placeholder="Search schedules…" autocomplete="off">
+    </div>
+    <button id="openSettings" class="settings-open" type="button" title="Display Settings" aria-label="Display Settings">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="3.2"/>
+        <path d="M12 2.8v2.3M12 18.9v2.3M21.2 12h-2.3M5.1 12H2.8M18.5 5.5l-1.6 1.6M7.1 16.9l-1.6 1.6M18.5 18.5l-1.6-1.6M7.1 7.1 5.5 5.5"/>
+        <circle cx="12" cy="12" r="7.1"/>
+      </svg>
+    </button>
+  </div>
+  <dialog id="settingsDialog" class="settings-dialog">
+    <form method="dialog" class="settings-content">
+      <div class="settings-head">
+        <h3>Display Settings</h3>
+        <button id="closeSettings" class="settings-close" type="submit">Close</button>
+      </div>
+      <div class="settings-sections">
+        <section class="settings-group">
+          <h4>Filter</h4>
+          <div class="controls">
+            <div class="control-row">
+              <div class="control-label">Service</div>
+              <div class="control-value"><select id="serviceFilter"></select></div>
+            </div>
+            <div class="control-row">
+              <div class="control-label">Region</div>
+              <div class="control-value"><select id="regionFilter"></select></div>
+            </div>
+            <div class="control-row">
+              <div class="control-label">Run Status</div>
+              <div class="control-value">
+                <select id="runStatusFilter">
+                  <option value="">all</option>
+                  <option value="failed">failed</option>
+                  <option value="completed">completed</option>
+                </select>
+              </div>
+            </div>
+            <div class="control-row checkbox-row">
+              <div class="control-label">Hide Disabled</div>
+              <label class="control-value"><input id="hideDisabled" type="checkbox" /> Hide disabled schedules</label>
+            </div>
+          </div>
+        </section>
+        <section class="settings-group">
+          <h4>Display</h4>
+          <div class="controls">
+            <div class="control-row">
+              <div class="control-label">Schedule Width</div>
+              <div class="control-value"><input id="nameWidth" type="range" min="220" max="640" step="10" value="420" /> <span id="nameWidthValue">420px</span></div>
+            </div>
+            <div id="descriptionWidthWrap" class="control-row" style="display:none">
+              <div class="control-label">Description Width</div>
+              <div class="control-value"><input id="descriptionWidth" type="range" min="180" max="720" step="10" value="280" /> <span id="descriptionWidthValue">280px</span></div>
+            </div>
+            <div id="targetWidthWrap" class="control-row" style="display:none">
+              <div class="control-label">Target Width</div>
+              <div class="control-value"><input id="targetWidth" type="range" min="180" max="720" step="10" value="320" /> <span id="targetWidthValue">320px</span></div>
+            </div>
+            <div id="descriptionToggleWrap" class="control-row checkbox-row" style="display:none">
+              <div class="control-label">Description</div>
+              <label class="control-value"><input id="showDescription" type="checkbox" checked /> Show Description</label>
+            </div>
+            <div id="targetToggleWrap" class="control-row checkbox-row" style="display:none">
+              <div class="control-label">Target</div>
+              <label class="control-value"><input id="showTarget" type="checkbox" checked /> Show Target</label>
+            </div>
+          </div>
+        </section>
+      </div>
+    </form>
+  </dialog>
 </header>
 <main>
   <div class="legend">
@@ -164,6 +322,7 @@ const tooltip = document.getElementById('tooltip');
 const diagnostics = document.getElementById('diagnostics');
 const WINDOW_START_MS = Date.parse(DATA.window.start);
 const SLOT_MINUTES = Number(DATA.window.slot_minutes) || 10;
+const SETTINGS_STORAGE_KEY = 'absc:settings:' + (location.pathname || '/');
 const accountLabel = DATA.account_name ? DATA.account_name + '(' + DATA.account_id + ')' : DATA.account_id;
 document.getElementById('meta').textContent =
   'Account: ' + accountLabel +
@@ -173,15 +332,95 @@ document.getElementById('meta').textContent =
 
 function unique(arr){ return [...new Set(arr)]; }
 
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function saveSettings() {
+  const showDescription = document.getElementById('showDescription');
+  const showTarget = document.getElementById('showTarget');
+  const nameWidth = document.getElementById('nameWidth');
+  const descriptionWidth = document.getElementById('descriptionWidth');
+  const targetWidth = document.getElementById('targetWidth');
+
+  const payload = {
+    showDescription: !!(showDescription && showDescription.checked),
+    showTarget: !!(showTarget && showTarget.checked),
+    nameWidth: nameWidth ? nameWidth.value : '420',
+    descriptionWidth: descriptionWidth ? descriptionWidth.value : '280',
+    targetWidth: targetWidth ? targetWidth.value : '320'
+  };
+
+  try {
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(payload));
+  } catch (_) {
+    // Ignore storage errors (private mode/quota exceeded).
+  }
+}
+
+function restoreSettings() {
+  const settings = loadSettings();
+  const showDescription = document.getElementById('showDescription');
+  const showTarget = document.getElementById('showTarget');
+  const nameWidth = document.getElementById('nameWidth');
+  const descriptionWidth = document.getElementById('descriptionWidth');
+  const targetWidth = document.getElementById('targetWidth');
+  if (showDescription && typeof settings.showDescription === 'boolean') {
+    showDescription.checked = settings.showDescription;
+    showDescription.dataset.restored = '1';
+  }
+  if (showTarget && typeof settings.showTarget === 'boolean') {
+    showTarget.checked = settings.showTarget;
+    showTarget.dataset.restored = '1';
+  }
+  if (nameWidth && settings.nameWidth != null) {
+    nameWidth.value = String(settings.nameWidth);
+  }
+  if (descriptionWidth && settings.descriptionWidth != null) {
+    descriptionWidth.value = String(settings.descriptionWidth);
+  }
+  if (targetWidth && settings.targetWidth != null) {
+    targetWidth.value = String(settings.targetWidth);
+  }
+}
+
+function setupSettingsPersistence() {
+  const ids = [
+    'showDescription',
+    'showTarget',
+    'nameWidth',
+    'descriptionWidth',
+    'targetWidth'
+  ];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const handler = () => saveSettings();
+    el.addEventListener('change', handler);
+    el.addEventListener('input', handler);
+  });
+}
+
 function buildFilters() {
   const service = document.getElementById('serviceFilter');
   const region = document.getElementById('regionFilter');
+  const runStatus = document.getElementById('runStatusFilter');
   const services = unique(DATA.schedules.map(s => s.service));
   const regions = unique(DATA.schedules.map(s => s.region));
   service.innerHTML = '<option value="">all</option>' + services.map(v => '<option>' + v + '</option>').join('');
   region.innerHTML = '<option value="">all</option>' + regions.map(v => '<option>' + v + '</option>').join('');
   service.onchange = render;
   region.onchange = render;
+  if (runStatus) runStatus.onchange = render;
+  const search = document.getElementById('scheduleSearch');
+  if (search) search.oninput = render;
 }
 
 function setupColumnWidthControls() {
@@ -252,8 +491,20 @@ function setupColumnVisibilityControls() {
   if (targetWrap) targetWrap.style.display = hasTarget ? '' : 'none';
   if (descriptionWidthWrap) descriptionWidthWrap.style.display = hasDescription ? '' : 'none';
   if (targetWidthWrap) targetWidthWrap.style.display = hasTarget ? '' : 'none';
-  if (descriptionToggle) descriptionToggle.checked = hasDescription;
-  if (targetToggle) targetToggle.checked = hasTarget;
+  if (descriptionToggle) {
+    if (!hasDescription) {
+      descriptionToggle.checked = false;
+    } else if (descriptionToggle.dataset.restored !== '1') {
+      descriptionToggle.checked = true;
+    }
+  }
+  if (targetToggle) {
+    if (!hasTarget) {
+      targetToggle.checked = false;
+    } else if (targetToggle.dataset.restored !== '1') {
+      targetToggle.checked = true;
+    }
+  }
   if (descriptionToggle) descriptionToggle.onchange = render;
   if (targetToggle) targetToggle.onchange = render;
 }
@@ -321,6 +572,41 @@ function setupErrorsLink() {
     return;
   }
   link.style.display = 'none';
+}
+
+function setupSettingsDialog() {
+  const dialog = document.getElementById('settingsDialog');
+  const open = document.getElementById('openSettings');
+  const close = document.getElementById('closeSettings');
+  if (!dialog || !open || !close) return;
+
+  open.onclick = () => {
+    if (typeof dialog.showModal === 'function') {
+      dialog.showModal();
+      return;
+    }
+    dialog.setAttribute('open', 'open');
+  };
+
+  close.onclick = () => {
+    if (typeof dialog.close === 'function') {
+      dialog.close();
+      return;
+    }
+    dialog.removeAttribute('open');
+  };
+
+  dialog.addEventListener('click', (event) => {
+    const rect = dialog.getBoundingClientRect();
+    const inside =
+      event.clientX >= rect.left &&
+      event.clientX <= rect.right &&
+      event.clientY >= rect.top &&
+      event.clientY <= rect.bottom;
+    if (!inside && typeof dialog.close === 'function') {
+      dialog.close();
+    }
+  });
 }
 
 function parseTs(ts) {
@@ -492,12 +778,26 @@ function compareSchedules(a, b) {
   });
 }
 
+function hasMatchingRunStatus(schedule, statusFilter) {
+  if (!statusFilter) return true;
+  const runs = schedule.runs || [];
+  if (statusFilter === 'failed') {
+    return runs.some(r => displayRunStatus(r.status) === 'FAILED');
+  }
+  if (statusFilter === 'completed') {
+    return runs.some(r => displayRunStatus(r.status) === 'COMPLETED');
+  }
+  return true;
+}
+
 function render() {
   const sVal = document.getElementById('serviceFilter').value;
   const rVal = document.getElementById('regionFilter').value;
+  const stVal = document.getElementById('runStatusFilter').value;
   const hideDisabled = document.getElementById('hideDisabled').checked;
+  const searchVal = (document.getElementById('scheduleSearch')?.value || '').toLowerCase().trim();
   const rows = DATA.schedules
-    .filter(s => (!sVal || s.service === sVal) && (!rVal || s.region === rVal) && (!hideDisabled || s.enabled !== false))
+    .filter(s => (!sVal || s.service === sVal) && (!rVal || s.region === rVal) && hasMatchingRunStatus(s, stVal) && (!hideDisabled || s.enabled !== false) && (!searchVal || (s.schedule_name || '').toLowerCase().includes(searchVal)))
     .sort(compareSchedules);
 
   const slotIssueReasonLabel = {
@@ -846,10 +1146,13 @@ function makeIcon(key, options) {
 }
 
 buildFilters();
+restoreSettings();
 setupColumnWidthControls();
 setupDisabledToggle();
 setupColumnVisibilityControls();
 setupErrorsLink();
+setupSettingsDialog();
+setupSettingsPersistence();
 render();
 </script>
 <!-- Copyright footer -->
