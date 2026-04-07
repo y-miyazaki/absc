@@ -28,8 +28,8 @@ github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.65.0 h1:3yaFbUbuLfN8n1q01
 github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.65.0/go.mod h1:PobeppEnIjw4pcgjFryNDZCTH7AiqZw0yb5r98Gvf9c=
 github.com/aws/aws-sdk-go-v2/service/ec2 v1.296.1 h1:AsKDVqIbQox9NykcAm14xUiuzAKbarnC5+PZkrB2010=
 github.com/aws/aws-sdk-go-v2/service/ec2 v1.296.1/go.mod h1:R+2BNtUfTfhPY0RH18oL02q116bakeBWjanrbnVBqkM=
-github.com/aws/aws-sdk-go-v2/service/ecs v1.74.1 h1:O0hhTSsxp24mIjaNUaZ0zST98SZojDluj/Zh4RkYss4=
-github.com/aws/aws-sdk-go-v2/service/ecs v1.74.1/go.mod h1:QkWmubOYmjj3cHn7A4CoUU7BKJhVeo39Gp6NH7IyhZw=
+github.com/aws/aws-sdk-go-v2/service/ecs v1.75.0 h1:VhatEa6ut7SjvJCW6Gx4keUMGMusOleGmiiNH6UiiTU=
+github.com/aws/aws-sdk-go-v2/service/ecs v1.75.0/go.mod h1:QkWmubOYmjj3cHn7A4CoUU7BKJhVeo39Gp6NH7IyhZw=
 github.com/aws/aws-sdk-go-v2/service/eventbridge v1.45.23 h1:wlOL7DYRnqjyTN1GJlDT5w1t062qC7JKiszZzH4S41A=
 github.com/aws/aws-sdk-go-v2/service/eventbridge v1.45.23/go.mod h1:bm3xSJdUbbsHQZAtyfYyDXtijYduolXRWfrPUmWQfbM=
 github.com/aws/aws-sdk-go-v2/service/glue v1.139.1 h1:2FiGBr6B+Y9nJPEvaRgo5Mxau8uAboLcgFwrwFy1hhM=
