@@ -1,3 +1,5 @@
+// Package exporter renders collected schedules into JSON, HTML, and CSV outputs.
+//
 //revive:disable:comments-density reason: data-shaping code is clearer without line-by-line commentary.
 package exporter
 
@@ -35,172 +37,6 @@ const (
 	slotsPerHour                       = 6
 	slotsPerTimelineDay                = 144
 )
-
-//go:embed html_template.html
-var htmlTemplate string
-
-//go:embed assets/icons/*.svg
-var iconAssets embed.FS
-
-//nolint:tagliatelle // Output is a stable external snake_case JSON schema.
-type Output struct {
-	Version     string           `json:"version"`
-	GeneratedAt string           `json:"generated_at"`
-	AccountName string           `json:"account_name,omitempty"`
-	AccountID   string           `json:"account_id"`
-	Timezone    string           `json:"timezone"`
-	Schedules   []Schedule       `json:"schedules"`
-	Alignment   []AlignmentIssue `json:"alignment_issues,omitempty"`
-	Errors      []ErrRecord      `json:"errors"`
-	Window      Window           `json:"window"`
-}
-
-type BuildOutputOptions struct {
-	IncludeNonSlotRuns bool
-}
-
-//nolint:tagliatelle // SlotRunIssue is a stable external snake_case JSON schema.
-type SlotRunIssue struct {
-	SlotLabel string `json:"slot_label"`
-	Reason    string `json:"reason"`
-	SlotIndex int    `json:"slot_index"`
-}
-
-//nolint:tagliatelle // AlignmentIssue is a stable external snake_case JSON schema.
-type AlignmentIssue struct {
-	ScheduleID   string `json:"schedule_id"`
-	ScheduleName string `json:"schedule_name"`
-	RunID        string `json:"run_id"`
-	RunStartAt   string `json:"run_start_at"`
-	RunEndAt     string `json:"run_end_at,omitempty"`
-	Reason       string `json:"reason"`
-}
-
-//nolint:tagliatelle // Window is a stable external snake_case JSON schema.
-type Window struct {
-	Start       string   `json:"start"`
-	End         string   `json:"end"`
-	HourLabels  []string `json:"hour_labels,omitempty"`
-	SlotLabels  []string `json:"slot_labels,omitempty"`
-	SlotMinutes int      `json:"slot_minutes"`
-}
-
-//nolint:tagliatelle // Schedule is a stable external snake_case JSON schema.
-type Schedule struct {
-	TargetAction               string         `json:"target_action,omitempty"`
-	ID                         string         `json:"id"`
-	Description                string         `json:"description,omitempty"`
-	ScheduleGroupName          string         `json:"schedule_group_name,omitempty"`
-	ScheduleName               string         `json:"schedule_name"`
-	ScheduleExpression         string         `json:"schedule_expression"`
-	ScheduleExpressionTimezone string         `json:"schedule_expression_timezone,omitempty"`
-	ScheduleExpressionTZLabel  string         `json:"schedule_expression_timezone_label,omitempty"`
-	NextInvocationAt           string         `json:"next_invocation_at,omitempty"`
-	NextInvocationLabel        string         `json:"next_invocation_label,omitempty"`
-	Service                    string         `json:"service"`
-	TargetKind                 string         `json:"target_kind"`
-	TargetID                   string         `json:"target_id,omitempty"`
-	TargetName                 string         `json:"target_name,omitempty"`
-	TargetService              string         `json:"target_service"`
-	Region                     string         `json:"region"`
-	TargetARN                  string         `json:"target_arn"`
-	RunInSlotCategory          string         `json:"run_in_slot_category"`
-	TriggerType                string         `json:"trigger_type"`
-	TriggerLabel               string         `json:"trigger_label"`
-	Runs                       []Run          `json:"runs"`
-	SlotRunIssues              []SlotRunIssue `json:"slot_run_issues,omitempty"`
-	DisplaySlots               []int          `json:"display_slots,omitempty"`
-	Slots                      []int          `json:"slots"`
-	ExpectedInWindow           bool           `json:"expected_in_window"`
-	Enabled                    bool           `json:"enabled"`
-	RunsCapped                 bool           `json:"runs_capped,omitempty"`
-}
-
-//nolint:tagliatelle // Run is a stable external snake_case JSON schema.
-type Run struct {
-	RunID         string `json:"run_id"`
-	Status        string `json:"status"`
-	StartAt       string `json:"start_at,omitempty"`
-	StartLabel    string `json:"start_label,omitempty"`
-	EndAt         string `json:"end_at,omitempty"`
-	EndLabel      string `json:"end_label,omitempty"`
-	DurationSec   *int64 `json:"duration_sec,omitempty"`
-	SourceService string `json:"source_service"`
-}
-
-//nolint:tagliatelle // ErrRecord is a stable external snake_case JSON schema.
-type ErrRecord struct {
-	Service string `json:"service"`
-	Region  string `json:"region"`
-	Message string `json:"message"`
-}
-
-func WriteJSON(path string, out *Output) (retErr error) {
-	cleanPath := filepath.Clean(path)
-	f, err := os.Create(cleanPath) // #nosec G304 -- validated application output path
-	if err != nil {
-		return fmt.Errorf("create json file: %w", err)
-	}
-	defer func() {
-		if closeErr := f.Close(); closeErr != nil && retErr == nil {
-			retErr = fmt.Errorf("close json file: %w", closeErr)
-		}
-	}()
-
-	enc := json.NewEncoder(f)
-	enc.SetIndent("", "  ")
-	if encodeErr := enc.Encode(out); encodeErr != nil {
-		return fmt.Errorf("encode json: %w", encodeErr)
-	}
-	return nil
-}
-
-func WriteSlotRunIssuesCSV(path string, out *Output) (retErr error) {
-	cleanPath := filepath.Clean(path)
-	f, err := os.Create(cleanPath) // #nosec G304 -- validated application output path
-	if err != nil {
-		return fmt.Errorf("create slot run issues csv file: %w", err)
-	}
-	defer func() {
-		if closeErr := f.Close(); closeErr != nil && retErr == nil {
-			retErr = fmt.Errorf("close slot run issues csv file: %w", closeErr)
-		}
-	}()
-
-	w := csv.NewWriter(f)
-	defer w.Flush()
-
-	header := []string{"schedule_id", "schedule_name", "region", "target_service", "slot_index", "slot_label", "reason", "runs_capped"}
-	if writeErr := w.Write(header); writeErr != nil {
-		return fmt.Errorf("write csv header: %w", writeErr)
-	}
-
-	for i := range out.Schedules {
-		s := out.Schedules[i]
-		for j := range s.SlotRunIssues {
-			issue := s.SlotRunIssues[j]
-			row := []string{
-				s.ID,
-				s.ScheduleName,
-				s.Region,
-				s.TargetService,
-				strconv.Itoa(issue.SlotIndex),
-				issue.SlotLabel,
-				issue.Reason,
-				strconv.FormatBool(s.RunsCapped),
-			}
-			if writeErr := w.Write(row); writeErr != nil {
-				return fmt.Errorf("write csv row: %w", writeErr)
-			}
-		}
-	}
-
-	if flushErr := w.Error(); flushErr != nil {
-		return fmt.Errorf("flush csv writer: %w", flushErr)
-	}
-
-	return nil
-}
 
 const errorsHTMLTemplate = `<!doctype html>
 <html lang="en">
@@ -240,34 +76,135 @@ const errorsHTMLTemplate = `<!doctype html>
 </body>
 </html>`
 
-func WriteErrorsHTML(path string, out *Output) (retErr error) {
-	tpl, err := template.New("errors").Parse(errorsHTMLTemplate)
-	if err != nil {
-		return fmt.Errorf("parse errors html template: %w", err)
-	}
+//go:embed html_template.html
+var htmlTemplate string
 
-	cleanPath := filepath.Clean(path)
-	f, err := os.Create(cleanPath) // #nosec G304 -- validated application output path
-	if err != nil {
-		return fmt.Errorf("create errors html file: %w", err)
-	}
-	defer func() {
-		if closeErr := f.Close(); closeErr != nil && retErr == nil {
-			retErr = fmt.Errorf("close errors html file: %w", closeErr)
-		}
-	}()
+//go:embed assets/icons/*.svg
+var iconAssets embed.FS
 
-	if execErr := tpl.Execute(f, out); execErr != nil {
-		return fmt.Errorf("render errors html file: %w", execErr)
-	}
-
-	return nil
+var observableTargetKinds = map[string]struct{}{
+	"batch":         {},
+	"ecs":           {},
+	"glue":          {},
+	"lambda":        {},
+	"redshift":      {},
+	"stepfunctions": {},
 }
 
+// AlignmentIssue reports a collected run that could not be aligned with an expected slot.
+//
+//nolint:tagliatelle // AlignmentIssue is a stable external snake_case JSON schema.
+type AlignmentIssue struct {
+	ScheduleID   string `json:"schedule_id"`
+	ScheduleName string `json:"schedule_name"`
+	RunID        string `json:"run_id"`
+	RunStartAt   string `json:"run_start_at"`
+	RunEndAt     string `json:"run_end_at,omitempty"`
+	Reason       string `json:"reason"`
+}
+
+// BuildOutputOptions controls optional output shaping behavior.
+type BuildOutputOptions struct {
+	IncludeNonSlotRuns bool
+}
+
+// ErrRecord is the rendered soft-error record emitted during collection.
+//
+//nolint:tagliatelle // ErrRecord is a stable external snake_case JSON schema.
+type ErrRecord struct {
+	Service string `json:"service"`
+	Region  string `json:"region"`
+	Message string `json:"message"`
+}
+
+// Output is the top-level serialized document consumed by the HTML viewer and JSON export.
+//
+//nolint:tagliatelle // Output is a stable external snake_case JSON schema.
+type Output struct {
+	Version     string           `json:"version"`
+	GeneratedAt string           `json:"generated_at"`
+	AccountName string           `json:"account_name,omitempty"`
+	AccountID   string           `json:"account_id"`
+	Timezone    string           `json:"timezone"`
+	Schedules   []Schedule       `json:"schedules"`
+	Alignment   []AlignmentIssue `json:"alignment_issues,omitempty"`
+	Errors      []ErrRecord      `json:"errors"`
+	Window      Window           `json:"window"`
+}
+
+// Run is the rendered execution record associated with a schedule.
+//
+//nolint:tagliatelle // Run is a stable external snake_case JSON schema.
+type Run struct {
+	RunID         string `json:"run_id"`
+	Status        string `json:"status"`
+	StartAt       string `json:"start_at,omitempty"`
+	StartLabel    string `json:"start_label,omitempty"`
+	EndAt         string `json:"end_at,omitempty"`
+	EndLabel      string `json:"end_label,omitempty"`
+	DurationSec   *int64 `json:"duration_sec,omitempty"`
+	SourceService string `json:"source_service"`
+}
+
+// Schedule is the rendered schedule view model used by JSON and HTML outputs.
+//
+//nolint:tagliatelle // Schedule is a stable external snake_case JSON schema.
+type Schedule struct {
+	TargetAction               string         `json:"target_action,omitempty"`
+	ID                         string         `json:"id"`
+	Description                string         `json:"description,omitempty"`
+	ScheduleGroupName          string         `json:"schedule_group_name,omitempty"`
+	ScheduleName               string         `json:"schedule_name"`
+	ScheduleExpression         string         `json:"schedule_expression"`
+	ScheduleExpressionTimezone string         `json:"schedule_expression_timezone,omitempty"`
+	ScheduleExpressionTZLabel  string         `json:"schedule_expression_timezone_label,omitempty"`
+	NextInvocationAt           string         `json:"next_invocation_at,omitempty"`
+	NextInvocationLabel        string         `json:"next_invocation_label,omitempty"`
+	Service                    string         `json:"service"`
+	TargetKind                 string         `json:"target_kind"`
+	TargetID                   string         `json:"target_id,omitempty"`
+	TargetName                 string         `json:"target_name,omitempty"`
+	TargetService              string         `json:"target_service"`
+	Region                     string         `json:"region"`
+	TargetARN                  string         `json:"target_arn"`
+	RunInSlotCategory          string         `json:"run_in_slot_category"`
+	TriggerType                string         `json:"trigger_type"`
+	TriggerLabel               string         `json:"trigger_label"`
+	Runs                       []Run          `json:"runs"`
+	SlotRunIssues              []SlotRunIssue `json:"slot_run_issues,omitempty"`
+	DisplaySlots               []int          `json:"display_slots,omitempty"`
+	Slots                      []int          `json:"slots"`
+	ExpectedInWindow           bool           `json:"expected_in_window"`
+	Enabled                    bool           `json:"enabled"`
+	RunsCapped                 bool           `json:"runs_capped,omitempty"`
+}
+
+// SlotRunIssue describes a schedule slot that did not map cleanly to collected runs.
+//
+//nolint:tagliatelle // SlotRunIssue is a stable external snake_case JSON schema.
+type SlotRunIssue struct {
+	SlotLabel string `json:"slot_label"`
+	Reason    string `json:"reason"`
+	SlotIndex int    `json:"slot_index"`
+}
+
+// Window describes the rendered timeline range and slot labels.
+//
+//nolint:tagliatelle // Window is a stable external snake_case JSON schema.
+type Window struct {
+	Start       string   `json:"start"`
+	End         string   `json:"end"`
+	HourLabels  []string `json:"hour_labels,omitempty"`
+	SlotLabels  []string `json:"slot_labels,omitempty"`
+	SlotMinutes int      `json:"slot_minutes"`
+}
+
+// BuildOutput renders the default output document for the given schedules and errors.
 func BuildOutput(accountID string, now, since time.Time, loc *time.Location, schedules []resources.Schedule, errs []resources.ErrorRecord) Output {
 	return BuildOutputWithOptions(accountID, now, since, loc, schedules, errs, BuildOutputOptions{})
 }
 
+// BuildOutputWithOptions renders the output document with optional view-model adjustments.
 func BuildOutputWithOptions(accountID string, now, since time.Time, loc *time.Location, schedules []resources.Schedule, errs []resources.ErrorRecord, options BuildOutputOptions) Output {
 	// Anchor the window to the local calendar day of `since` (lookback start).
 	// With the default 24h lookback, this shows the previous day's full timeline.
@@ -434,15 +371,6 @@ func buildSlotRunIssues(slots []int, runs []Run, windowStart time.Time, reason s
 func isObservableTargetKind(targetKind string, observableKinds map[string]struct{}) bool {
 	_, ok := observableKinds[strings.ToLower(strings.TrimSpace(targetKind))]
 	return ok
-}
-
-var observableTargetKinds = map[string]struct{}{
-	"batch":         {},
-	"ecs":           {},
-	"glue":          {},
-	"lambda":        {},
-	"redshift":      {},
-	"stepfunctions": {},
 }
 
 func scheduleExpectedInWindow(expression, expressionTimezone string, windowStart, windowEnd time.Time) bool {
@@ -669,9 +597,38 @@ func formatUTCOffset(offsetSeconds int) string {
 	return helpers.FormatUTCOffset(offsetSeconds)
 }
 
+// WriteErrorsHTML writes the error report page for a rendered output document.
+func WriteErrorsHTML(path string, out *Output) (retErr error) {
+	tpl, err := template.New("errors").Parse(errorsHTMLTemplate)
+	if err != nil {
+		return fmt.Errorf("parse errors html template: %w", err)
+	}
+
+	cleanPath := filepath.Clean(path)
+	f, err := os.Create(cleanPath) // #nosec G304 -- validated application output path
+	if err != nil {
+		return fmt.Errorf("create errors html file: %w", err)
+	}
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil && retErr == nil {
+			retErr = fmt.Errorf("close errors html file: %w", closeErr)
+		}
+	}()
+
+	if execErr := tpl.Execute(f, out); execErr != nil {
+		return fmt.Errorf("render errors html file: %w", execErr)
+	}
+
+	return nil
+}
+
+// WriteHTML writes the interactive HTML timeline for a rendered output document.
 func WriteHTML(path string, out *Output) (retErr error) {
-	// Output contains only string/struct/slice fields; json.Marshal is guaranteed to succeed.
-	b, _ := json.Marshal(out)
+	//nolint:errchkjson // Keep explicit error handling to satisfy the project rule that errors must not be ignored.
+	b, err := json.Marshal(out)
+	if err != nil {
+		return fmt.Errorf("marshal html payload: %w", err)
+	}
 
 	html := htmlTemplate
 	html = strings.ReplaceAll(html, "@@INDEX_TITLE@@", "ABSC Cron Timeline")
@@ -694,6 +651,75 @@ func WriteHTML(path string, out *Output) (retErr error) {
 
 	if iconErr := writeIconAssets(filepath.Dir(cleanPath)); iconErr != nil {
 		return fmt.Errorf("write html assets: %w", iconErr)
+	}
+
+	return nil
+}
+
+// WriteJSON writes the JSON representation of a rendered output document.
+func WriteJSON(path string, out *Output) (retErr error) {
+	cleanPath := filepath.Clean(path)
+	f, err := os.Create(cleanPath) // #nosec G304 -- validated application output path
+	if err != nil {
+		return fmt.Errorf("create json file: %w", err)
+	}
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil && retErr == nil {
+			retErr = fmt.Errorf("close json file: %w", closeErr)
+		}
+	}()
+
+	enc := json.NewEncoder(f)
+	enc.SetIndent("", "  ")
+	if encodeErr := enc.Encode(out); encodeErr != nil {
+		return fmt.Errorf("encode json: %w", encodeErr)
+	}
+	return nil
+}
+
+// WriteSlotRunIssuesCSV writes slot/run mismatch diagnostics as CSV.
+func WriteSlotRunIssuesCSV(path string, out *Output) (retErr error) {
+	cleanPath := filepath.Clean(path)
+	f, err := os.Create(cleanPath) // #nosec G304 -- validated application output path
+	if err != nil {
+		return fmt.Errorf("create slot run issues csv file: %w", err)
+	}
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil && retErr == nil {
+			retErr = fmt.Errorf("close slot run issues csv file: %w", closeErr)
+		}
+	}()
+
+	w := csv.NewWriter(f)
+	defer w.Flush()
+
+	header := []string{"schedule_id", "schedule_name", "region", "target_service", "slot_index", "slot_label", "reason", "runs_capped"}
+	if writeErr := w.Write(header); writeErr != nil {
+		return fmt.Errorf("write csv header: %w", writeErr)
+	}
+
+	for i := range out.Schedules {
+		s := out.Schedules[i]
+		for j := range s.SlotRunIssues {
+			issue := s.SlotRunIssues[j]
+			row := []string{
+				s.ID,
+				s.ScheduleName,
+				s.Region,
+				s.TargetService,
+				strconv.Itoa(issue.SlotIndex),
+				issue.SlotLabel,
+				issue.Reason,
+				strconv.FormatBool(s.RunsCapped),
+			}
+			if writeErr := w.Write(row); writeErr != nil {
+				return fmt.Errorf("write csv row: %w", writeErr)
+			}
+		}
+	}
+
+	if flushErr := w.Error(); flushErr != nil {
+		return fmt.Errorf("flush csv writer: %w", flushErr)
 	}
 
 	return nil

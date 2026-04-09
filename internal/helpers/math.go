@@ -5,6 +5,7 @@ package helpers
 
 const maxInt32Value = 1<<31 - 1
 
+// SafeInt32 clamps an int into the non-negative int32 range.
 func SafeInt32(value int) int32 {
 	if value < 0 {
 		return 0

@@ -29,6 +29,7 @@ const (
 	// Account and ARN parsing defaults keep CLI behavior explicit.
 	accountIDUnknown      = "unknown"
 	accountIndex          = 4
+	accountNameFlagName   = "account-name"
 	arnSplitParts         = 6
 	dayDuration           = 24 * time.Hour
 	daysAgoFlagName       = "days-ago"
@@ -60,7 +61,7 @@ const (
 
 // Build-time version information injected by GoReleaser via ldflags.
 var (
-	version = "v1.0.13"
+	version = "v1.0.14"
 )
 
 var (
@@ -165,6 +166,7 @@ func newApp(l *logger.SlogLogger) *cli.App {
 			&cli.IntFlag{Name: maxConcurrencyFlagName, Usage: "Max concurrent resource collectors", Value: defaultMaxConcurrency},
 			&cli.IntFlag{Name: maxResultsFlagName, Usage: "Max executions/jobs per target", Value: defaultMaxResults},
 			&cli.BoolFlag{Name: includeNonSlotRunsFlagName, Usage: "Include runs that do not overlap scheduled slots in output", Value: false},
+			&cli.BoolFlag{Name: accountNameFlagName, Usage: "Resolve account display name via account:GetAccountInformation", Value: false},
 			&cli.DurationFlag{Name: timeoutFlagName, Usage: "Overall command timeout", Value: defaultTimeout},
 		},
 		Action: func(c *cli.Context) error {
@@ -252,9 +254,13 @@ func runCommand(c *cli.Context, l *logger.SlogLogger) error {
 
 	l.Info("AWS identity", "identity", identityARN)
 	accountID := accountIDFromARN(identityARN)
-	accountName, accountNameErr := getAccountName(ctx, &cfg, accountID)
-	if accountNameErr != nil {
-		l.Warn("failed to fetch AWS account information", "account_id", accountID, "error", accountNameErr)
+	var accountName string
+	if c.Bool(accountNameFlagName) {
+		var accountNameErr error
+		accountName, accountNameErr = getAccountName(ctx, &cfg, accountID)
+		if accountNameErr != nil {
+			l.Warn("failed to fetch AWS account information", "account_id", accountID, "error", accountNameErr)
+		}
 	}
 
 	// Collect schedules first, then persist both JSON and HTML outputs.

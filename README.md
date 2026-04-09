@@ -50,12 +50,12 @@ ABSC generates an interactive HTML viewer that allows you to browse collected sc
 ### Using Go Install
 
 ```bash
-go install github.com/y-miyazaki/absc/cmd/absc@v1.0.13
+go install github.com/y-miyazaki/absc/cmd/absc@v1.0.14
 ```
 
 ### Using Release tar.gz
 
-You can download a prebuilt release tarball from the Releases page and install it quickly. The examples below use the `v1.0.13` release.
+You can download a prebuilt release tarball from the Releases page and install it quickly. The examples below use the `v1.0.14` release.
 
 Available platforms:
 
@@ -66,20 +66,20 @@ Available platforms:
 Linux (AMD64) example:
 
 ```bash
-VERSION=v1.0.13 && curl -L https://github.com/y-miyazaki/absc/releases/download/${VERSION}/absc-linux-amd64.tar.gz | tar -xzf - && sudo mv absc /usr/local/bin/ && sudo chmod +x /usr/local/bin/absc
+VERSION=v1.0.14 && curl -L https://github.com/y-miyazaki/absc/releases/download/${VERSION}/absc-linux-amd64.tar.gz | tar -xzf - && sudo mv absc /usr/local/bin/ && sudo chmod +x /usr/local/bin/absc
 ```
 
 macOS (ARM64) example:
 
 ```bash
-VERSION=v1.0.13 && curl -L https://github.com/y-miyazaki/absc/releases/download/${VERSION}/absc-darwin-arm64.tar.gz | tar -xzf - && sudo mv absc /usr/local/bin/ && sudo chmod +x /usr/local/bin/absc
+VERSION=v1.0.14 && curl -L https://github.com/y-miyazaki/absc/releases/download/${VERSION}/absc-darwin-arm64.tar.gz | tar -xzf - && sudo mv absc /usr/local/bin/ && sudo chmod +x /usr/local/bin/absc
 ```
 
 Notes:
 
 - The release typically ships an `absc-${VERSION}-checksums.txt` file. Verify the checksum before installing in production.
 - For Windows, download the `.zip` asset from the Releases page and extract the `absc.exe` binary.
-- `go install` is convenient for development. Release tarballs are preferable when you want a pinned binary such as `v1.0.13`.
+- `go install` is convenient for development. Release tarballs are preferable when you want a pinned binary such as `v1.0.14`.
 
 ### Build from Source
 
@@ -165,6 +165,7 @@ OPTIONS:
   --days-ago value            Calendar day offset (0=today, 1=yesterday) (default: 1)
    --max-concurrency value     Max concurrent resource collectors (default: 5)
     --max-results value         Max executions/jobs per target (default: 144)
+   --account-name              Resolve account display name via account:GetAccountInformation (default: false)
    --help, -h                  show help
 ```
 
@@ -342,9 +343,9 @@ If you prefer to separate permissions, the run-enrichment statement is:
 
 Notes:
 
-- `account:GetAccountInformation` is used to resolve the account display name shown as `accountName(accountID)` in generated HTML and error pages.
-- `account:GetAccountInformation` is recommended as part of the default policy because it is easy to miss and ABSC now uses it for standard account display metadata.
-- If you run ABSC from CI/CD or an assumed role, add `account:GetAccountInformation` to that role as well.
+- `account:GetAccountInformation` is used to resolve the account display name shown as `accountName(accountID)` in generated HTML and error pages. This API is only called when `--account-name` is enabled.
+- `account:GetAccountInformation` is only needed when `--account-name` is passed. You can omit it from the policy if you do not use this flag.
+- If you run ABSC from CI/CD or an assumed role and want account display names, add `account:GetAccountInformation` to that role and pass `--account-name`.
 - `cloudtrail:LookupEvents` is only needed for ECS backfill when stopped-task history is outside ECS API retention.
 - If you do not use run enrichment, the second policy block is not required.
 - You can scope resources more tightly per service where IAM supports resource-level restrictions.
@@ -399,9 +400,10 @@ jobs:
 
       # The assumed role should include account:GetAccountInformation
       # if you want the generated pages to show accountName(accountID).
+      # Pass --account-name to enable this feature.
 
       - name: Install absc
-        run: go install github.com/y-miyazaki/absc/cmd/absc@v1.0.13
+        run: go install github.com/y-miyazaki/absc/cmd/absc@v1.0.14
 
       - name: Collect schedules
         run: absc --timezone Asia/Tokyo

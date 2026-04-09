@@ -320,9 +320,10 @@ func TestRunCommand_Success(t *testing.T) {
 
 	baseDir := t.TempDir()
 	ctx := newTestContext(t, map[string]string{
-		outputDirFlagName: baseDir,
-		regionFlagName:    "ap-northeast-1,us-east-1",
-		timezoneFlagName:  "UTC",
+		outputDirFlagName:   baseDir,
+		regionFlagName:      "ap-northeast-1,us-east-1",
+		timezoneFlagName:    "UTC",
+		accountNameFlagName: "true",
 	})
 
 	if err := runCommand(ctx, testLogger()); err != nil {

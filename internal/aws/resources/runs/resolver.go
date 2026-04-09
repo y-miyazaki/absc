@@ -81,6 +81,13 @@ var supportedRunTargetKinds = func() []string {
 	return targetKinds
 }()
 
+// Resolver dispatches execution-history lookups to target-specific collectors.
+type Resolver struct {
+	collectors map[string]runCollector
+	region     string
+}
+
+// TargetHints carries service-specific identifiers that help run collectors refine lookups.
 type TargetHints struct {
 	EC2InstanceIDs       []string
 	ECSRoleARN           string
@@ -99,11 +106,6 @@ type runCollectorDeps struct {
 	ecsSvc   *ecs.Client
 	glueSvc  *glue.Client
 	stepSvc  *sfn.Client
-}
-
-type Resolver struct {
-	collectors map[string]runCollector
-	region     string
 }
 
 // NewResolver creates a new Resolver that fetches execution history for schedule targets.

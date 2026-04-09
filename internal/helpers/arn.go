@@ -5,6 +5,7 @@ package helpers
 
 import "strings"
 
+// ResourceNameFromARN extracts the trailing resource name from an ARN-like identifier.
 func ResourceNameFromARN(arn string) string {
 	if arn == "" {
 		return ""

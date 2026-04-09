@@ -78,6 +78,7 @@ var awsCronMonthAliases = map[string]int{
 	"DEC": awsCronDecember,
 }
 
+// BuildDailySlots expands an AWS cron or rate expression into one day's slot bitmap.
 func BuildDailySlots(expr string, slotMinutes int) []int {
 	slotsPerDay := dayMinutes / slotMinutes
 	slotsPerHour := minutesPerHour / slotMinutes
@@ -125,6 +126,7 @@ func BuildDailySlots(expr string, slotMinutes int) []int {
 	return slots
 }
 
+// MatchAWSCronExpression reports whether a timestamp matches the provided AWS cron fields.
 func MatchAWSCronExpression(fields []string, candidate time.Time) bool {
 	if len(fields) != awsCronFieldCount {
 		return false
@@ -168,6 +170,7 @@ func MatchAWSCronExpression(fields []string, candidate time.Time) bool {
 	return domMatch && dowMatch
 }
 
+// MatchCronField reports whether a single cron field matches the provided value.
 func MatchCronField(field string, value, minValue, maxValue int, aliases map[string]int) bool {
 	trimmed := strings.ToUpper(strings.TrimSpace(field))
 	if trimmed == "" {
@@ -185,6 +188,7 @@ func MatchCronField(field string, value, minValue, maxValue int, aliases map[str
 	return false
 }
 
+// MatchCronPart reports whether one cron token or token range matches the provided value.
 func MatchCronPart(part string, value, minValue, maxValue int, aliases map[string]int) bool {
 	if strings.Contains(part, awsCronSlashSeparator) {
 		pieces := strings.SplitN(part, awsCronSlashSeparator, awsCronSplitParts)
@@ -255,6 +259,7 @@ func MatchCronPart(part string, value, minValue, maxValue int, aliases map[strin
 	return ok && value == v
 }
 
+// ParseCronAtom parses a single cron atom using optional aliases.
 func ParseCronAtom(value string, aliases map[string]int) (int, bool) {
 	trimmed := strings.ToUpper(strings.TrimSpace(value))
 	if trimmed == "" {
@@ -272,6 +277,7 @@ func ParseCronAtom(value string, aliases map[string]int) (int, bool) {
 	return parsed, true
 }
 
+// ParseCronField expands a cron field into the discrete values it can match.
 func ParseCronField(field string, minValue, maxValue int) []int {
 	trimmed := strings.TrimSpace(field)
 	if trimmed == awsCronWildcard || trimmed == awsCronNoSpecific {

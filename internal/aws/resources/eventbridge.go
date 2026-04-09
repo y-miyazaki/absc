@@ -19,6 +19,7 @@ import (
 	"github.com/y-miyazaki/absc/internal/aws/resources/runs"
 )
 
+// EventBridgeCollector collects scheduled EventBridge rules in one region.
 type EventBridgeCollector struct {
 	batchSvc *batch.Client
 	ctSvc    *cloudtrail.Client

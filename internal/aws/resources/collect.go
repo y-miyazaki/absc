@@ -9,9 +9,10 @@ import (
 	resourcescore "github.com/y-miyazaki/absc/internal/aws/resources/core"
 )
 
-type CollectOptions = resourcescore.CollectOptions
-
 const defaultMaxConcurrency = 5
+
+// CollectOptions aliases the shared core collection options for resource collectors.
+type CollectOptions = resourcescore.CollectOptions
 
 // Collector is implemented by each AWS-backed schedule source.
 type Collector interface {
