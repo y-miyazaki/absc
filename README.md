@@ -12,7 +12,9 @@ It focuses on scheduled workloads managed by EventBridge Rules and EventBridge S
 ## Features
 
 - EventBridge Rules and EventBridge Scheduler collection across multiple regions
+- Event-pattern-based EventBridge Rules collection with run enrichment
 - Timeline-oriented HTML output for one-day schedule visibility
+- Trigger type column (Cron/Event) in the HTML viewer for schedule classification
 - JSON output for automation or secondary processing
 - Target service detection for Lambda, ECS, Batch, Glue, Step Functions, and more
 - Recent run enrichment for Step Functions, Batch, ECS, Glue, and Lambda
@@ -48,12 +50,12 @@ ABSC generates an interactive HTML viewer that allows you to browse collected sc
 ### Using Go Install
 
 ```bash
-go install github.com/y-miyazaki/absc/cmd/absc@v1.0.12
+go install github.com/y-miyazaki/absc/cmd/absc@v1.0.13
 ```
 
 ### Using Release tar.gz
 
-You can download a prebuilt release tarball from the Releases page and install it quickly. The examples below use the `v1.0.12` release.
+You can download a prebuilt release tarball from the Releases page and install it quickly. The examples below use the `v1.0.13` release.
 
 Available platforms:
 
@@ -64,20 +66,20 @@ Available platforms:
 Linux (AMD64) example:
 
 ```bash
-VERSION=v1.0.12 && curl -L https://github.com/y-miyazaki/absc/releases/download/${VERSION}/absc-linux-amd64.tar.gz | tar -xzf - && sudo mv absc /usr/local/bin/ && sudo chmod +x /usr/local/bin/absc
+VERSION=v1.0.13 && curl -L https://github.com/y-miyazaki/absc/releases/download/${VERSION}/absc-linux-amd64.tar.gz | tar -xzf - && sudo mv absc /usr/local/bin/ && sudo chmod +x /usr/local/bin/absc
 ```
 
 macOS (ARM64) example:
 
 ```bash
-VERSION=v1.0.12 && curl -L https://github.com/y-miyazaki/absc/releases/download/${VERSION}/absc-darwin-arm64.tar.gz | tar -xzf - && sudo mv absc /usr/local/bin/ && sudo chmod +x /usr/local/bin/absc
+VERSION=v1.0.13 && curl -L https://github.com/y-miyazaki/absc/releases/download/${VERSION}/absc-darwin-arm64.tar.gz | tar -xzf - && sudo mv absc /usr/local/bin/ && sudo chmod +x /usr/local/bin/absc
 ```
 
 Notes:
 
 - The release typically ships an `absc-${VERSION}-checksums.txt` file. Verify the checksum before installing in production.
 - For Windows, download the `.zip` asset from the Releases page and extract the `absc.exe` binary.
-- `go install` is convenient for development. Release tarballs are preferable when you want a pinned binary such as `v1.0.12`.
+- `go install` is convenient for development. Release tarballs are preferable when you want a pinned binary such as `v1.0.13`.
 
 ### Build from Source
 
@@ -172,7 +174,8 @@ OPTIONS:
 
 ABSC currently collects schedules from the following AWS sources:
 
-- EventBridge Rules with schedule expressions
+- EventBridge Rules with schedule expressions (cron/rate)
+- EventBridge Rules with event patterns (event-triggered)
 - EventBridge Scheduler schedules
 
 ### Target Classification
@@ -246,6 +249,7 @@ output/
 
 - Account metadata shown as `accountName(accountID)` when available
 - Service and region filters
+- Trigger type column showing Cron expression or Event rule name
 - Sticky schedule name column
 - 10-minute slots across a 24-hour window
 - Scheduled slot markers and actual run overlays
@@ -397,7 +401,7 @@ jobs:
       # if you want the generated pages to show accountName(accountID).
 
       - name: Install absc
-        run: go install github.com/y-miyazaki/absc/cmd/absc@v1.0.12
+        run: go install github.com/y-miyazaki/absc/cmd/absc@v1.0.13
 
       - name: Collect schedules
         run: absc --timezone Asia/Tokyo

@@ -105,6 +105,8 @@ type Schedule struct {
 	Region                     string         `json:"region"`
 	TargetARN                  string         `json:"target_arn"`
 	RunInSlotCategory          string         `json:"run_in_slot_category"`
+	TriggerType                string         `json:"trigger_type"`
+	TriggerLabel               string         `json:"trigger_label"`
 	Runs                       []Run          `json:"runs"`
 	SlotRunIssues              []SlotRunIssue `json:"slot_run_issues,omitempty"`
 	DisplaySlots               []int          `json:"display_slots,omitempty"`
@@ -330,7 +332,8 @@ func BuildOutputWithOptions(accountID string, now, since time.Time, loc *time.Lo
 		}
 
 		isObservableTarget := isObservableTargetKind(s.TargetKind, observableTargetKinds)
-		expectedInWindow := scheduleExpectedInWindow(s.ScheduleExpression, s.ScheduleExpressionTimezone, dayStart, windowEnd)
+		isEventTrigger := s.TriggerType == "event"
+		expectedInWindow := isEventTrigger || scheduleExpectedInWindow(s.ScheduleExpression, s.ScheduleExpressionTimezone, dayStart, windowEnd)
 		runInSlotCategory := runInSlotCategoryObservable
 		if !isObservableTarget {
 			runInSlotCategory = runInSlotCategoryNotObservable
@@ -374,6 +377,8 @@ func BuildOutputWithOptions(accountID string, now, since time.Time, loc *time.Lo
 			ExpectedInWindow:           expectedInWindow,
 			RunInSlotCategory:          runInSlotCategory,
 			RunsCapped:                 s.RunsCapped,
+			TriggerType:                s.TriggerType,
+			TriggerLabel:               s.TriggerLabel,
 			Runs:                       runs,
 		})
 

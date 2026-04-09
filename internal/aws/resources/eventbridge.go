@@ -3,6 +3,7 @@ package resources
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -66,8 +67,15 @@ func (c *EventBridgeCollector) Collect(ctx context.Context, opts CollectOptions)
 		for ruleIndex := range page.Rules {
 			r := page.Rules[ruleIndex]
 			expr := aws.ToString(r.ScheduleExpression)
-			if expr == "" {
+			eventPattern := aws.ToString(r.EventPattern)
+			if expr == "" && eventPattern == "" {
 				continue
+			}
+			triggerType := "cron"
+			triggerLabel := expr
+			if expr == "" {
+				triggerType = "event"
+				triggerLabel = eventPatternSourceLabel(eventPattern, aws.ToString(r.Name))
 			}
 			enabled := strings.EqualFold(string(r.State), "ENABLED")
 			allTargets := make([]eventbridgetypes.Target, 0)
@@ -102,6 +110,8 @@ func (c *EventBridgeCollector) Collect(ctx context.Context, opts CollectOptions)
 					TargetKind:         "other",
 					TargetService:      "Other",
 					NextInvocationAt:   "",
+					TriggerType:        triggerType,
+					TriggerLabel:       triggerLabel,
 					Slots:              buildSlots(expr),
 					Runs:               make([]Run, 0),
 				})
@@ -136,6 +146,8 @@ func (c *EventBridgeCollector) Collect(ctx context.Context, opts CollectOptions)
 					TargetID:           targetID,
 					TargetName:         targetName,
 					NextInvocationAt:   "",
+					TriggerType:        triggerType,
+					TriggerLabel:       triggerLabel,
 					Slots:              buildSlots(expr),
 					Runs:               make([]Run, 0),
 				}
@@ -158,6 +170,36 @@ func (c *EventBridgeCollector) Collect(ctx context.Context, opts CollectOptions)
 		nextToken = page.NextToken
 	}
 	return schedules, errs
+}
+
+// eventPatternSourceLabel extracts source values from an EventPattern JSON.
+// Falls back to the rule name when source cannot be determined.
+func eventPatternSourceLabel(pattern, ruleName string) string {
+	if pattern == "" {
+		return ruleName
+	}
+	var m map[string]any
+	if err := json.Unmarshal([]byte(pattern), &m); err != nil {
+		return ruleName
+	}
+	srcVal, ok := m["source"]
+	if !ok {
+		return ruleName
+	}
+	arr, ok := srcVal.([]any)
+	if !ok || len(arr) == 0 {
+		return ruleName
+	}
+	parts := make([]string, 0, len(arr))
+	for _, v := range arr {
+		if s, isStr := v.(string); isStr && s != "" {
+			parts = append(parts, s)
+		}
+	}
+	if len(parts) == 0 {
+		return ruleName
+	}
+	return strings.Join(parts, ", ")
 }
 
 func resolveEventBridgeTargetDisplay(target *eventbridgetypes.Target, targetService, targetARN string) (targetName, targetID string) {

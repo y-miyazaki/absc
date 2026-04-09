@@ -6,6 +6,7 @@ import "time"
 const SlotsPerDay = 144
 
 type CollectOptions struct {
+	ReferenceTime  time.Time
 	Since          time.Time
 	Until          time.Time
 	Regions        []string
@@ -44,6 +45,8 @@ type Schedule struct {
 	ID                         string
 	TargetService              string
 	TargetARN                  string
+	TriggerType                string // "cron" or "event"
+	TriggerLabel               string // cron expression or event rule name
 	Slots                      []int
 	Runs                       []Run
 	Enabled                    bool

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/batch"
@@ -65,7 +64,7 @@ func (*SchedulerCollector) Name() string {
 func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) ([]Schedule, []ErrorRecord) {
 	schedules := make([]Schedule, 0)
 	errs := make([]ErrorRecord, 0)
-	nowUTC := time.Now().UTC()
+	nowUTC := opts.ReferenceTime.UTC()
 	resolver := runs.NewResolver(c.region, c.stepSvc, c.batchSvc, c.ctSvc, c.ecsSvc, c.glueSvc, c.cwlSvc)
 
 	p := scheduler.NewListSchedulesPaginator(c.svc, &scheduler.ListSchedulesInput{})
@@ -122,13 +121,14 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 					runTargetARN = fmt.Sprintf("arn:aws:states:%s:%s:stateMachine:%s", c.region, accountID, targetName)
 				}
 				nextInvocationAt := computeSchedulerNextInvocation(detail, nowUTC)
+				scheduleExpr := aws.ToString(detail.ScheduleExpression)
 				s := Schedule{
 					ID:                         fmt.Sprintf("eventbridge_scheduler:%s:%s", c.region, aws.ToString(detail.Name)),
 					Service:                    "eventbridge_scheduler",
 					Description:                aws.ToString(detail.Description),
 					ScheduleGroupName:          aws.ToString(detail.GroupName),
 					ScheduleName:               aws.ToString(detail.Name),
-					ScheduleExpression:         aws.ToString(detail.ScheduleExpression),
+					ScheduleExpression:         scheduleExpr,
 					ScheduleExpressionTimezone: aws.ToString(detail.ScheduleExpressionTimezone),
 					Enabled:                    enabled,
 					Region:                     c.region,
@@ -139,7 +139,9 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 					TargetID:                   targetID,
 					TargetName:                 targetName,
 					NextInvocationAt:           nextInvocationAt,
-					Slots:                      buildSlots(aws.ToString(detail.ScheduleExpression)),
+					TriggerType:                "cron",
+					TriggerLabel:               scheduleExpr,
+					Slots:                      buildSlots(scheduleExpr),
 					Runs:                       make([]Run, 0),
 				}
 				if runErr := resolver.PopulateScheduleRuns(ctx, &s, runTargetARN, runJobName, hints, opts); runErr != nil {
@@ -153,13 +155,14 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 			targetName := resolveSchedulerTargetName(targetARN, "", runTargetARN)
 			targetAction := detectTargetAction(targetARN)
 			nextInvocationAt := computeSchedulerNextInvocation(detail, nowUTC)
+			scheduleExpr := aws.ToString(detail.ScheduleExpression)
 			s := Schedule{
 				ID:                         fmt.Sprintf("eventbridge_scheduler:%s:%s", c.region, aws.ToString(detail.Name)),
 				Service:                    "eventbridge_scheduler",
 				Description:                aws.ToString(detail.Description),
 				ScheduleGroupName:          aws.ToString(detail.GroupName),
 				ScheduleName:               aws.ToString(detail.Name),
-				ScheduleExpression:         aws.ToString(detail.ScheduleExpression),
+				ScheduleExpression:         scheduleExpr,
 				ScheduleExpressionTimezone: aws.ToString(detail.ScheduleExpressionTimezone),
 				Enabled:                    enabled,
 				Region:                     c.region,
@@ -170,7 +173,9 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 				TargetID:                   "",
 				TargetName:                 targetName,
 				NextInvocationAt:           nextInvocationAt,
-				Slots:                      buildSlots(aws.ToString(detail.ScheduleExpression)),
+				TriggerType:                "cron",
+				TriggerLabel:               scheduleExpr,
+				Slots:                      buildSlots(scheduleExpr),
 				Runs:                       make([]Run, 0),
 			}
 			if runErr := resolver.PopulateScheduleRuns(ctx, &s, runTargetARN, runJobName, hints, opts); runErr != nil {

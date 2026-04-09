@@ -60,7 +60,7 @@ const (
 
 // Build-time version information injected by GoReleaser via ldflags.
 var (
-	version = "v1.0.12"
+	version = "v1.0.13"
 )
 
 var (
@@ -263,6 +263,7 @@ func runCommand(c *cli.Context, l *logger.SlogLogger) error {
 	schedules, errs := collectSchedules(ctx, &cfg, resources.CollectOptions{
 		MaxConcurrency: c.Int(maxConcurrencyFlagName),
 		MaxResults:     c.Int(maxResultsFlagName),
+		ReferenceTime:  now,
 		Regions:        regions,
 		Since:          since,
 		Until:          since.Add(defaultWindowDays * dayDuration),

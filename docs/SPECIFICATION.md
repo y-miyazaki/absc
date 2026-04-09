@@ -75,8 +75,15 @@ Both arrays contain 144 integers and are always relative to the display timezone
 
 ABSC collects schedules from two sources.
 
-- EventBridge Rules — only rules with schedule expressions are collected.
+- EventBridge Rules — rules with schedule expressions (cron/rate) and rules with event patterns are both collected.
 - EventBridge Scheduler — all schedules including one-time `at()` expressions.
+
+Each collected schedule carries a `trigger_type` field:
+
+- `cron` — the schedule fires on a time-based expression (cron, rate, or at).
+- `event` — the schedule fires in response to an event pattern match.
+
+Event-based rules have no schedule expression, so their slot arrays are all zeros. Run enrichment still applies to event-based rules when the target service supports it.
 
 ### Concurrency
 
@@ -203,6 +210,8 @@ The `expected_in_window` field indicates whether the schedule expression is expe
 For `cron()` expressions, detection works by scanning every minute from the window start to the window end in the schedule expression timezone and testing the cron expression against each candidate. If any minute matches, `expected_in_window = true`.
 
 For `rate()` and `at()` expressions, `expected_in_window` is always `true` because rate intervals are assumed to be continuous and one-time expressions are assumed to fall within any given day.
+
+For event-based rules (no schedule expression), `expected_in_window` is always `true` because event triggers are non-deterministic and may fire at any time.
 
 If the cron expression cannot be parsed (wrong field count, unknown syntax), `expected_in_window` defaults to `true` to avoid silently suppressing slot issues for malformed expressions.
 

@@ -20,6 +20,7 @@
       --region-col-width: 130px;
       --description-col-width: 280px;
       --target-col-width: 320px;
+      --trigger-col-width: 280px;
     }
     body { margin: 0; font-family: "Noto Sans", "Segoe UI", sans-serif; color: var(--text); background: radial-gradient(circle at 10% 0%, #e4f4f3, var(--bg) 35%); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
     header { padding: 16px 20px; border-bottom: 1px solid #d5dde3; background: #ffffffcc; backdrop-filter: blur(6px); flex-shrink: 0; }
@@ -137,21 +138,27 @@
     .timeline { position: relative; border: 1px solid #d7e0e7; background: var(--panel); border-radius: 12px; overflow: auto; flex: 1; min-height: 0; padding-bottom: 4px; box-sizing: border-box; }
     .row {
       display: grid;
-      grid-template-columns: var(--schedule-col-width) var(--region-col-width) repeat(144, 14px);
+      grid-template-columns: var(--schedule-col-width) repeat(144, 14px);
       border-bottom: 1px solid #eef2f5;
       min-height: 20px;
       width: max-content;
       min-width: max-content;
     }
-    .timeline.show-description .row {
-      grid-template-columns: var(--schedule-col-width) var(--region-col-width) var(--description-col-width) repeat(144, 14px);
-    }
-    .timeline.show-target .row {
-      grid-template-columns: var(--schedule-col-width) var(--region-col-width) var(--target-col-width) repeat(144, 14px);
-    }
-    .timeline.show-description.show-target .row {
-      grid-template-columns: var(--schedule-col-width) var(--region-col-width) var(--description-col-width) var(--target-col-width) repeat(144, 14px);
-    }
+    .timeline.show-region .row { grid-template-columns: var(--schedule-col-width) var(--region-col-width) repeat(144, 14px); }
+    .timeline.show-description .row { grid-template-columns: var(--schedule-col-width) var(--description-col-width) repeat(144, 14px); }
+    .timeline.show-trigger .row { grid-template-columns: var(--schedule-col-width) var(--trigger-col-width) repeat(144, 14px); }
+    .timeline.show-target .row { grid-template-columns: var(--schedule-col-width) var(--target-col-width) repeat(144, 14px); }
+    .timeline.show-region.show-description .row { grid-template-columns: var(--schedule-col-width) var(--region-col-width) var(--description-col-width) repeat(144, 14px); }
+    .timeline.show-region.show-trigger .row { grid-template-columns: var(--schedule-col-width) var(--region-col-width) var(--trigger-col-width) repeat(144, 14px); }
+    .timeline.show-region.show-target .row { grid-template-columns: var(--schedule-col-width) var(--region-col-width) var(--target-col-width) repeat(144, 14px); }
+    .timeline.show-description.show-trigger .row { grid-template-columns: var(--schedule-col-width) var(--description-col-width) var(--trigger-col-width) repeat(144, 14px); }
+    .timeline.show-description.show-target .row { grid-template-columns: var(--schedule-col-width) var(--description-col-width) var(--target-col-width) repeat(144, 14px); }
+    .timeline.show-trigger.show-target .row { grid-template-columns: var(--schedule-col-width) var(--trigger-col-width) var(--target-col-width) repeat(144, 14px); }
+    .timeline.show-region.show-description.show-trigger .row { grid-template-columns: var(--schedule-col-width) var(--region-col-width) var(--description-col-width) var(--trigger-col-width) repeat(144, 14px); }
+    .timeline.show-region.show-description.show-target .row { grid-template-columns: var(--schedule-col-width) var(--region-col-width) var(--description-col-width) var(--target-col-width) repeat(144, 14px); }
+    .timeline.show-region.show-trigger.show-target .row { grid-template-columns: var(--schedule-col-width) var(--region-col-width) var(--trigger-col-width) var(--target-col-width) repeat(144, 14px); }
+    .timeline.show-description.show-trigger.show-target .row { grid-template-columns: var(--schedule-col-width) var(--description-col-width) var(--trigger-col-width) var(--target-col-width) repeat(144, 14px); }
+    .timeline.show-region.show-description.show-trigger.show-target .row { grid-template-columns: var(--schedule-col-width) var(--region-col-width) var(--description-col-width) var(--trigger-col-width) var(--target-col-width) repeat(144, 14px); }
     .row.head { position: sticky; top: 0; background: #f3f8f8; z-index: 25; box-shadow: 0 1px 0 #dde3e7; }
     .left-col {
       padding: 4px 8px;
@@ -254,6 +261,10 @@
               <div class="control-value"><select id="regionFilter"></select></div>
             </div>
             <div class="control-row">
+              <div class="control-label">Trigger</div>
+              <div class="control-value"><select id="triggerFilter"></select></div>
+            </div>
+            <div class="control-row">
               <div class="control-label">Run Status</div>
               <div class="control-value">
                 <select id="runStatusFilter">
@@ -273,24 +284,24 @@
           <h4>Display</h4>
           <div class="controls">
             <div class="control-row">
-              <div class="control-label">Schedule Width</div>
+              <div class="control-label">Schedule</div>
               <div class="control-value"><input id="nameWidth" type="range" min="220" max="640" step="10" value="420" /> <span id="nameWidthValue">420px</span></div>
             </div>
-            <div id="descriptionWidthWrap" class="control-row" style="display:none">
-              <div class="control-label">Description Width</div>
-              <div class="control-value"><input id="descriptionWidth" type="range" min="180" max="720" step="10" value="280" /> <span id="descriptionWidthValue">280px</span></div>
+            <div id="regionRowWrap" class="control-row">
+              <div class="control-label">Region</div>
+              <div class="control-value"><label><input id="showRegion" type="checkbox" checked /></label> <input id="regionWidth" type="range" min="80" max="300" step="10" value="130" /> <span id="regionWidthValue">130px</span></div>
             </div>
-            <div id="targetWidthWrap" class="control-row" style="display:none">
-              <div class="control-label">Target Width</div>
-              <div class="control-value"><input id="targetWidth" type="range" min="180" max="720" step="10" value="320" /> <span id="targetWidthValue">320px</span></div>
-            </div>
-            <div id="descriptionToggleWrap" class="control-row checkbox-row" style="display:none">
+            <div id="descriptionRowWrap" class="control-row" style="display:none">
               <div class="control-label">Description</div>
-              <label class="control-value"><input id="showDescription" type="checkbox" checked /> Show Description</label>
+              <div class="control-value"><label><input id="showDescription" type="checkbox" checked /></label> <input id="descriptionWidth" type="range" min="180" max="720" step="10" value="280" /> <span id="descriptionWidthValue">280px</span></div>
             </div>
-            <div id="targetToggleWrap" class="control-row checkbox-row" style="display:none">
+            <div id="triggerRowWrap" class="control-row" style="display:none">
+              <div class="control-label">Trigger</div>
+              <div class="control-value"><label><input id="showTrigger" type="checkbox" checked /></label> <input id="triggerWidth" type="range" min="180" max="720" step="10" value="280" /> <span id="triggerWidthValue">280px</span></div>
+            </div>
+            <div id="targetRowWrap" class="control-row" style="display:none">
               <div class="control-label">Target</div>
-              <label class="control-value"><input id="showTarget" type="checkbox" checked /> Show Target</label>
+              <div class="control-value"><label><input id="showTarget" type="checkbox" checked /></label> <input id="targetWidth" type="range" min="180" max="720" step="10" value="320" /> <span id="targetWidthValue">320px</span></div>
             </div>
           </div>
         </section>
@@ -344,17 +355,25 @@ function loadSettings() {
 }
 
 function saveSettings() {
+  const showRegion = document.getElementById('showRegion');
   const showDescription = document.getElementById('showDescription');
+  const showTrigger = document.getElementById('showTrigger');
   const showTarget = document.getElementById('showTarget');
   const nameWidth = document.getElementById('nameWidth');
+  const regionWidth = document.getElementById('regionWidth');
   const descriptionWidth = document.getElementById('descriptionWidth');
+  const triggerWidth = document.getElementById('triggerWidth');
   const targetWidth = document.getElementById('targetWidth');
 
   const payload = {
+    showRegion: !!(showRegion && showRegion.checked),
     showDescription: !!(showDescription && showDescription.checked),
+    showTrigger: !!(showTrigger && showTrigger.checked),
     showTarget: !!(showTarget && showTarget.checked),
     nameWidth: nameWidth ? nameWidth.value : '420',
+    regionWidth: regionWidth ? regionWidth.value : '130',
     descriptionWidth: descriptionWidth ? descriptionWidth.value : '280',
+    triggerWidth: triggerWidth ? triggerWidth.value : '280',
     targetWidth: targetWidth ? targetWidth.value : '320'
   };
 
@@ -367,14 +386,26 @@ function saveSettings() {
 
 function restoreSettings() {
   const settings = loadSettings();
+  const showRegion = document.getElementById('showRegion');
   const showDescription = document.getElementById('showDescription');
+  const showTrigger = document.getElementById('showTrigger');
   const showTarget = document.getElementById('showTarget');
   const nameWidth = document.getElementById('nameWidth');
+  const regionWidth = document.getElementById('regionWidth');
   const descriptionWidth = document.getElementById('descriptionWidth');
+  const triggerWidth = document.getElementById('triggerWidth');
   const targetWidth = document.getElementById('targetWidth');
+  if (showRegion && typeof settings.showRegion === 'boolean') {
+    showRegion.checked = settings.showRegion;
+    showRegion.dataset.restored = '1';
+  }
   if (showDescription && typeof settings.showDescription === 'boolean') {
     showDescription.checked = settings.showDescription;
     showDescription.dataset.restored = '1';
+  }
+  if (showTrigger && typeof settings.showTrigger === 'boolean') {
+    showTrigger.checked = settings.showTrigger;
+    showTrigger.dataset.restored = '1';
   }
   if (showTarget && typeof settings.showTarget === 'boolean') {
     showTarget.checked = settings.showTarget;
@@ -383,8 +414,14 @@ function restoreSettings() {
   if (nameWidth && settings.nameWidth != null) {
     nameWidth.value = String(settings.nameWidth);
   }
+  if (regionWidth && settings.regionWidth != null) {
+    regionWidth.value = String(settings.regionWidth);
+  }
   if (descriptionWidth && settings.descriptionWidth != null) {
     descriptionWidth.value = String(settings.descriptionWidth);
+  }
+  if (triggerWidth && settings.triggerWidth != null) {
+    triggerWidth.value = String(settings.triggerWidth);
   }
   if (targetWidth && settings.targetWidth != null) {
     targetWidth.value = String(settings.targetWidth);
@@ -393,10 +430,14 @@ function restoreSettings() {
 
 function setupSettingsPersistence() {
   const ids = [
+    'showRegion',
     'showDescription',
+    'showTrigger',
     'showTarget',
     'nameWidth',
+    'regionWidth',
     'descriptionWidth',
+    'triggerWidth',
     'targetWidth'
   ];
   ids.forEach(id => {
@@ -411,11 +452,17 @@ function setupSettingsPersistence() {
 function buildFilters() {
   const service = document.getElementById('serviceFilter');
   const region = document.getElementById('regionFilter');
+  const trigger = document.getElementById('triggerFilter');
   const runStatus = document.getElementById('runStatusFilter');
   const services = unique(DATA.schedules.map(s => s.service));
   const regions = unique(DATA.schedules.map(s => s.region));
+  const triggers = unique(DATA.schedules.map(s => s.trigger_type || '').filter(v => v !== ''));
   service.innerHTML = '<option value="">all</option>' + services.map(v => '<option>' + v + '</option>').join('');
   region.innerHTML = '<option value="">all</option>' + regions.map(v => '<option>' + v + '</option>').join('');
+  if (trigger) {
+    trigger.innerHTML = '<option value="">all</option>' + triggers.map(v => '<option>' + v + '</option>').join('');
+    trigger.onchange = render;
+  }
   service.onchange = render;
   region.onchange = render;
   if (runStatus) runStatus.onchange = render;
@@ -426,8 +473,12 @@ function buildFilters() {
 function setupColumnWidthControls() {
   const scheduleSlider = document.getElementById('nameWidth');
   const scheduleValue = document.getElementById('nameWidthValue');
+  const regionSlider = document.getElementById('regionWidth');
+  const regionValue = document.getElementById('regionWidthValue');
   const descriptionSlider = document.getElementById('descriptionWidth');
   const descriptionValue = document.getElementById('descriptionWidthValue');
+  const triggerSlider = document.getElementById('triggerWidth');
+  const triggerValue = document.getElementById('triggerWidthValue');
   const targetSlider = document.getElementById('targetWidth');
   const targetValue = document.getElementById('targetWidthValue');
 
@@ -437,10 +488,22 @@ function setupColumnWidthControls() {
     scheduleValue.textContent = width + 'px';
     applyStickyColumns();
   };
+  const applyRegion = () => {
+    const width = Number(regionSlider.value) || 130;
+    document.documentElement.style.setProperty('--region-col-width', width + 'px');
+    regionValue.textContent = width + 'px';
+    applyStickyColumns();
+  };
   const applyDescription = () => {
     const width = Number(descriptionSlider.value) || 280;
     document.documentElement.style.setProperty('--description-col-width', width + 'px');
     descriptionValue.textContent = width + 'px';
+    applyStickyColumns();
+  };
+  const applyTrigger = () => {
+    const width = Number(triggerSlider.value) || 280;
+    document.documentElement.style.setProperty('--trigger-col-width', width + 'px');
+    triggerValue.textContent = width + 'px';
     applyStickyColumns();
   };
   const applyTarget = () => {
@@ -451,11 +514,15 @@ function setupColumnWidthControls() {
   };
 
   scheduleSlider.oninput = applySchedule;
+  regionSlider.oninput = applyRegion;
   descriptionSlider.oninput = applyDescription;
+  triggerSlider.oninput = applyTrigger;
   targetSlider.oninput = applyTarget;
 
   applySchedule();
+  applyRegion();
   applyDescription();
+  applyTrigger();
   applyTarget();
 }
 
@@ -467,9 +534,23 @@ function hasTargetData() {
   return (DATA.schedules || []).some(s => String((s.target_name || s.target_arn || '')).trim() !== '');
 }
 
+function hasTriggerData() {
+  return (DATA.schedules || []).some(s => String(s.trigger_type || '').trim() !== '');
+}
+
 function showDescriptionColumn() {
   const checkbox = document.getElementById('showDescription');
   return hasDescriptionData() && !!checkbox && checkbox.checked;
+}
+
+function showRegionColumn() {
+  const checkbox = document.getElementById('showRegion');
+  return !!checkbox && checkbox.checked;
+}
+
+function showTriggerColumn() {
+  const checkbox = document.getElementById('showTrigger');
+  return hasTriggerData() && !!checkbox && checkbox.checked;
 }
 
 function showTargetColumn() {
@@ -479,23 +560,31 @@ function showTargetColumn() {
 
 function setupColumnVisibilityControls() {
   const hasDescription = hasDescriptionData();
+  const hasTrigger = hasTriggerData();
   const hasTarget = hasTargetData();
-  const descriptionWrap = document.getElementById('descriptionToggleWrap');
-  const targetWrap = document.getElementById('targetToggleWrap');
-  const descriptionWidthWrap = document.getElementById('descriptionWidthWrap');
-  const targetWidthWrap = document.getElementById('targetWidthWrap');
+  const descriptionWrap = document.getElementById('descriptionRowWrap');
+  const triggerWrap = document.getElementById('triggerRowWrap');
+  const targetWrap = document.getElementById('targetRowWrap');
+  const showRegion = document.getElementById('showRegion');
   const descriptionToggle = document.getElementById('showDescription');
+  const triggerToggle = document.getElementById('showTrigger');
   const targetToggle = document.getElementById('showTarget');
 
   if (descriptionWrap) descriptionWrap.style.display = hasDescription ? '' : 'none';
+  if (triggerWrap) triggerWrap.style.display = hasTrigger ? '' : 'none';
   if (targetWrap) targetWrap.style.display = hasTarget ? '' : 'none';
-  if (descriptionWidthWrap) descriptionWidthWrap.style.display = hasDescription ? '' : 'none';
-  if (targetWidthWrap) targetWidthWrap.style.display = hasTarget ? '' : 'none';
   if (descriptionToggle) {
     if (!hasDescription) {
       descriptionToggle.checked = false;
     } else if (descriptionToggle.dataset.restored !== '1') {
       descriptionToggle.checked = true;
+    }
+  }
+  if (triggerToggle) {
+    if (!hasTrigger) {
+      triggerToggle.checked = false;
+    } else if (triggerToggle.dataset.restored !== '1') {
+      triggerToggle.checked = true;
     }
   }
   if (targetToggle) {
@@ -505,7 +594,9 @@ function setupColumnVisibilityControls() {
       targetToggle.checked = true;
     }
   }
+  if (showRegion) showRegion.onchange = render;
   if (descriptionToggle) descriptionToggle.onchange = render;
+  if (triggerToggle) triggerToggle.onchange = render;
   if (targetToggle) targetToggle.onchange = render;
 }
 
@@ -513,17 +604,23 @@ function applyStickyColumns() {
   const scheduleWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--schedule-col-width'), 10) || 420;
   const regionWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--region-col-width'), 10) || 130;
   const descriptionWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--description-col-width'), 10) || 280;
+  const triggerWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--trigger-col-width'), 10) || 280;
   const targetWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--target-col-width'), 10) || 320;
 
+  const showRegion = showRegionColumn();
   const showDescription = showDescriptionColumn();
+  const showTrigger = showTriggerColumn();
   const showTarget = showTargetColumn();
 
+  timeline.classList.toggle('show-region', showRegion);
   timeline.classList.toggle('show-description', showDescription);
+  timeline.classList.toggle('show-trigger', showTrigger);
   timeline.classList.toggle('show-target', showTarget);
 
   const scheduleCols = timeline.querySelectorAll('.schedule-col');
   const regionCols = timeline.querySelectorAll('.region-col');
   const descriptionCols = timeline.querySelectorAll('.description-col');
+  const triggerCols = timeline.querySelectorAll('.trigger-col');
   const targetCols = timeline.querySelectorAll('.target-col');
 
   scheduleCols.forEach(el => {
@@ -532,6 +629,11 @@ function applyStickyColumns() {
   });
 
   regionCols.forEach(el => {
+    if (!showRegion) {
+      el.classList.add('hidden');
+      el.style.left = '';
+      return;
+    }
     el.classList.remove('hidden');
     el.style.left = scheduleWidth + 'px';
   });
@@ -543,7 +645,18 @@ function applyStickyColumns() {
       return;
     }
     el.classList.remove('hidden');
-    el.style.left = (scheduleWidth + regionWidth) + 'px';
+    el.style.left = (scheduleWidth + (showRegion ? regionWidth : 0)) + 'px';
+  });
+
+  triggerCols.forEach(el => {
+    if (!showTrigger) {
+      el.classList.add('hidden');
+      el.style.left = '';
+      return;
+    }
+    el.classList.remove('hidden');
+    const left = scheduleWidth + (showRegion ? regionWidth : 0) + (showDescription ? descriptionWidth : 0);
+    el.style.left = left + 'px';
   });
 
   targetCols.forEach(el => {
@@ -553,7 +666,7 @@ function applyStickyColumns() {
       return;
     }
     el.classList.remove('hidden');
-    const left = scheduleWidth + regionWidth + (showDescription ? descriptionWidth : 0);
+    const left = scheduleWidth + (showRegion ? regionWidth : 0) + (showDescription ? descriptionWidth : 0) + (showTrigger ? triggerWidth : 0);
     el.style.left = left + 'px';
   });
 }
@@ -758,24 +871,51 @@ function targetConsoleURL(schedule) {
   return '';
 }
 
+let currentSortColumn = null;
+let currentSortAsc = true;
+
+function sortKeyForColumn(s, col) {
+  switch (col) {
+    case 'schedule': return (s.service === 'eventbridge_rule' ? '0' : '1') + ':' + (s.schedule_name || '');
+    case 'region': return s.region || '';
+    case 'description': return s.description || '';
+    case 'trigger': return s.trigger_label || s.schedule_expression || '';
+    case 'target': return (s.target_name || s.target_arn || '');
+    default: return '';
+  }
+}
+
 function compareSchedules(a, b) {
+  if (currentSortColumn) {
+    const ka = sortKeyForColumn(a, currentSortColumn);
+    const kb = sortKeyForColumn(b, currentSortColumn);
+    const cmp = ka.localeCompare(kb, undefined, { numeric: true, sensitivity: 'base' });
+    if (cmp !== 0) return currentSortAsc ? cmp : -cmp;
+  }
   const servicePriority = {
     eventbridge_rule: 0,
     eventbridge_scheduler: 1,
   };
   const serviceDelta = (servicePriority[a.service] ?? 99) - (servicePriority[b.service] ?? 99);
   if (serviceDelta !== 0) return serviceDelta;
-
-  const nameDelta = (a.schedule_name || '').localeCompare(b.schedule_name || '', undefined, {
-    numeric: true,
-    sensitivity: 'base',
-  });
+  const nameDelta = (a.schedule_name || '').localeCompare(b.schedule_name || '', undefined, { numeric: true, sensitivity: 'base' });
   if (nameDelta !== 0) return nameDelta;
+  return (a.region || '').localeCompare(b.region || '', undefined, { numeric: true, sensitivity: 'base' });
+}
 
-  return (a.region || '').localeCompare(b.region || '', undefined, {
-    numeric: true,
-    sensitivity: 'base',
-  });
+function onHeaderSort(col) {
+  if (currentSortColumn === col) {
+    currentSortAsc = !currentSortAsc;
+  } else {
+    currentSortColumn = col;
+    currentSortAsc = true;
+  }
+  render();
+}
+
+function sortIndicator(col) {
+  if (currentSortColumn !== col) return '';
+  return currentSortAsc ? ' \u25B2' : ' \u25BC';
 }
 
 function hasMatchingRunStatus(schedule, statusFilter) {
@@ -793,11 +933,12 @@ function hasMatchingRunStatus(schedule, statusFilter) {
 function render() {
   const sVal = document.getElementById('serviceFilter').value;
   const rVal = document.getElementById('regionFilter').value;
+  const tVal = (document.getElementById('triggerFilter') || {}).value || '';
   const stVal = document.getElementById('runStatusFilter').value;
   const hideDisabled = document.getElementById('hideDisabled').checked;
   const searchVal = (document.getElementById('scheduleSearch')?.value || '').toLowerCase().trim();
   const rows = DATA.schedules
-    .filter(s => (!sVal || s.service === sVal) && (!rVal || s.region === rVal) && hasMatchingRunStatus(s, stVal) && (!hideDisabled || s.enabled !== false) && (!searchVal || (s.schedule_name || '').toLowerCase().includes(searchVal)))
+    .filter(s => (!sVal || s.service === sVal) && (!rVal || s.region === rVal) && (!tVal || (s.trigger_type || '') === tVal) && hasMatchingRunStatus(s, stVal) && (!hideDisabled || s.enabled !== false) && (!searchVal || (s.schedule_name || '').toLowerCase().includes(searchVal)))
     .sort(compareSchedules);
 
   const slotIssueReasonLabel = {
@@ -895,24 +1036,40 @@ function render() {
 
   const head = document.createElement('div');
   head.className = 'row head';
+  const sortableStyle = 'cursor:pointer;user-select:none';
   const scheduleHead = document.createElement('div');
   scheduleHead.className = 'left-col sticky-col schedule-col col-title';
-  scheduleHead.textContent = 'Schedule';
+  scheduleHead.textContent = 'Schedule' + sortIndicator('schedule');
+  scheduleHead.style.cssText = sortableStyle;
+  scheduleHead.onclick = () => onHeaderSort('schedule');
   head.appendChild(scheduleHead);
 
   const regionHead = document.createElement('div');
   regionHead.className = 'left-col sticky-col region-col col-title';
-  regionHead.textContent = 'Region';
+  regionHead.textContent = 'Region' + sortIndicator('region');
+  regionHead.style.cssText = sortableStyle;
+  regionHead.onclick = () => onHeaderSort('region');
   head.appendChild(regionHead);
 
   const descriptionHead = document.createElement('div');
   descriptionHead.className = 'left-col sticky-col description-col col-title';
-  descriptionHead.textContent = 'Description';
+  descriptionHead.textContent = 'Description' + sortIndicator('description');
+  descriptionHead.style.cssText = sortableStyle;
+  descriptionHead.onclick = () => onHeaderSort('description');
   head.appendChild(descriptionHead);
+
+  const triggerHead = document.createElement('div');
+  triggerHead.className = 'left-col sticky-col trigger-col col-title';
+  triggerHead.textContent = 'Trigger' + sortIndicator('trigger');
+  triggerHead.style.cssText = sortableStyle;
+  triggerHead.onclick = () => onHeaderSort('trigger');
+  head.appendChild(triggerHead);
 
   const targetHead = document.createElement('div');
   targetHead.className = 'left-col sticky-col target-col col-title';
-  targetHead.textContent = 'Target';
+  targetHead.textContent = 'Target' + sortIndicator('target');
+  targetHead.style.cssText = sortableStyle;
+  targetHead.onclick = () => onHeaderSort('target');
   head.appendChild(targetHead);
 
   for(let i=0;i<144;i++) {
@@ -983,6 +1140,13 @@ function render() {
     descriptionCol.title = s.description || '';
     descriptionCol.textContent = s.description || '-';
     row.appendChild(descriptionCol);
+
+    const triggerCol = document.createElement('div');
+    triggerCol.className = 'left-col sticky-col trigger-col';
+    const triggerDisplay = s.trigger_label || s.schedule_expression || '-';
+    triggerCol.title = triggerDisplay;
+    triggerCol.textContent = triggerDisplay;
+    row.appendChild(triggerCol);
 
     const targetCol = document.createElement('div');
     targetCol.className = 'left-col sticky-col target-col';
