@@ -24,8 +24,8 @@ github.com/aws/aws-sdk-go-v2/service/batch v1.63.2 h1:9bsy0RFJYSspgVBhJ9rArmHOMS
 github.com/aws/aws-sdk-go-v2/service/batch v1.63.2/go.mod h1:T/6gED/2b8Qh8ZOOke4oG/JCjUewh+YFkTDF7GODXQ0=
 github.com/aws/aws-sdk-go-v2/service/cloudtrail v1.55.9 h1:ndjU1c3H1BYJy7fG0Y6Nh/sgD2M/KN+PZaqyCK/Fdfs=
 github.com/aws/aws-sdk-go-v2/service/cloudtrail v1.55.9/go.mod h1:aH6yXmBYSr1k8uycfqxH5pv4T5N3x2cfFPvrlhyWjAU=
-github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.68.0 h1:+/lmB/+i2oqkzbmlQxsW0kr/+wmJgmyiEF9VDJicX34=
-github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.68.0/go.mod h1:PobeppEnIjw4pcgjFryNDZCTH7AiqZw0yb5r98Gvf9c=
+github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.69.0 h1:4VXxRYg0NfdHLs6XfD+iRagMr2Fhzz/RSsCZJojC7a8=
+github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.69.0/go.mod h1:PobeppEnIjw4pcgjFryNDZCTH7AiqZw0yb5r98Gvf9c=
 github.com/aws/aws-sdk-go-v2/service/ec2 v1.297.0 h1:A+7NViqbMUCoTQFWjbSXdbzE4K5Ziu2zWJtZzAusm+A=
 github.com/aws/aws-sdk-go-v2/service/ec2 v1.297.0/go.mod h1:R+2BNtUfTfhPY0RH18oL02q116bakeBWjanrbnVBqkM=
 github.com/aws/aws-sdk-go-v2/service/ecs v1.77.0 h1:g3RYQmK6uRU5kOuwDthemuiiTbmwyGd8Wzf+k7cYWtk=
