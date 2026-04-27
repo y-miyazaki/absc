@@ -50,12 +50,12 @@ ABSC generates an interactive HTML viewer that allows you to browse collected sc
 ### Using Go Install
 
 ```bash
-go install github.com/y-miyazaki/absc/cmd/absc@v1.0.14
+go install github.com/y-miyazaki/absc/cmd/absc@v1.0.15
 ```
 
 ### Using Release tar.gz
 
-You can download a prebuilt release tarball from the Releases page and install it quickly. The examples below use the `v1.0.14` release.
+You can download a prebuilt release tarball from the Releases page and install it quickly. The examples below use the `v1.0.15` release.
 
 Available platforms:
 
@@ -66,20 +66,20 @@ Available platforms:
 Linux (AMD64) example:
 
 ```bash
-VERSION=v1.0.14 && curl -L https://github.com/y-miyazaki/absc/releases/download/${VERSION}/absc-linux-amd64.tar.gz | tar -xzf - && sudo mv absc /usr/local/bin/ && sudo chmod +x /usr/local/bin/absc
+VERSION=v1.0.15 && curl -L https://github.com/y-miyazaki/absc/releases/download/${VERSION}/absc-linux-amd64.tar.gz | tar -xzf - && sudo mv absc /usr/local/bin/ && sudo chmod +x /usr/local/bin/absc
 ```
 
 macOS (ARM64) example:
 
 ```bash
-VERSION=v1.0.14 && curl -L https://github.com/y-miyazaki/absc/releases/download/${VERSION}/absc-darwin-arm64.tar.gz | tar -xzf - && sudo mv absc /usr/local/bin/ && sudo chmod +x /usr/local/bin/absc
+VERSION=v1.0.15 && curl -L https://github.com/y-miyazaki/absc/releases/download/${VERSION}/absc-darwin-arm64.tar.gz | tar -xzf - && sudo mv absc /usr/local/bin/ && sudo chmod +x /usr/local/bin/absc
 ```
 
 Notes:
 
 - The release typically ships an `absc-${VERSION}-checksums.txt` file. Verify the checksum before installing in production.
 - For Windows, download the `.zip` asset from the Releases page and extract the `absc.exe` binary.
-- `go install` is convenient for development. Release tarballs are preferable when you want a pinned binary such as `v1.0.14`.
+- `go install` is convenient for development. Release tarballs are preferable when you want a pinned binary such as `v1.0.15`.
 
 ### Build from Source
 
@@ -403,7 +403,7 @@ jobs:
       # Pass --account-name to enable this feature.
 
       - name: Install absc
-        run: go install github.com/y-miyazaki/absc/cmd/absc@v1.0.14
+        run: go install github.com/y-miyazaki/absc/cmd/absc@v1.0.15
 
       - name: Collect schedules
         run: absc --timezone Asia/Tokyo

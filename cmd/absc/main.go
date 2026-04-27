@@ -61,7 +61,7 @@ const (
 
 // Build-time version information injected by GoReleaser via ldflags.
 var (
-	version = "v1.0.14"
+	version = "v1.0.15"
 )
 
 var (
