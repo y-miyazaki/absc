@@ -14,7 +14,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/eventbridge v1.45.23
 	github.com/aws/aws-sdk-go-v2/service/glue v1.139.3
 	github.com/aws/aws-sdk-go-v2/service/scheduler v1.17.22
-	github.com/aws/aws-sdk-go-v2/service/sfn v1.40.10
+	github.com/aws/aws-sdk-go-v2/service/sfn v1.40.11
 	github.com/urfave/cli/v2 v2.27.7
 	github.com/y-miyazaki/go-common v0.9.1
 )
