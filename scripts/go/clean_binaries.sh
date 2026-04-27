@@ -17,7 +17,7 @@
 # - Removed build directories listed to stdout
 #
 # Design Rules:
-# - Rule 1: Binary detection uses `file` command (ELF/Mach-O/PE) -- name-agnostic
+# - Rule 1: Binary detection uses `file` command (ELF/Mach-O/PE), falls back to magic bytes via `od` -- name-agnostic
 # - Rule 2: .git/ directory is always excluded from scan
 # - Rule 3: Dry-run mode never deletes; shows what would be removed
 #######################################
@@ -152,24 +152,63 @@ function print_summary {
 #   remove_binary_files
 #
 #######################################
+#######################################
+# is_binary_executable: Detect if a file is a binary executable
+#
+# Description:
+#   Uses `file` command when available, falls back to magic byte detection
+#   via `od` for environments where `file` is not installed.
+#   Detects ELF (Linux), Mach-O (macOS), and PE32 (Windows) executables.
+#
+# Arguments:
+#   $1 - File path to check
+#
+# Returns:
+#   0 if file is a binary executable, 1 otherwise
+#
+# Usage:
+#   if is_binary_executable "/path/to/file"; then ...
+#
+#######################################
+function is_binary_executable {
+    local filepath="$1"
+
+    # Prefer `file` command when available
+    if command -v file > /dev/null 2>&1; then
+        local file_type
+        file_type="$(file --brief "$filepath" 2> /dev/null || true)"
+        if echo "$file_type" | grep -qE "^ELF.*executable|^Mach-O.*executable|^PE32.*executable"; then
+            return 0
+        fi
+        return 1
+    fi
+
+    # Fallback: detect via magic bytes using `od`
+    local magic
+    magic="$(od -A n -t x1 -N 4 "$filepath" 2> /dev/null | tr -d ' ')" || return 1
+
+    case "$magic" in
+        7f454c46) return 0 ;;                                  # ELF
+        feedface | feedfacf | cefaedfe | cffaedfe) return 0 ;; # Mach-O
+        4d5a*) return 0 ;;                                     # PE (MZ header)
+    esac
+    return 1
+}
+
 function remove_binary_files {
     echo_section "Scanning for binary executables"
 
     while IFS= read -r -d '' filepath; do
-        # Use `file` to detect binary type -- name-agnostic, works across platforms
-        local file_type
-        file_type="$(file --brief "$filepath" 2> /dev/null || true)"
-
-        if echo "$file_type" | grep -qE "^ELF.*executable|^Mach-O.*executable|^PE32.*executable"; then
+        if is_binary_executable "$filepath"; then
             if [[ "$DRY_RUN" == "true" ]]; then
-                log "INFO" "DRY-RUN: Would remove binary: ${filepath} (${file_type})"
+                log "INFO" "DRY-RUN: Would remove binary: ${filepath}"
             else
                 rm -f "$filepath"
                 log "INFO" "Removed binary: ${filepath}"
             fi
             ((BINARY_COUNT++)) || true
         else
-            [[ "$VERBOSE" == "true" ]] && log "INFO" "Skipped (not binary executable): ${filepath}"
+            [[ "$VERBOSE" == "true" ]] && log "INFO" "Skipped (not binary executable): ${filepath}" || true
         fi
     done < <(find "$ROOT_DIR" -type f ! -path '*/.git/*' -print0)
 }
@@ -205,7 +244,7 @@ function remove_build_dirs {
             fi
             ((DIR_COUNT++)) || true
         else
-            [[ "$VERBOSE" == "true" ]] && log "INFO" "Not found (skip): ${target}"
+            [[ "$VERBOSE" == "true" ]] && log "INFO" "Not found (skip): ${target}" || true
         fi
     done
 }

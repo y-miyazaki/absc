@@ -30,7 +30,7 @@ This project adheres to a code of conduct. By participating, you are expected to
 
 ### Prerequisites
 
-- Go 1.25.8 or later
+- Go 1.25.9 or later
 - AWS credentials configured
 - golangci-lint (for linting)
 
