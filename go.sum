@@ -24,8 +24,8 @@ github.com/aws/aws-sdk-go-v2/service/cloudtrail v1.55.9 h1:ndjU1c3H1BYJy7fG0Y6Nh
 github.com/aws/aws-sdk-go-v2/service/cloudtrail v1.55.9/go.mod h1:aH6yXmBYSr1k8uycfqxH5pv4T5N3x2cfFPvrlhyWjAU=
 github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.70.0 h1:U+qPb/Js1MmlDootMPGhqI4JC0yNbWFUGZaZIhRCPtE=
 github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.70.0/go.mod h1:O7cQtpXZSk+P59gPFZIpcMpKwLk5d9zabFpV8fw68RM=
-github.com/aws/aws-sdk-go-v2/service/ec2 v1.297.0 h1:A+7NViqbMUCoTQFWjbSXdbzE4K5Ziu2zWJtZzAusm+A=
-github.com/aws/aws-sdk-go-v2/service/ec2 v1.297.0/go.mod h1:R+2BNtUfTfhPY0RH18oL02q116bakeBWjanrbnVBqkM=
+github.com/aws/aws-sdk-go-v2/service/ec2 v1.297.1 h1:9nfacm+uWgbdPaOplvJjxN50qgthexb7GOR/97ygc5o=
+github.com/aws/aws-sdk-go-v2/service/ec2 v1.297.1/go.mod h1:E1pnYwWFZ8N3REmeN9Fe/Zipbpps4HJj8DQGNnLUMYc=
 github.com/aws/aws-sdk-go-v2/service/ecs v1.79.0 h1:n8a9xGGhGAskh38cKq5EKzYsPoCKqazjn+Sb2/UX8FQ=
 github.com/aws/aws-sdk-go-v2/service/ecs v1.79.0/go.mod h1:1DlTqkp+8uc5At3UXyJAvJXFaWoMmxSHcp2Zdor0qGw=
 github.com/aws/aws-sdk-go-v2/service/eventbridge v1.45.23 h1:wlOL7DYRnqjyTN1GJlDT5w1t062qC7JKiszZzH4S41A=
