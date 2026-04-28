@@ -68,8 +68,8 @@ checksum:
   algorithm: sha256
 
 # SBOM (Software Bill of Materials) generation
-# sboms:
-#   - artifacts: archive
+sboms:
+  - artifacts: archive
 
 # Snapshot configuration (for local builds)
 snapshot:
@@ -131,15 +131,14 @@ release:
 #     message_template: 'ABSC {{.Tag}} is out! Check it out: {{ .ReleaseURL }}'
 #     channel: '#releases'
 
-# Signing configuration (optional)
-# sign:
-#   cmd: gpg
-#   args:
-#     - "--batch"
-#     - "-u"
-#     - "{{ .Env.GPG_FINGERPRINT }}"
-#     - "--output"
-#     - "${signature}"
-#     - "--detach-sign"
-#     - "${artifact}"
-#   artifacts: checksum
+# Signing configuration (cosign keyless)
+signs:
+  - cmd: cosign
+    signature: "${artifact}.sigstore.json"
+    args:
+      - "sign-blob"
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: checksum
+    output: true
