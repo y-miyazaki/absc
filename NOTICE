@@ -1,0 +1,48 @@
+ABSC (AWS Batch Schedule Collector)
+Copyright 2026 y-miyazaki
+
+This product is licensed under the Apache License, Version 2.0.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+This product includes software developed by third parties:
+
+- AWS SDK for Go v2 (https://github.com/aws/aws-sdk-go-v2)
+  Copyright Amazon.com, Inc. or its affiliates. Licensed under Apache-2.0.
+
+- smithy-go (https://github.com/aws/smithy-go)
+  Copyright Amazon.com, Inc. or its affiliates. Licensed under Apache-2.0.
+
+- urfave/cli (https://github.com/urfave/cli)
+  Copyright urfave/cli contributors. Licensed under MIT.
+
+- go-common (https://github.com/y-miyazaki/go-common)
+  Copyright y-miyazaki. Licensed under Apache-2.0.
+
+- logrus (https://github.com/sirupsen/logrus)
+  Copyright Simon Eskildsen. Licensed under MIT.
+
+- zap (https://go.uber.org/zap)
+  Copyright Uber Technologies, Inc. Licensed under MIT.
+
+- multierr (https://go.uber.org/multierr)
+  Copyright Uber Technologies, Inc. Licensed under MIT.
+
+- blackfriday (https://github.com/russross/blackfriday)
+  Copyright Russ Ross. Licensed under BSD-2-Clause.
+
+- go-md2man (https://github.com/cpuguy83/go-md2man)
+  Copyright cpuguy83. Licensed under MIT.
+
+- errors (https://github.com/pkg/errors)
+  Copyright Dave Cheney. Licensed under BSD-2-Clause.
+
+- smetrics (https://github.com/xrash/smetrics)
+  Copyright xrash. Licensed under MIT.
+
+- GORM (https://gorm.io/gorm)
+  Copyright Jinzhu. Licensed under MIT.
+
+- golang.org/x/sys
+  Copyright The Go Authors. Licensed under BSD-3-Clause.
