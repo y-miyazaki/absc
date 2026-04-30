@@ -6,7 +6,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.41.6
 	github.com/aws/aws-sdk-go-v2/config v1.32.16
 	github.com/aws/aws-sdk-go-v2/service/account v1.30.6
-	github.com/aws/aws-sdk-go-v2/service/batch v1.63.2
+	github.com/aws/aws-sdk-go-v2/service/batch v1.64.0
 	github.com/aws/aws-sdk-go-v2/service/cloudtrail v1.55.9
 	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.70.0
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.297.0
