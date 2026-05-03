@@ -65,6 +65,7 @@ regexes = [
 ]
 stopwords = [
     "014df517-39d1-4453-b7b3-9930c563627c",
+    "123456789012",
     "abcdefghijklmnopqrstuvwxyz",
 ]
 
@@ -616,7 +617,7 @@ entropy = 4
 keywords = ["aiza"]
 [[rules.allowlists]]
 regexes = [
-    '''aaaa''',
+    '''AIzaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx''',
 ]
 
 [[rules]]
@@ -2959,6 +2960,10 @@ description = "Identified a Slack Bot token, which may compromise bot integratio
 regex = '''xoxb-[0-9]{10,13}-[0-9]{10,13}[a-zA-Z0-9-]*'''
 entropy = 3
 keywords = ["xoxb"]
+[[rules.allowlists]]
+regexes = [
+    '''xoxb-xxxxxxxxxxxxx-xxxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx''',
+]
 
 [[rules]]
 id = "slack-config-access-token"
