@@ -42,7 +42,7 @@ Report after creation using the format in [references/common-output-format.md](r
 **Does:**
 
 - Create or update one `docs/<filename>.md` per invocation
-- Apply the template from [references/templates.md](references/templates.md) matching the document type
+- Apply the template from [references/category-templates.md](references/category-templates.md) matching the document type
 - Add relative-path cross-references to existing `docs/` files where relevant
 - Follow project-specific documentation standards when available; otherwise apply the default technical documentation structure defined in this skill
 - Update `README.md` links section if it contains a `docs/` index block and the file is new
@@ -63,7 +63,7 @@ Report after creation using the format in [references/common-output-format.md](r
 
 **Category Details** (read when relevant):
 
-- [references/templates.md](references/templates.md) - Read to get the template for the chosen document type
+- [references/category-templates.md](references/category-templates.md) - Read to get the template for the chosen document type
 - Project markdown guidance file (if present) - Read when a repository defines additional markdown/documentation rules
 
 ## Workflow
@@ -98,7 +98,7 @@ Report after creation using the format in [references/common-output-format.md](r
 For project-defined custom types:
 
 1. Define filename pattern before generation.
-2. Add or select a matching template section in `references/templates.md`.
+2. Add or select a matching template section in `references/category-templates.md`.
 3. If no dedicated template exists, use `general` as fallback.
 
 **Naming Rules:**
@@ -114,7 +114,7 @@ Numeric prefix only when documents have a defined reading order: `01_architectur
 
 ### Step 2: Load Template
 
-Load [references/templates.md](references/templates.md) and select the section matching the document type from Step 1.
+Load [references/category-templates.md](references/category-templates.md) and select the section matching the document type from Step 1.
 
 ### Step 3: Create File
 

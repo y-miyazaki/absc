@@ -28,7 +28,7 @@
 
 ### DC-01: Template Applied
 
-- [ ] Template from `references/templates.md` matching the document type is used as base
+- [ ] Template from `references/category-templates.md` matching the document type is used as base
 - [ ] All `<placeholder>` values are replaced with actual content
 - [ ] Empty optional sections are removed (not left as placeholder headings)
 - **PASS** if template applied and placeholders replaced, **FAIL** if placeholders remain
