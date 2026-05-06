@@ -49,7 +49,7 @@ packages:
   - name: golang.org/x/tools/gopls@v0.21.1 # Go language server
   # Terraform related tools
   - name: hashicorp/terraform@v1.14.7 # terraform
-  - name: terraform-linters/tflint@v0.61.0 # linter
+  - name: terraform-linters/tflint@v0.62.0 # linter
   - name: terraform-docs/terraform-docs@v0.21.0 # documentation generator
   - name: getsops/sops@v3.12.2 # encryption tool
   - name: jamesWoolfenden/pike@v0.3.99
