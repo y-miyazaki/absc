@@ -39,7 +39,7 @@ require (
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/xrash/smetrics v0.0.0-20250705151800-55b8f293f342 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.uber.org/zap v1.27.1 // indirect
+	go.uber.org/zap v1.28.0 // indirect
 	golang.org/x/sys v0.43.0 // indirect
 	gorm.io/gorm v1.31.1 // indirect
 )
