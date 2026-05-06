@@ -43,7 +43,7 @@ packages:
   - name: air-verse/air@v1.64.5 # live reload
   - name: golang/vuln/govulncheck@v1.1.4 # vulnerability scanner
   - name: swaggo/swag@v1.16.6 # API documentation generator
-  - name: go-swagger/go-swagger@v0.33.1 # API documentation generator
+  - name: go-swagger/go-swagger@v0.33.2 # API documentation generator
   - name: ko-build/ko@v0.18.1 # container builder
   - name: goreleaser/goreleaser@v2.14.3 # release automation
   - name: golang.org/x/tools/gopls@v0.21.1 # Go language server
