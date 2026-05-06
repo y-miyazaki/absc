@@ -19,7 +19,7 @@ packages:
   - name: aquasecurity/trivy@v0.69.3 # vulnerability scanner
   # AWS related tools
   - name: aws/aws-cli@2.34.38 # AWS CLI
-  - name: kayac/ecspresso@v2.7.1 # ECS deployment tool
+  - name: kayac/ecspresso@v2.8.3 # ECS deployment tool
   - name: Songmu/ecschedule@v0.17.2 # ECS scheduled tasks deployment tool
   - name: aws/aws-sam-cli@v1.159.1 # SAM CLI tool
   # GitHub related tools
