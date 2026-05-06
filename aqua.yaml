@@ -16,7 +16,7 @@ packages:
   # Security related tools
   - name: pre-commit/pre-commit@v4.6.0 # pre-commit framework
   - name: gitleaks/gitleaks@v8.30.1 # secret scanner
-  - name: aquasecurity/trivy@v0.69.3 # vulnerability scanner
+  - name: aquasecurity/trivy@v0.70.0 # vulnerability scanner
   # AWS related tools
   - name: aws/aws-cli@2.34.38 # AWS CLI
   - name: kayac/ecspresso@v2.8.3 # ECS deployment tool
