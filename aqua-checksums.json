@@ -681,6 +681,36 @@
       "algorithm": "sha256"
     },
     {
+      "id": "github_release/github.com/github/copilot-cli/v1.0.41/copilot-darwin-arm64.tar.gz",
+      "checksum": "458448DB454DC28250C2B83C08E2881D871B1C9973669AC564FF81AD76DFF0BA",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/github/copilot-cli/v1.0.41/copilot-darwin-x64.tar.gz",
+      "checksum": "0C5DEBA04F9FD3644FFC7016069D966B1288B9F2734706BAD532F0DC102ADD44",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/github/copilot-cli/v1.0.41/copilot-linux-arm64.tar.gz",
+      "checksum": "7D5B77CE0CF8B1EB1E58C507216199FC51CFA4FB987BD6ED46CC32483EB7FA57",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/github/copilot-cli/v1.0.41/copilot-linux-x64.tar.gz",
+      "checksum": "EEAD744DBC46591110CEDE7F078CDCA0708ECC673E43FC7572E01D292BB5DDFB",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/github/copilot-cli/v1.0.41/copilot-win32-arm64.zip",
+      "checksum": "72C3D42528B341F4713B953B727E576E7C3CB2E61610563F7747C777F4259A50",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/github/copilot-cli/v1.0.41/copilot-win32-x64.zip",
+      "checksum": "8FF84EC2C8964DB514BFCB2B49AE9D6B451FF9CC8A2374AE155E10AC11D3BAB6",
+      "algorithm": "sha256"
+    },
+    {
       "id": "github_release/github.com/github/copilot-cli/v1.0.5/copilot-darwin-arm64.tar.gz",
       "checksum": "54B0063D78FC0727491FF3F8FA251EDDFEEC80E76B3FFBA04E2CCAE56977039A",
       "algorithm": "sha256"
@@ -1263,6 +1293,36 @@
     {
       "id": "github_release/github.com/jamesWoolfenden/pike/v0.4.0/pike_0.4.0_windows_arm64.zip",
       "checksum": "F5FBCF94DCDD5D4596FFC5704EFBB3CFDDBF3C7D8B71A32F7197DDA4B70B64ED",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/jamesWoolfenden/pike/v0.4.1/pike_0.4.1_darwin_amd64.tar.gz",
+      "checksum": "32F5B045D6E03221D01A837748EAC38806033F5E8498C7DA9EA1DFD1A7153DC3",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/jamesWoolfenden/pike/v0.4.1/pike_0.4.1_darwin_arm64.tar.gz",
+      "checksum": "CCCB3FC86010DFB1D2CBB2FC6080FE34EA501F7F7B28DBA4736523EBE443E197",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/jamesWoolfenden/pike/v0.4.1/pike_0.4.1_linux_amd64.tar.gz",
+      "checksum": "17F32AC32A51A98E878EED1F007AAF97FBF1BB9DF091E70215846E1BE5072612",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/jamesWoolfenden/pike/v0.4.1/pike_0.4.1_linux_arm64.tar.gz",
+      "checksum": "BF231B5CE82454BB8DD2F73328C77CA4164476E6D34E5A71CDB7C9972F6C7BE2",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/jamesWoolfenden/pike/v0.4.1/pike_0.4.1_windows_amd64.zip",
+      "checksum": "509FFA15CC3B85838C8AEF810A3209F0FB33C96D1E7229D43123E6334553EB7C",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/jamesWoolfenden/pike/v0.4.1/pike_0.4.1_windows_arm64.zip",
+      "checksum": "E4F1A8CD4AAF3C5BE63B35BFB74C671935637D32B7D884C715141EFDFB26E3E2",
       "algorithm": "sha256"
     },
     {
@@ -1856,6 +1916,36 @@
       "algorithm": "sha256"
     },
     {
+      "id": "github_release/github.com/suzuki-shunsuke/ghalint/v1.5.6/ghalint_1.5.6_darwin_amd64.tar.gz",
+      "checksum": "D2A0E8605333068065DCF4C9B7B7A24891EDA1750AC01FB755DFBA426A390883",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/suzuki-shunsuke/ghalint/v1.5.6/ghalint_1.5.6_darwin_arm64.tar.gz",
+      "checksum": "1262CAC411E27B4653E6B66B7B06580EBCC2026FDD903E12E6CB0E4591639DE6",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/suzuki-shunsuke/ghalint/v1.5.6/ghalint_1.5.6_linux_amd64.tar.gz",
+      "checksum": "98EE0E3330DE7286F470D1E89C03FF7CE70D7A5998BA0F15969C400447BE579C",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/suzuki-shunsuke/ghalint/v1.5.6/ghalint_1.5.6_linux_arm64.tar.gz",
+      "checksum": "203A22C70B40BB161626973AD2A8DD06AEB736699FC8E03DD425DEE8FF3406E6",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/suzuki-shunsuke/ghalint/v1.5.6/ghalint_1.5.6_windows_amd64.zip",
+      "checksum": "109EA9B39C8E263CEF924BD3B4FE5505964204F934CA60D986F4090D01A99BA5",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/suzuki-shunsuke/ghalint/v1.5.6/ghalint_1.5.6_windows_arm64.zip",
+      "checksum": "C1219CAE104EA418A1CB4E7A02526A3FAD384C0788FA3540A86B316BB074D0D8",
+      "algorithm": "sha256"
+    },
+    {
       "id": "github_release/github.com/suzuki-shunsuke/ghatm/v0.3.7/ghatm_darwin_amd64.tar.gz",
       "checksum": "207CC87B84046B6457DF55FECCC6AF20F0F073FD7DB5AFFC05B3D00B95C553C7",
       "algorithm": "sha256"
@@ -2276,6 +2366,11 @@
       "algorithm": "sha256"
     },
     {
+      "id": "http/awscli.amazonaws.com/AWSCLIV2-2.34.43.pkg",
+      "checksum": "8F4348E1924D7DADE123876DF94E069B04D9C9908ADA02346B9D4152918DCEFB",
+      "algorithm": "sha256"
+    },
+    {
       "id": "http/awscli.amazonaws.com/AWSCLIV2-2.34.9.pkg",
       "checksum": "732AD67A5D9C5401734DAAD39946840DD5DBE4729815CB8AE3D2B5A8C55BAFE7",
       "algorithm": "sha256"
@@ -2296,6 +2391,11 @@
       "algorithm": "sha256"
     },
     {
+      "id": "http/awscli.amazonaws.com/awscli-exe-linux-aarch64-2.34.43.zip",
+      "checksum": "8B3B2C2F483AD2D1EF4E25F592F4060F235B6B4D5D5A8B006D922D71680883B9",
+      "algorithm": "sha256"
+    },
+    {
       "id": "http/awscli.amazonaws.com/awscli-exe-linux-aarch64-2.34.9.zip",
       "checksum": "8FE570DAC640882FD8E386A0D73A7E32DDB6BEF303C7273F25A30698BABFFA28",
       "algorithm": "sha256"
@@ -2313,6 +2413,11 @@
     {
       "id": "http/awscli.amazonaws.com/awscli-exe-linux-x86_64-2.34.38.zip",
       "checksum": "3995024376A981F1B3CA232A2CB4112E62ADB3F9DD023AAD4985201302D117FD",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "http/awscli.amazonaws.com/awscli-exe-linux-x86_64-2.34.43.zip",
+      "checksum": "822BD52EFA310541D26526280D6AD17B03A8386CA97E3EF9A2D988348D6C52AA",
       "algorithm": "sha256"
     },
     {
