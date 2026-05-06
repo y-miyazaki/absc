@@ -15,7 +15,7 @@ packages:
   - name: google/go-jsonnet@v0.21.0 # Jsonnet command-line tool
   # Security related tools
   - name: pre-commit/pre-commit@v4.5.1 # pre-commit framework
-  - name: gitleaks/gitleaks@v8.30.0 # secret scanner
+  - name: gitleaks/gitleaks@v8.30.1 # secret scanner
   - name: aquasecurity/trivy@v0.69.3 # vulnerability scanner
   # AWS related tools
   - name: aws/aws-cli@2.34.9 # AWS CLI
