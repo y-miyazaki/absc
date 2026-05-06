@@ -27,7 +27,7 @@ packages:
   - name: github/copilot-cli@v1.0.40 # GitHub Copilot CLI
   - name: rhysd/actionlint@v1.7.12 # GitHub Actions linter
   - name: suzuki-shunsuke/disable-checkout-persist-credentials@v1.0.0 # GitHub Actions settings persist-credentials
-  - name: suzuki-shunsuke/ghalint@v1.5.5 # GitHub Actions linter
+  - name: suzuki-shunsuke/ghalint@v1.5.6 # GitHub Actions linter
   - name: suzuki-shunsuke/ghatm@v1.0.0 # GitHub Actions settings timeout-minutes
   - name: suzuki-shunsuke/pinact@v3.9.2 # GitHub Actions pinning tool
   - name: zizmorcore/zizmor@v1.24.1 # GitHub Actions settings concurrency
