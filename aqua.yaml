@@ -30,7 +30,7 @@ packages:
   - name: suzuki-shunsuke/ghalint@v1.5.5 # GitHub Actions linter
   - name: suzuki-shunsuke/ghatm@v1.0.0 # GitHub Actions settings timeout-minutes
   - name: suzuki-shunsuke/pinact@v3.9.0 # GitHub Actions pinning tool
-  - name: zizmorcore/zizmor@v1.23.1 # GitHub Actions settings concurrency
+  - name: zizmorcore/zizmor@v1.24.1 # GitHub Actions settings concurrency
   # Go related tools
   - name: protocolbuffers/protobuf-go/protoc-gen-go@v1.36.11 # protobuf code generator
   - name: grpc/grpc-go/protoc-gen-go-grpc@cmd/protoc-gen-go-grpc/v1.6.1 # gRPC code generator
