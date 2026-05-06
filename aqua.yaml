@@ -52,4 +52,4 @@ packages:
   - name: terraform-linters/tflint@v0.62.0 # linter
   - name: terraform-docs/terraform-docs@v0.22.0 # documentation generator
   - name: getsops/sops@v3.12.2 # encryption tool
-  - name: jamesWoolfenden/pike@v0.3.99
+  - name: jamesWoolfenden/pike@v0.4.0
