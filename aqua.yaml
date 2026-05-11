@@ -34,7 +34,7 @@ packages:
   # Go related tools
   - name: protocolbuffers/protobuf-go/protoc-gen-go@v1.36.11 # protobuf code generator
   - name: grpc/grpc-go/protoc-gen-go-grpc@cmd/protoc-gen-go-grpc/v1.6.1 # gRPC code generator
-  - name: bufbuild/buf@v1.68.4 # protobuf linter and formatter
+  - name: bufbuild/buf@v1.69.0 # protobuf linter and formatter
   - name: protocolbuffers/protobuf/protoc@v34.1 # protobuf compiler
   - name: oapi-codegen/oapi-codegen@v2.6.0 # OpenAPI code generator
   - name: go-delve/delve@v1.26.3 # debugger
