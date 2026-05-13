@@ -24,7 +24,7 @@ packages:
   - name: Songmu/ecschedule@v0.17.2 # ECS scheduled tasks deployment tool
   # GitHub related tools
   - name: cli/cli@v2.92.0 # GitHub CLI
-  - name: github/copilot-cli@v1.0.41 # GitHub Copilot CLI
+  - name: github/copilot-cli@v1.0.46 # GitHub Copilot CLI
   - name: rhysd/actionlint@v1.7.12 # GitHub Actions linter
   - name: suzuki-shunsuke/disable-checkout-persist-credentials@v1.0.0 # disable persist-credentials in checkout action
   - name: suzuki-shunsuke/ghalint@v1.5.6 # GitHub Actions linter
@@ -42,7 +42,7 @@ packages:
   - name: goreleaser/goreleaser@v2.15.4 # release automation
   - name: grpc/grpc-go/protoc-gen-go-grpc@cmd/protoc-gen-go-grpc/v1.6.1 # gRPC code generator
   - name: ko-build/ko@v0.18.1 # container builder
-  - name: mvdan/gofumpt@v0.9.2 # code formatter(vs gofmt)
+  - name: mvdan/gofumpt@v0.10.0 # code formatter(vs gofmt)
   - name: oapi-codegen/oapi-codegen@v2.7.0 # OpenAPI code generator
   - name: protocolbuffers/protobuf-go/protoc-gen-go@v1.36.11 # protobuf code generator
   - name: protocolbuffers/protobuf/protoc@v34.1 # protobuf compiler
@@ -51,6 +51,6 @@ packages:
   # Terraform related tools
   - name: getsops/sops@v3.13.0 # encryption tool
   - name: hashicorp/terraform@v1.15.1 # infrastructure as code
-  - name: jamesWoolfenden/pike@v0.4.5 # generate minimum IAM policy from Terraform
-  - name: terraform-docs/terraform-docs@v0.22.0 # documentation generator
+  # - name: jamesWoolfenden/pike@v0.4.5 # generate minimum IAM policy from Terraform
+  - name: terraform-docs/terraform-docs@v0.24.0 # documentation generator
   - name: terraform-linters/tflint@v0.62.0 # linter
