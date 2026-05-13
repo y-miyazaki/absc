@@ -15,7 +15,7 @@ import (
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/account"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	awscfg "github.com/y-miyazaki/absc/internal/aws"
 	"github.com/y-miyazaki/absc/internal/aws/resources"
@@ -100,7 +100,7 @@ func main() {
 	l := logger.NewSlogLogger(&logger.SlogConfig{Level: slog.LevelInfo, Format: "text"})
 	app := newApp(l)
 
-	if err := app.Run(os.Args); err != nil {
+	if err := app.Run(context.Background(), os.Args[1:]); err != nil {
 		l.Error("failed to run app", "error", err)
 		os.Exit(1)
 	}
@@ -113,14 +113,6 @@ func accountIDFromARN(arn string) string {
 		return accountIDUnknown
 	}
 	return parts[accountIndex]
-}
-
-// commandContext returns the CLI-bound context and falls back to background.
-func commandContext(c *cli.Context) context.Context {
-	if c != nil && c.Context != nil {
-		return c.Context
-	}
-	return context.Background()
 }
 
 // fetchAccountName retrieves the human-readable account name for the given account ID.
@@ -137,8 +129,8 @@ func fetchAccountName(ctx context.Context, cfg *awssdk.Config, accountID string)
 }
 
 // newApp builds the CLI application and wires the main action.
-func newApp(l *logger.SlogLogger) *cli.App {
-	return &cli.App{
+func newApp(l *logger.SlogLogger) *cli.Command {
+	return &cli.Command{
 		Name:    "absc",
 		Usage:   "Collect cron schedules from AWS and render timeline HTML",
 		Version: version,
@@ -146,13 +138,13 @@ func newApp(l *logger.SlogLogger) *cli.App {
 			&cli.StringFlag{
 				Name:    profileFlagName,
 				Usage:   "AWS profile to use",
-				EnvVars: []string{"AWS_PROFILE", "AWS_DEFAULT_PROFILE"},
+				Sources: cli.EnvVars("AWS_PROFILE", "AWS_DEFAULT_PROFILE"),
 			},
 			&cli.StringFlag{
 				Name:    regionFlagName,
 				Aliases: []string{regionShortAlias},
 				Usage:   "AWS region(s) to use (comma-separated list accepted)",
-				EnvVars: []string{"AWS_DEFAULT_REGION"},
+				Sources: cli.EnvVars("AWS_DEFAULT_REGION"),
 				Value:   defaultRegion,
 			},
 			&cli.StringFlag{
@@ -169,8 +161,8 @@ func newApp(l *logger.SlogLogger) *cli.App {
 			&cli.BoolFlag{Name: accountNameFlagName, Usage: "Resolve account display name via account:GetAccountInformation", Value: false},
 			&cli.DurationFlag{Name: timeoutFlagName, Usage: "Overall command timeout", Value: defaultTimeout},
 		},
-		Action: func(c *cli.Context) error {
-			return runCommand(c, l)
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			return runCommand(ctx, cmd, l)
 		},
 	}
 }
@@ -195,53 +187,53 @@ func parseRegions(v string) []string {
 }
 
 // regionArg resolves the region flag with support for the deprecated alias.
-func regionArg(c *cli.Context) string {
-	if c.IsSet(regionsFlagName) {
-		if v := strings.TrimSpace(c.String(regionsFlagName)); v != "" {
+func regionArg(cmd *cli.Command) string {
+	if cmd.IsSet(regionsFlagName) {
+		if v := strings.TrimSpace(cmd.String(regionsFlagName)); v != "" {
 			return v
 		}
 	}
-	if c.IsSet(regionFlagName) {
-		if v := strings.TrimSpace(c.String(regionFlagName)); v != "" {
+	if cmd.IsSet(regionFlagName) {
+		if v := strings.TrimSpace(cmd.String(regionFlagName)); v != "" {
 			return v
 		}
 	}
-	if v := strings.TrimSpace(c.String(regionFlagName)); v != "" {
+	if v := strings.TrimSpace(cmd.String(regionFlagName)); v != "" {
 		return v
 	}
 	return defaultRegion
 }
 
 // runCommand executes the absc collection flow for a prepared CLI context.
-func runCommand(c *cli.Context, l *logger.SlogLogger) error {
-	ctx := commandContext(c)
+func runCommand(ctx context.Context, cmd *cli.Command, l *logger.SlogLogger) error {
 	// Apply an overall command timeout that propagates to all downstream AWS calls.
-	if timeout := c.Duration(timeoutFlagName); timeout > 0 {
+	if timeout := cmd.Duration(timeoutFlagName); timeout > 0 {
 		var cancel context.CancelFunc
+		//nolint:revive
 		ctx, cancel = context.WithTimeout(ctx, timeout)
 		defer cancel()
 	}
 
-	if c.Int(maxResultsFlagName) < 1 {
+	if cmd.Int(maxResultsFlagName) < 1 {
 		return errInvalidMaxResults
 	}
-	if c.Int(daysAgoFlagName) < 0 {
+	if cmd.Int(daysAgoFlagName) < 0 {
 		return errInvalidDaysAgo
 	}
 
 	// Resolve CLI options before touching AWS services.
-	loc, err := time.LoadLocation(c.String(timezoneFlagName))
+	loc, err := time.LoadLocation(cmd.String(timezoneFlagName))
 	if err != nil {
 		return fmt.Errorf("failed to load timezone: %w", err)
 	}
 
-	regions := parseRegions(regionArg(c))
+	regions := parseRegions(regionArg(cmd))
 	if len(regions) == 0 {
 		regions = []string{defaultRegion}
 	}
 
 	// Load config and verify credentials up front for clearer failures.
-	cfg, err := newAWSConfig(ctx, regions[0], c.String(profileFlagName))
+	cfg, err := newAWSConfig(ctx, regions[0], cmd.String(profileFlagName))
 	if err != nil {
 		return fmt.Errorf("failed to initialize aws config: %w", err)
 	}
@@ -255,7 +247,7 @@ func runCommand(c *cli.Context, l *logger.SlogLogger) error {
 	l.Info("AWS identity", "identity", identityARN)
 	accountID := accountIDFromARN(identityARN)
 	var accountName string
-	if c.Bool(accountNameFlagName) {
+	if cmd.Bool(accountNameFlagName) {
 		var accountNameErr error
 		accountName, accountNameErr = getAccountName(ctx, &cfg, accountID)
 		if accountNameErr != nil {
@@ -265,10 +257,10 @@ func runCommand(c *cli.Context, l *logger.SlogLogger) error {
 
 	// Collect schedules first, then persist both JSON and HTML outputs.
 	now := nowFunc().In(loc)
-	since := timelineWindowStart(now, c.Int(daysAgoFlagName), loc)
+	since := timelineWindowStart(now, cmd.Int(daysAgoFlagName), loc)
 	schedules, errs := collectSchedules(ctx, &cfg, resources.CollectOptions{
-		MaxConcurrency: c.Int(maxConcurrencyFlagName),
-		MaxResults:     c.Int(maxResultsFlagName),
+		MaxConcurrency: cmd.Int(maxConcurrencyFlagName),
+		MaxResults:     cmd.Int(maxResultsFlagName),
 		ReferenceTime:  now,
 		Regions:        regions,
 		Since:          since,
@@ -276,10 +268,10 @@ func runCommand(c *cli.Context, l *logger.SlogLogger) error {
 	})
 
 	result := buildOutput(accountID, now, since, loc, schedules, errs, exporter.BuildOutputOptions{
-		IncludeNonSlotRuns: c.Bool(includeNonSlotRunsFlagName),
+		IncludeNonSlotRuns: cmd.Bool(includeNonSlotRunsFlagName),
 	})
 	result.AccountName = accountName
-	outDir := filepath.Join(c.String(outputDirFlagName), accountID, defaultOutputSubDir)
+	outDir := filepath.Join(cmd.String(outputDirFlagName), accountID, defaultOutputSubDir)
 	if mkErr := mkdirAll(outDir, outputDirPermission); mkErr != nil {
 		return fmt.Errorf("failed to create output directory: %w", mkErr)
 	}
