@@ -1,6 +1,6 @@
 # Manual workflow for releasing Go application
 # This workflow allows manual release creation by specifying a version.
-# It uses the reusable-cd-go-releaser workflow to build and publish releases.
+# It uses the cd-go-releaser workflow to build and publish releases.
 name: cd-wd-go-releaser
 
 on:
@@ -29,7 +29,7 @@ on:
 jobs:
   release:
     name: Release ABSC
-    uses: ./.github/workflows/reusable-cd-go-releaser.yaml
+    uses: y-miyazaki/config/.github/workflows/cd-go-releaser.yaml@v1.0.0
     with:
       component: absc
       create_tag: ${{ inputs.create_tag }}
