@@ -391,7 +391,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.25.9'
+          go-version: '1.26.3'
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
