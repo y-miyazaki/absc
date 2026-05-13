@@ -8,11 +8,11 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/account v1.31.0
 	github.com/aws/aws-sdk-go-v2/service/batch v1.64.1
 	github.com/aws/aws-sdk-go-v2/service/cloudtrail v1.55.11
-	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.72.0
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.299.1
+	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.73.0
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.301.0
 	github.com/aws/aws-sdk-go-v2/service/ecs v1.79.1
 	github.com/aws/aws-sdk-go-v2/service/eventbridge v1.45.25
-	github.com/aws/aws-sdk-go-v2/service/glue v1.140.1
+	github.com/aws/aws-sdk-go-v2/service/glue v1.141.0
 	github.com/aws/aws-sdk-go-v2/service/scheduler v1.17.24
 	github.com/aws/aws-sdk-go-v2/service/sfn v1.40.12
 	github.com/urfave/cli/v2 v2.27.7
