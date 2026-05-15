@@ -1,7 +1,6 @@
-# Manual workflow for releasing Go application
-# This workflow allows manual release creation by specifying a version.
-# It uses the cd-go-releaser workflow to build and publish releases.
-name: cd-wd-go-releaser
+# Manual workflow: Go application release with GoReleaser
+# Allows manual release creation by specifying a version.
+name: on-cd-wd-go-releaser
 
 on:
   workflow_dispatch:
@@ -51,11 +50,11 @@ jobs:
           echo "version=$GO_VERSION" >> "$GITHUB_OUTPUT"
 
   release:
-    name: Release ABSC
+    name: Release base
     needs: detect-go-version
     uses: y-miyazaki/config/.github/workflows/cd-go-releaser.yaml@4d5104b3af3d62cc3afa960f5c9f99ae95699979 # v1.0.6
     with:
-      component: absc
+      component: base
       create_tag: ${{ inputs.create_tag }}
       draft: ${{ inputs.draft }}
       go_project_path: "."
