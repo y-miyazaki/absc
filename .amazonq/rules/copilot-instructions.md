@@ -1,1 +1,0 @@
-/workspace/.github/copilot-instructions.md
