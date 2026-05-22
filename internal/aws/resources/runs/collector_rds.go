@@ -39,6 +39,7 @@ func (c *rdsCollector) Collect(ctx context.Context, schedule *resourcescore.Sche
 	}
 	return runs, nil
 }
+
 func (c *rdsCollector) collectRuns(ctx context.Context, targetAction string, resourceIDs []string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
 	runs, err := collectCloudTrailRunsForResources(ctx, c.ctSvc, targetAction, resourceIDs, since, until, maxResults, c.caches, c.runsFromEvent)
 	if err != nil {

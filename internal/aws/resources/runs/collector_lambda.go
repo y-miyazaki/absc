@@ -34,9 +34,11 @@ const (
 	lambdaStatusFailed                = "FAILED"
 )
 
-var lambdaDurationPattern = regexp.MustCompile(`Duration:\s*(\d+(?:\.\d+)?)\s*ms`)
-var lambdaErrorTypePattern = regexp.MustCompile(`Error Type:\s*([A-Za-z0-9._-]+)`)
-var lambdaStatusPattern = regexp.MustCompile(`Status:\s*([A-Za-z_]+)`)
+var (
+	lambdaDurationPattern  = regexp.MustCompile(`Duration:\s*(\d+(?:\.\d+)?)\s*ms`)
+	lambdaErrorTypePattern = regexp.MustCompile(`Error Type:\s*([A-Za-z0-9._-]+)`)
+	lambdaStatusPattern    = regexp.MustCompile(`Status:\s*([A-Za-z_]+)`)
+)
 
 type lambdaCollector struct {
 	caches *runCollectorCaches
