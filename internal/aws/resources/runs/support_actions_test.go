@@ -23,7 +23,6 @@ func TestIsMeasurableAction(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			if got := isMeasurableAction(tt.targetKind, tt.targetAction); got != tt.want {
@@ -48,7 +47,6 @@ func TestCloudTrailRequestedStatus(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			if got := cloudTrailRequestedStatus(tt.eventName); got != tt.want {

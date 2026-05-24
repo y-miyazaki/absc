@@ -16,7 +16,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/scheduler v1.17.24
 	github.com/aws/aws-sdk-go-v2/service/sfn v1.40.12
 	github.com/urfave/cli/v3 v3.9.0
-	github.com/y-miyazaki/go-common v0.10.2
+	github.com/y-miyazaki/go-common v0.10.3
 )
 
 require (

@@ -197,7 +197,6 @@ func TestLambdaCollector_FunctionNameExtraction(t *testing.T) {
 	collector := &lambdaCollector{}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := collector.functionName(tt.functionTarget)
@@ -229,7 +228,6 @@ func TestLambdaCloudTrailResourceIDs(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := (&lambdaCollector{}).cloudTrailResourceIDs(tt.functionTarget)
