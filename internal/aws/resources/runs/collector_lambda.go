@@ -1,5 +1,3 @@
-// Package runs resolves execution history for schedule targets.
-//
 //revive:disable:comments-density reason: parser-focused collector code is intentionally compact.
 package runs
 
@@ -66,8 +64,6 @@ func newLambdaCollector(svc *cloudwatchlogs.Client, ctSvc *cloudtrail.Client, ca
 	return &lambdaCollector{caches: caches, ctSvc: ctSvc, svc: svc}
 }
 
-func (*lambdaCollector) Service() string { return "lambda" }
-
 //nolint:gocritic // CollectOptions is shared as a value object across collectors.
 func (c *lambdaCollector) Collect(ctx context.Context, schedule *resourcescore.Schedule, targetARN, runJobName string, hints TargetHints, opts resourcescore.CollectOptions) ([]resourcescore.Run, error) {
 	_ = runJobName
@@ -78,6 +74,25 @@ func (c *lambdaCollector) Collect(ctx context.Context, schedule *resourcescore.S
 	})
 	if err != nil {
 		return nil, fmt.Errorf("collect lambda runs for target %s: %w", targetARN, err)
+	}
+	return runs, nil
+}
+
+func (*lambdaCollector) Service() string { return "lambda" }
+
+func (c *lambdaCollector) cloudTrailResourceIDs(functionTarget string) []string {
+	trimmed := strings.TrimSpace(functionTarget)
+	if trimmed == "" {
+		return nil
+	}
+	ids := appendUniqueTrimmedResourceIDs(nil, trimmed)
+	return appendUniqueTrimmedResourceIDs(ids, c.functionName(functionTarget))
+}
+
+func (c *lambdaCollector) collectCloudTrailRuns(ctx context.Context, targetAction, functionTarget string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
+	runs, err := collectCloudTrailRunsForResources(ctx, c.ctSvc, targetAction, c.cloudTrailResourceIDs(functionTarget), since, until, maxResults, c.caches, c.runsFromCloudTrailEvent)
+	if err != nil {
+		return nil, fmt.Errorf("collect lambda cloudtrail runs: %w", err)
 	}
 	return runs, nil
 }
@@ -125,14 +140,6 @@ func (c *lambdaCollector) collectRuns(ctx context.Context, targetAction, functio
 	return runs, nil
 }
 
-func (c *lambdaCollector) collectCloudTrailRuns(ctx context.Context, targetAction, functionTarget string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
-	runs, err := collectCloudTrailRunsForResources(ctx, c.ctSvc, targetAction, c.cloudTrailResourceIDs(functionTarget), since, until, maxResults, c.caches, c.runsFromCloudTrailEvent)
-	if err != nil {
-		return nil, fmt.Errorf("collect lambda cloudtrail runs: %w", err)
-	}
-	return runs, nil
-}
-
 func (c *lambdaCollector) collectRunsWithPattern(ctx context.Context, functionName string, since, until time.Time, maxResults int, filterPattern string) ([]resourcescore.Run, error) {
 	pageSize := pageSizeForLimit(maxResults, cloudWatchLogsFilterEventsPageSizeMax)
 	input := &cloudwatchlogs.FilterLogEventsInput{LogGroupName: aws.String("/aws/lambda/" + functionName), StartTime: aws.Int64(since.UnixMilli()), FilterPattern: aws.String(filterPattern), Limit: &pageSize}
@@ -160,6 +167,59 @@ func (c *lambdaCollector) collectRunsWithPattern(ctx context.Context, functionNa
 	return runs, nil
 }
 
+func (c *lambdaCollector) durationSec(message string) int64 {
+	if report, ok := c.parsePlatformReport(message); ok {
+		if report.Record.Metrics.DurationMs <= 0 {
+			return 0
+		}
+		return int64(math.Ceil(report.Record.Metrics.DurationMs / 1000.0))
+	}
+	match := lambdaDurationPattern.FindStringSubmatch(message)
+	if len(match) < lambdaSplitParts {
+		return 0
+	}
+	milliseconds, err := strconv.ParseFloat(match[1], lambdaFloatBitSize)
+	if err != nil || milliseconds <= 0 {
+		return 0
+	}
+	return int64(math.Ceil(milliseconds / 1000.0))
+}
+
+func (*lambdaCollector) eventIDOrTime(eventID *string, timestamp time.Time) string {
+	if eventID != nil && *eventID != "" {
+		return *eventID
+	}
+	return helpers.FormatRFC3339NanoUTC(timestamp)
+}
+
+func (*lambdaCollector) functionName(functionTarget string) string {
+	trimmed := strings.TrimSpace(functionTarget)
+	if trimmed == "" {
+		return ""
+	}
+	if strings.Contains(trimmed, ":function:") {
+		parts := strings.SplitN(trimmed, ":function:", lambdaSplitParts)
+		if len(parts) == lambdaSplitParts {
+			return strings.SplitN(parts[1], ":", lambdaSplitParts)[0]
+		}
+	}
+	if strings.Contains(trimmed, ":") {
+		return helpers.ResourceNameFromARN(trimmed)
+	}
+	return trimmed
+}
+
+func (*lambdaCollector) parsePlatformReport(message string) (lambdaPlatformReport, bool) {
+	var report lambdaPlatformReport
+	if err := json.Unmarshal([]byte(strings.TrimSpace(message)), &report); err != nil {
+		return lambdaPlatformReport{}, false
+	}
+	if !strings.EqualFold(strings.TrimSpace(report.Type), lambdaPlatformReportType) {
+		return lambdaPlatformReport{}, false
+	}
+	return report, true
+}
+
 func (c *lambdaCollector) runFromLogEvent(event cloudwatchlogstypes.FilteredLogEvent, since time.Time) (resourcescore.Run, bool) {
 	if event.Timestamp == nil || event.Message == nil {
 		return resourcescore.Run{}, false
@@ -183,60 +243,14 @@ func (c *lambdaCollector) runFromLogEvent(event cloudwatchlogstypes.FilteredLogE
 	return run, true
 }
 
-func (*lambdaCollector) functionName(functionTarget string) string {
-	trimmed := strings.TrimSpace(functionTarget)
-	if trimmed == "" {
-		return ""
+func (*lambdaCollector) runSortTime(run *resourcescore.Run) time.Time {
+	if parsed, err := time.Parse(time.RFC3339, run.EndAt); err == nil {
+		return parsed
 	}
-	if strings.Contains(trimmed, ":function:") {
-		parts := strings.SplitN(trimmed, ":function:", lambdaSplitParts)
-		if len(parts) == lambdaSplitParts {
-			return strings.SplitN(parts[1], ":", lambdaSplitParts)[0]
-		}
+	if parsed, err := time.Parse(time.RFC3339, run.StartAt); err == nil {
+		return parsed
 	}
-	if strings.Contains(trimmed, ":") {
-		return helpers.ResourceNameFromARN(trimmed)
-	}
-	return trimmed
-}
-
-func (*lambdaCollector) runsFromCloudTrailEvent(event *cloudtrailtypes.Event, since time.Time) []cloudTrailActionRun {
-	runs := genericCloudTrailRunsFromEvent(
-		event,
-		since,
-		lambdaCloudTrailRequestResourceKeys,
-	)
-	for runIndex := range runs {
-		runs[runIndex].run.SourceService = "cloudtrail"
-	}
-	return runs
-}
-
-func (c *lambdaCollector) cloudTrailResourceIDs(functionTarget string) []string {
-	trimmed := strings.TrimSpace(functionTarget)
-	if trimmed == "" {
-		return nil
-	}
-	ids := appendUniqueTrimmedResourceIDs(nil, trimmed)
-	return appendUniqueTrimmedResourceIDs(ids, c.functionName(functionTarget))
-}
-
-func (c *lambdaCollector) durationSec(message string) int64 {
-	if report, ok := c.parsePlatformReport(message); ok {
-		if report.Record.Metrics.DurationMs <= 0 {
-			return 0
-		}
-		return int64(math.Ceil(report.Record.Metrics.DurationMs / 1000.0))
-	}
-	match := lambdaDurationPattern.FindStringSubmatch(message)
-	if len(match) < lambdaSplitParts {
-		return 0
-	}
-	milliseconds, err := strconv.ParseFloat(match[1], lambdaFloatBitSize)
-	if err != nil || milliseconds <= 0 {
-		return 0
-	}
-	return int64(math.Ceil(milliseconds / 1000.0))
+	return time.Time{}
 }
 
 func (c *lambdaCollector) runStatus(message string) string {
@@ -267,14 +281,16 @@ func (c *lambdaCollector) runStatusDetail(message string) string {
 	return lambdaStatusCompleted
 }
 
-func (*lambdaCollector) runSortTime(run *resourcescore.Run) time.Time {
-	if parsed, err := time.Parse(time.RFC3339, run.EndAt); err == nil {
-		return parsed
+func (*lambdaCollector) runsFromCloudTrailEvent(event *cloudtrailtypes.Event, since time.Time) []cloudTrailActionRun {
+	runs := genericCloudTrailRunsFromEvent(
+		event,
+		since,
+		lambdaCloudTrailRequestResourceKeys,
+	)
+	for runIndex := range runs {
+		runs[runIndex].run.SourceService = "cloudtrail"
 	}
-	if parsed, err := time.Parse(time.RFC3339, run.StartAt); err == nil {
-		return parsed
-	}
-	return time.Time{}
+	return runs
 }
 
 func (*lambdaCollector) statusDetailFromFields(status, errorType string) string {
@@ -290,22 +306,4 @@ func (*lambdaCollector) statusDetailFromFields(status, errorType string) string 
 		return lambdaStatusFailed
 	}
 	return lambdaStatusCompleted
-}
-
-func (*lambdaCollector) parsePlatformReport(message string) (lambdaPlatformReport, bool) {
-	var report lambdaPlatformReport
-	if err := json.Unmarshal([]byte(strings.TrimSpace(message)), &report); err != nil {
-		return lambdaPlatformReport{}, false
-	}
-	if !strings.EqualFold(strings.TrimSpace(report.Type), lambdaPlatformReportType) {
-		return lambdaPlatformReport{}, false
-	}
-	return report, true
-}
-
-func (*lambdaCollector) eventIDOrTime(eventID *string, timestamp time.Time) string {
-	if eventID != nil && *eventID != "" {
-		return *eventID
-	}
-	return helpers.FormatRFC3339NanoUTC(timestamp)
 }

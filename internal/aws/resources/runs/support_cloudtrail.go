@@ -1,5 +1,3 @@
-// Package runs resolves execution history for schedule targets.
-//
 //revive:disable:comments-density reason: CloudTrail helpers are intentionally compact.
 package runs
 
@@ -193,13 +191,7 @@ func appendUniqueTrimmedResourceIDs(resourceIDs []string, candidates ...string) 
 		if trimmed == "" {
 			continue
 		}
-		duplicate := false
-		for _, existing := range result {
-			if existing == trimmed {
-				duplicate = true
-				break
-			}
-		}
+		duplicate := slices.Contains(result, trimmed)
 		if duplicate {
 			continue
 		}

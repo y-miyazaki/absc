@@ -1,5 +1,3 @@
-// Package runs resolves execution history for schedule targets.
-//
 //revive:disable:comments-density reason: pagination helpers are intentionally compact and self-descriptive.
 package runs
 

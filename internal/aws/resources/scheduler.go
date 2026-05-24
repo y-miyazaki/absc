@@ -207,11 +207,6 @@ func NewSchedulerCollector(cfg *aws.Config, region string) (*SchedulerCollector,
 	}, nil
 }
 
-// Name returns the collector identifier.
-func (*SchedulerCollector) Name() string {
-	return "eventbridge_scheduler"
-}
-
 // Collect lists schedules, computes next invocations, and resolves recent runs.
 //
 //nolint:gocritic // CollectOptions is intentionally passed by value to preserve the public API.
@@ -341,17 +336,22 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 	return schedules, errs
 }
 
+// Name returns the collector identifier.
+func (*SchedulerCollector) Name() string {
+	return "eventbridge_scheduler"
+}
+
 // awsSDKServiceFromARN extracts the service name from an aws-sdk scheduler target ARN.
 // For an ARN containing ":aws-sdk:SERVICE:ACTION", returns "service" (lowercase).
 func awsSDKServiceFromARN(lowerARN string) string {
 	const marker = ":aws-sdk:"
-	idx := strings.Index(lowerARN, marker)
-	if idx < 0 {
+	_, after, ok := strings.Cut(lowerARN, marker)
+	if !ok {
 		return ""
 	}
-	rest := lowerARN[idx+len(marker):]
-	if colon := strings.Index(rest, ":"); colon >= 0 {
-		return rest[:colon]
+	rest := after
+	if before, _, found := strings.Cut(rest, ":"); found {
+		return before
 	}
 	return rest
 }

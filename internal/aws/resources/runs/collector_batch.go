@@ -1,5 +1,3 @@
-// Package runs resolves execution history for schedule targets.
-//
 //revive:disable:comments-density reason: collector code is intentionally linear and concise.
 package runs
 
@@ -29,8 +27,6 @@ func newBatchCollector(svc *batch.Client, ctSvc *cloudtrail.Client, caches *runC
 	return &batchCollector{caches: caches, ctSvc: ctSvc, svc: svc}
 }
 
-func (*batchCollector) Service() string { return "batch" }
-
 //nolint:gocritic // CollectOptions is shared as a value object across collectors.
 func (c *batchCollector) Collect(ctx context.Context, schedule *resourcescore.Schedule, targetARN, runJobName string, hints TargetHints, opts resourcescore.CollectOptions) ([]resourcescore.Run, error) {
 	_ = hints
@@ -41,6 +37,23 @@ func (c *batchCollector) Collect(ctx context.Context, schedule *resourcescore.Sc
 	})
 	if err != nil {
 		return nil, fmt.Errorf("collect batch runs for target %s: %w", targetARN, err)
+	}
+	return runs, nil
+}
+
+func (*batchCollector) Service() string { return "batch" }
+
+func (*batchCollector) cloudTrailResourceIDs(targetARN, jobName string) []string {
+	ids := make([]string, 0, batchCloudTrailResourceIDsCapacity)
+	ids = appendUniqueTrimmedResourceIDs(ids, targetARN)
+	ids = appendResourceNameFromARN(ids, targetARN)
+	return appendUniqueTrimmedResourceIDs(ids, jobName)
+}
+
+func (c *batchCollector) collectCloudTrailRuns(ctx context.Context, targetAction, targetARN, jobName string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
+	runs, err := collectCloudTrailRunsForResources(ctx, c.ctSvc, targetAction, c.cloudTrailResourceIDs(targetARN, jobName), since, until, maxResults, c.caches, c.runsFromCloudTrailEvent)
+	if err != nil {
+		return nil, fmt.Errorf("collect batch cloudtrail runs: %w", err)
 	}
 	return runs, nil
 }
@@ -104,25 +117,10 @@ func (c *batchCollector) collectRuns(ctx context.Context, targetAction, targetAR
 	return runs, nil
 }
 
-func (c *batchCollector) collectCloudTrailRuns(ctx context.Context, targetAction, targetARN, jobName string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
-	runs, err := collectCloudTrailRunsForResources(ctx, c.ctSvc, targetAction, c.cloudTrailResourceIDs(targetARN, jobName), since, until, maxResults, c.caches, c.runsFromCloudTrailEvent)
-	if err != nil {
-		return nil, fmt.Errorf("collect batch cloudtrail runs: %w", err)
-	}
-	return runs, nil
-}
-
 func (*batchCollector) runsFromCloudTrailEvent(event *cloudtrailtypes.Event, since time.Time) []cloudTrailActionRun {
 	return genericCloudTrailRunsFromEvent(
 		event,
 		since,
 		batchCloudTrailRequestResourceKeys,
 	)
-}
-
-func (*batchCollector) cloudTrailResourceIDs(targetARN, jobName string) []string {
-	ids := make([]string, 0, batchCloudTrailResourceIDsCapacity)
-	ids = appendUniqueTrimmedResourceIDs(ids, targetARN)
-	ids = appendResourceNameFromARN(ids, targetARN)
-	return appendUniqueTrimmedResourceIDs(ids, jobName)
 }

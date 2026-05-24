@@ -1,5 +1,3 @@
-// Package runs resolves execution history for schedule targets.
-//
 //revive:disable:comments-density reason: CloudTrail parser code is intentionally compact.
 package runs
 
@@ -38,8 +36,6 @@ func newEC2Collector(ctSvc *cloudtrail.Client, caches *runCollectorCaches) *ec2C
 	return &ec2Collector{caches: caches, ctSvc: ctSvc}
 }
 
-func (*ec2Collector) Service() string { return "ec2" }
-
 //nolint:gocritic // CollectOptions is shared as a value object across collectors.
 func (c *ec2Collector) Collect(ctx context.Context, schedule *resourcescore.Schedule, targetARN, runJobName string, hints TargetHints, opts resourcescore.CollectOptions) ([]resourcescore.Run, error) {
 	_ = targetARN
@@ -54,6 +50,8 @@ func (c *ec2Collector) Collect(ctx context.Context, schedule *resourcescore.Sche
 	}
 	return runs, nil
 }
+
+func (*ec2Collector) Service() string { return "ec2" }
 
 func (c *ec2Collector) collectRuns(ctx context.Context, targetAction string, instanceIDs []string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
 	runs, err := collectCloudTrailRunsForResources(ctx, c.ctSvc, targetAction, instanceIDs, since, until, maxResults, c.caches, c.runsFromEvent)

@@ -1,5 +1,3 @@
-// Package runs resolves execution history for schedule targets.
-//
 //revive:disable:comments-density reason: CloudTrail parser code is intentionally compact.
 package runs
 
@@ -23,8 +21,6 @@ func newRedshiftCollector(ctSvc *cloudtrail.Client, caches *runCollectorCaches) 
 	return &redshiftCollector{caches: caches, ctSvc: ctSvc}
 }
 
-func (*redshiftCollector) Service() string { return "redshift" }
-
 //nolint:gocritic // CollectOptions is shared as a value object across collectors.
 func (c *redshiftCollector) Collect(ctx context.Context, schedule *resourcescore.Schedule, targetARN, runJobName string, hints TargetHints, opts resourcescore.CollectOptions) ([]resourcescore.Run, error) {
 	_ = targetARN
@@ -39,6 +35,8 @@ func (c *redshiftCollector) Collect(ctx context.Context, schedule *resourcescore
 	}
 	return runs, nil
 }
+
+func (*redshiftCollector) Service() string { return "redshift" }
 
 func (c *redshiftCollector) collectRuns(ctx context.Context, targetAction string, clusterIDs []string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
 	runs, err := collectCloudTrailRunsForResources(ctx, c.ctSvc, targetAction, clusterIDs, since, until, maxResults, c.caches, c.runsFromEvent)

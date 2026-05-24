@@ -1,5 +1,3 @@
-// Package runs resolves execution history for schedule targets.
-//
 //revive:disable:comments-density reason: collector code is intentionally linear and concise.
 package runs
 
@@ -27,8 +25,6 @@ func newGlueCollector(svc *glue.Client, ctSvc *cloudtrail.Client, caches *runCol
 	return &glueCollector{caches: caches, ctSvc: ctSvc, svc: svc}
 }
 
-func (*glueCollector) Service() string { return "glue" }
-
 //nolint:gocritic // CollectOptions is shared as a value object across collectors.
 func (c *glueCollector) Collect(ctx context.Context, schedule *resourcescore.Schedule, targetARN, runJobName string, hints TargetHints, opts resourcescore.CollectOptions) ([]resourcescore.Run, error) {
 	_ = runJobName
@@ -39,6 +35,28 @@ func (c *glueCollector) Collect(ctx context.Context, schedule *resourcescore.Sch
 	})
 	if err != nil {
 		return nil, fmt.Errorf("collect glue runs for target %s: %w", targetARN, err)
+	}
+	return runs, nil
+}
+
+func (*glueCollector) Service() string { return "glue" }
+
+func (*glueCollector) cloudTrailResourceIDs(jobNameOrARN string) []string {
+	trimmed := strings.TrimSpace(jobNameOrARN)
+	if trimmed == "" {
+		return nil
+	}
+	ids := appendUniqueTrimmedResourceIDs(nil, trimmed)
+	if strings.Contains(trimmed, ":") {
+		ids = appendResourceNameFromARN(ids, trimmed)
+	}
+	return ids
+}
+
+func (c *glueCollector) collectCloudTrailRuns(ctx context.Context, targetAction, jobNameOrARN string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
+	runs, err := collectCloudTrailRunsForResources(ctx, c.ctSvc, targetAction, c.cloudTrailResourceIDs(jobNameOrARN), since, until, maxResults, c.caches, c.runsFromCloudTrailEvent)
+	if err != nil {
+		return nil, fmt.Errorf("collect glue cloudtrail runs: %w", err)
 	}
 	return runs, nil
 }
@@ -92,30 +110,10 @@ func (c *glueCollector) collectRuns(ctx context.Context, targetAction, jobNameOr
 	return runs, nil
 }
 
-func (c *glueCollector) collectCloudTrailRuns(ctx context.Context, targetAction, jobNameOrARN string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
-	runs, err := collectCloudTrailRunsForResources(ctx, c.ctSvc, targetAction, c.cloudTrailResourceIDs(jobNameOrARN), since, until, maxResults, c.caches, c.runsFromCloudTrailEvent)
-	if err != nil {
-		return nil, fmt.Errorf("collect glue cloudtrail runs: %w", err)
-	}
-	return runs, nil
-}
-
 func (*glueCollector) runsFromCloudTrailEvent(event *cloudtrailtypes.Event, since time.Time) []cloudTrailActionRun {
 	return genericCloudTrailRunsFromEvent(
 		event,
 		since,
 		glueCloudTrailRequestResourceKeys,
 	)
-}
-
-func (*glueCollector) cloudTrailResourceIDs(jobNameOrARN string) []string {
-	trimmed := strings.TrimSpace(jobNameOrARN)
-	if trimmed == "" {
-		return nil
-	}
-	ids := appendUniqueTrimmedResourceIDs(nil, trimmed)
-	if strings.Contains(trimmed, ":") {
-		ids = appendResourceNameFromARN(ids, trimmed)
-	}
-	return ids
 }

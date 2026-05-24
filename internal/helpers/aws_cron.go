@@ -1,5 +1,3 @@
-// Package helpers provides reusable pure utility functions.
-//
 //revive:disable:comments-density reason: parser helpers are intentionally compact and mechanically structured.
 package helpers
 
@@ -179,7 +177,7 @@ func MatchCronField(field string, value, minValue, maxValue int, aliases map[str
 	if trimmed == awsCronWildcard || trimmed == awsCronNoSpecific {
 		return true
 	}
-	for _, rawPart := range strings.Split(trimmed, ",") {
+	for rawPart := range strings.SplitSeq(trimmed, ",") {
 		part := strings.TrimSpace(rawPart)
 		if part != "" && MatchCronPart(part, value, minValue, maxValue, aliases) {
 			return true
@@ -289,7 +287,7 @@ func ParseCronField(field string, minValue, maxValue int) []int {
 	}
 
 	result := make(map[int]struct{})
-	for _, rawPart := range strings.Split(trimmed, ",") {
+	for rawPart := range strings.SplitSeq(trimmed, ",") {
 		part := strings.TrimSpace(rawPart)
 		if part == "" {
 			continue

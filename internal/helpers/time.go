@@ -1,5 +1,3 @@
-// Package helpers provides reusable pure utility functions.
-//
 //revive:disable:comments-density reason: helper functions are straightforward and intentionally compact.
 package helpers
 

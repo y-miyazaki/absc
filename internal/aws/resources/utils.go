@@ -111,11 +111,11 @@ func detectTargetService(arn string) string {
 	}
 
 	lower := strings.ToLower(v)
-	if idx := strings.Index(lower, schedulerSDKMarker); idx >= 0 {
-		sdkPart := lower[idx+len(schedulerSDKMarker):]
+	if _, after, ok := strings.Cut(lower, schedulerSDKMarker); ok {
+		sdkPart := after
 		sdkParts := strings.SplitN(sdkPart, colonSeparator, sdkSplitParts)
 		if len(sdkParts) >= 1 {
-			if label, ok := serviceLabelBySDKService[sdkParts[0]]; ok {
+			if label, found := serviceLabelBySDKService[sdkParts[0]]; found {
 				return label
 			}
 		}

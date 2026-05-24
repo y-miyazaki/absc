@@ -1,5 +1,3 @@
-// Package runs resolves execution history for schedule targets.
-//
 //revive:disable:comments-density reason: small action-classification helpers are intentionally compact.
 package runs
 

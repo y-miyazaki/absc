@@ -45,11 +45,6 @@ func NewEventBridgeCollector(cfg *aws.Config, region string) (*EventBridgeCollec
 	}, nil
 }
 
-// Name returns the collector identifier.
-func (*EventBridgeCollector) Name() string {
-	return "eventbridge_rule"
-}
-
 // Collect loads scheduled rules and resolves supported target runs.
 //
 //nolint:gocritic // CollectOptions is intentionally passed by value to preserve the public API.
@@ -171,6 +166,11 @@ func (c *EventBridgeCollector) Collect(ctx context.Context, opts CollectOptions)
 		nextToken = page.NextToken
 	}
 	return schedules, errs
+}
+
+// Name returns the collector identifier.
+func (*EventBridgeCollector) Name() string {
+	return "eventbridge_rule"
 }
 
 // eventPatternSourceLabel extracts source values from an EventPattern JSON.

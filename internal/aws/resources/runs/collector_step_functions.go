@@ -1,5 +1,3 @@
-// Package runs resolves execution history for schedule targets.
-//
 //revive:disable:comments-density reason: collector code is intentionally linear and concise.
 package runs
 
@@ -33,8 +31,6 @@ func newStepFunctionsCollector(svc *sfn.Client, ctSvc *cloudtrail.Client, caches
 	return &stepFunctionsCollector{caches: caches, ctSvc: ctSvc, svc: svc}
 }
 
-func (*stepFunctionsCollector) Service() string { return "stepfunctions" }
-
 //nolint:gocritic // CollectOptions is shared as a value object across collectors.
 func (c *stepFunctionsCollector) Collect(ctx context.Context, schedule *resourcescore.Schedule, targetARN, runJobName string, hints TargetHints, opts resourcescore.CollectOptions) ([]resourcescore.Run, error) {
 	_ = runJobName
@@ -45,6 +41,25 @@ func (c *stepFunctionsCollector) Collect(ctx context.Context, schedule *resource
 	})
 	if err != nil {
 		return nil, fmt.Errorf("collect step function runs for target %s: %w", targetARN, err)
+	}
+	return runs, nil
+}
+
+func (*stepFunctionsCollector) Service() string { return "stepfunctions" }
+
+func (*stepFunctionsCollector) cloudTrailResourceIDs(stateMachineARN string) []string {
+	trimmed := strings.TrimSpace(stateMachineARN)
+	if trimmed == "" {
+		return nil
+	}
+	ids := appendUniqueTrimmedResourceIDs(nil, trimmed)
+	return appendResourceNameFromARN(ids, trimmed)
+}
+
+func (c *stepFunctionsCollector) collectCloudTrailRuns(ctx context.Context, targetAction, stateMachineARN string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
+	runs, err := collectCloudTrailRunsForResources(ctx, c.ctSvc, targetAction, c.cloudTrailResourceIDs(stateMachineARN), since, until, maxResults, c.caches, c.runsFromCloudTrailEvent)
+	if err != nil {
+		return nil, fmt.Errorf("collect stepfunctions cloudtrail runs: %w", err)
 	}
 	return runs, nil
 }
@@ -66,7 +81,7 @@ func (c *stepFunctionsCollector) collectRuns(ctx context.Context, targetAction, 
 			err  error
 			page *sfn.ListExecutionsOutput
 		)
-		for attempt := 0; attempt < stepFunctionMaxAttempts; attempt++ {
+		for attempt := range stepFunctionMaxAttempts {
 			page, err = p.NextPage(ctx)
 			if err == nil {
 				break
@@ -108,12 +123,12 @@ func (c *stepFunctionsCollector) collectRuns(ctx context.Context, targetAction, 
 	return runs, nil
 }
 
-func (c *stepFunctionsCollector) collectCloudTrailRuns(ctx context.Context, targetAction, stateMachineARN string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
-	runs, err := collectCloudTrailRunsForResources(ctx, c.ctSvc, targetAction, c.cloudTrailResourceIDs(stateMachineARN), since, until, maxResults, c.caches, c.runsFromCloudTrailEvent)
-	if err != nil {
-		return nil, fmt.Errorf("collect stepfunctions cloudtrail runs: %w", err)
+func (*stepFunctionsCollector) isThrottlingError(err error) bool {
+	if err == nil {
+		return false
 	}
-	return runs, nil
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "throttling") || strings.Contains(message, "rate exceeded")
 }
 
 func (*stepFunctionsCollector) runsFromCloudTrailEvent(event *cloudtrailtypes.Event, since time.Time) []cloudTrailActionRun {
@@ -122,21 +137,4 @@ func (*stepFunctionsCollector) runsFromCloudTrailEvent(event *cloudtrailtypes.Ev
 		since,
 		stepFunctionsCloudTrailRequestResourceKeys,
 	)
-}
-
-func (*stepFunctionsCollector) cloudTrailResourceIDs(stateMachineARN string) []string {
-	trimmed := strings.TrimSpace(stateMachineARN)
-	if trimmed == "" {
-		return nil
-	}
-	ids := appendUniqueTrimmedResourceIDs(nil, trimmed)
-	return appendResourceNameFromARN(ids, trimmed)
-}
-
-func (*stepFunctionsCollector) isThrottlingError(err error) bool {
-	if err == nil {
-		return false
-	}
-	message := strings.ToLower(err.Error())
-	return strings.Contains(message, "throttling") || strings.Contains(message, "rate exceeded")
 }

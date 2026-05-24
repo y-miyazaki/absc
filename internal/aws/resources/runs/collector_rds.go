@@ -1,5 +1,3 @@
-// Package runs resolves execution history for schedule targets.
-//
 //revive:disable:comments-density reason: CloudTrail parser code is intentionally compact.
 package runs
 
@@ -23,8 +21,6 @@ func newRDSCollector(ctSvc *cloudtrail.Client, caches *runCollectorCaches) *rdsC
 	return &rdsCollector{caches: caches, ctSvc: ctSvc}
 }
 
-func (*rdsCollector) Service() string { return "rds" }
-
 //nolint:gocritic // CollectOptions is shared as a value object across collectors.
 func (c *rdsCollector) Collect(ctx context.Context, schedule *resourcescore.Schedule, targetARN, runJobName string, hints TargetHints, opts resourcescore.CollectOptions) ([]resourcescore.Run, error) {
 	_ = targetARN
@@ -39,6 +35,8 @@ func (c *rdsCollector) Collect(ctx context.Context, schedule *resourcescore.Sche
 	}
 	return runs, nil
 }
+
+func (*rdsCollector) Service() string { return "rds" }
 
 func (c *rdsCollector) collectRuns(ctx context.Context, targetAction string, resourceIDs []string, since, until time.Time, maxResults int) ([]resourcescore.Run, error) {
 	runs, err := collectCloudTrailRunsForResources(ctx, c.ctSvc, targetAction, resourceIDs, since, until, maxResults, c.caches, c.runsFromEvent)

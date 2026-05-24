@@ -11,6 +11,7 @@ import (
 	"html/template"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -410,12 +411,7 @@ func scheduleSlotsInWindow(expression, expressionTimezone string, fallbackSlots 
 }
 
 func hasActiveSlot(slots []int) bool {
-	for i := range slots {
-		if slots[i] == 1 {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(slots, 1)
 }
 
 func buildSlotLabel(windowStart time.Time, slotIndex int) string {
@@ -457,7 +453,7 @@ func buildHourLabels(dayStart time.Time) []string {
 
 func buildSlotLabels(dayStart time.Time) []string {
 	labels := make([]string, 0, slotsPerTimelineDay)
-	for i := 0; i < slotsPerTimelineDay; i++ {
+	for i := range slotsPerTimelineDay {
 		start := dayStart.Add(time.Duration(i*slotMinutes) * time.Minute)
 		end := start.Add(time.Duration(slotMinutes) * time.Minute)
 		labels = append(labels, start.Format("15:04")+" - "+end.Format("15:04"))
