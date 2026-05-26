@@ -71,14 +71,6 @@
         "TOKEN=\"$GH_TOKEN\"; if [ -z \"$TOKEN\" ]; then TOKEN=\"$GITHUB_TOKEN\"; fi; uvx mcp-compressor==0.19.8 -- uvx mcp-proxy==0.12.0 --transport streamablehttp -H Authorization \"Bearer $TOKEN\" https://api.githubcopilot.com/mcp/"
       ]
     },
-    "playwright": {
-      "type": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "@playwright/mcp@0.0.75"
-      ]
-    },
     "codebase-memory-mcp": {
       "type": "stdio",
       "command": "codebase-memory-mcp",
@@ -89,6 +81,14 @@
       "command": "lean-ctx",
       "args": [
         "mcp"
+      ]
+    },
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@0.0.75"
       ]
     }
   },
