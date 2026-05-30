@@ -1,19 +1,19 @@
 lockfile_version: '1'
-generated_at: '2026-05-30T06:32:38.227708+00:00'
+generated_at: '2026-05-30T11:41:10.419437+00:00'
 apm_version: 0.14.0
 dependencies:
 - repo_url: y-miyazaki/config
   host: github.com
-  resolved_commit: ef4b653a927987fafd8849d53e2787e8f3020a3b
-  resolved_ref: v1.1.19
+  resolved_commit: 633b853b8832f3db2ca819d675b49271c3ce027b
+  resolved_ref: v1.1.20
   virtual_path: .apm/packages/aws
   is_virtual: true
   package_type: apm_package
   content_hash: sha256:e79bc9c3b1d62b34e939720f4f6a93d362dc79f1f2398de6a52107d723e82e03
 - repo_url: y-miyazaki/config
   host: github.com
-  resolved_commit: ef4b653a927987fafd8849d53e2787e8f3020a3b
-  resolved_ref: v1.1.19
+  resolved_commit: 633b853b8832f3db2ca819d675b49271c3ce027b
+  resolved_ref: v1.1.20
   virtual_path: .apm/packages/common
   is_virtual: true
   package_type: apm_package
@@ -25,16 +25,22 @@ dependencies:
   - .agents/skills/github-pr-body
   - .agents/skills/instructions-review
   - .agents/skills/markdown-validation
+  - .github/hooks/common-github-actions-actionlint.json
+  - .github/hooks/common-github-actions-ghalint.json
+  - .github/hooks/common-github-actions-zizmor.json
   - .github/hooks/common-lean-ctx.json
   - .github/hooks/common-markdownlint-cli2.json
   deployed_file_hashes:
+    .github/hooks/common-github-actions-actionlint.json: sha256:bf9fb5170a781b1378a7fec249a9d31807ee5027e84f82077746b94230781134
+    .github/hooks/common-github-actions-ghalint.json: sha256:cc6a2c06a24b436bad009e73b2d06f4a96747c29987a59f581b6d92d9068e63c
+    .github/hooks/common-github-actions-zizmor.json: sha256:4ad79520c68b1e585651f9d5ac0d9abe33c57b2df33626f66bff5c575ffdea2a
     .github/hooks/common-lean-ctx.json: sha256:30f187840c795acc257b22328f7bd3cd0ab78eb086a8c6e04f9792c18d4b2a7e
     .github/hooks/common-markdownlint-cli2.json: sha256:5a8f69cbf2e60aad7475b5855729f344ded69ba70010405f3c8e4e5f5061e3ec
-  content_hash: sha256:93aadd153c3abf60ac184ecb7d3f8f038e595b695259b4ee1585b9bb4b4f31c2
+  content_hash: sha256:ea558155d6a882ddf219787586ea86a24d2112b9e94789d43abd8a8ebe3db315
 - repo_url: y-miyazaki/config
   host: github.com
-  resolved_commit: ef4b653a927987fafd8849d53e2787e8f3020a3b
-  resolved_ref: v1.1.19
+  resolved_commit: 633b853b8832f3db2ca819d675b49271c3ce027b
+  resolved_ref: v1.1.20
   virtual_path: .apm/packages/go
   is_virtual: true
   package_type: apm_package
@@ -44,11 +50,11 @@ dependencies:
   - .github/hooks/go-golangci-lint.json
   deployed_file_hashes:
     .github/hooks/go-golangci-lint.json: sha256:5023d21f574b5478520b3308b50d9207c813e42f9a0e38cbcc906db9c0955462
-  content_hash: sha256:933cc908de5be0d4145f871f9f22f48f30eb4fed673b22c80393618a1d0bf148
+  content_hash: sha256:6234c159b6e4ad0a8f337af10fca4d61e03126eb53e1c419a9a7ddab135084d3
 - repo_url: y-miyazaki/config
   host: github.com
-  resolved_commit: ef4b653a927987fafd8849d53e2787e8f3020a3b
-  resolved_ref: v1.1.19
+  resolved_commit: 633b853b8832f3db2ca819d675b49271c3ce027b
+  resolved_ref: v1.1.20
   virtual_path: .apm/packages/shell-script
   is_virtual: true
   package_type: apm_package
@@ -60,7 +66,7 @@ dependencies:
   deployed_file_hashes:
     .github/hooks/shell-script-shellcheck.json: sha256:4e9c4634d6b9e3bce629f4ff0af8cf78c31a92b690cf37b1ff9b85d3bf114a26
     .github/hooks/shell-script-shfmt.json: sha256:50cd9a52cef467c379c986ef4809891ec4bfc5edeceb239948ed69eb1f4cbe47
-  content_hash: sha256:94fdbaebb73835b9f4080074c502cec170a8eb5a5779d6471ae06506c358bb1f
+  content_hash: sha256:dfd230f7196f96d055c81608493c5a9022ce7d137e264b6b8cffe023ea4f39f0
 mcp_servers:
 - aws-documentation-mcp-server
 - aws-knowledge-mcp-server
