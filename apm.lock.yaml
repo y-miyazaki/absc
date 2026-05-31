@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-05-31T17:36:33.088861+00:00'
+generated_at: '2026-05-31T17:46:15.350271+00:00'
 apm_version: 0.14.0
 dependencies:
 - repo_url: y-miyazaki/config
@@ -30,12 +30,20 @@ dependencies:
   - .github/hooks/common-github-actions-zizmor.json
   - .github/hooks/common-lean-ctx.json
   - .github/hooks/common-markdownlint-cli2.json
+  - .github/instructions/agent-skills.instructions.md
+  - .github/instructions/github-actions-workflow.instructions.md
+  - .github/instructions/instructions.instructions.md
+  - .github/instructions/markdown.instructions.md
   deployed_file_hashes:
     .github/hooks/common-github-actions-actionlint.json: sha256:bf9fb5170a781b1378a7fec249a9d31807ee5027e84f82077746b94230781134
     .github/hooks/common-github-actions-ghalint.json: sha256:cc6a2c06a24b436bad009e73b2d06f4a96747c29987a59f581b6d92d9068e63c
     .github/hooks/common-github-actions-zizmor.json: sha256:4ad79520c68b1e585651f9d5ac0d9abe33c57b2df33626f66bff5c575ffdea2a
     .github/hooks/common-lean-ctx.json: sha256:30f187840c795acc257b22328f7bd3cd0ab78eb086a8c6e04f9792c18d4b2a7e
     .github/hooks/common-markdownlint-cli2.json: sha256:5a8f69cbf2e60aad7475b5855729f344ded69ba70010405f3c8e4e5f5061e3ec
+    .github/instructions/agent-skills.instructions.md: sha256:c4d6fbf162ea92229232615e967c5e5d004bd8f442354b7c85ee6ecd45cfb557
+    .github/instructions/github-actions-workflow.instructions.md: sha256:5585dd66938fcded0dcb7e860a87db7cad43a1817b08388a023ce7c912674621
+    .github/instructions/instructions.instructions.md: sha256:6e29597165f539e30974603b04416db334f92df8e2a3f05247f1bc7871dc9b21
+    .github/instructions/markdown.instructions.md: sha256:350ed7ecc1a368256e2ecc0a143a61db72e18f5e7261d655e04fcad822f9f782
   content_hash: sha256:10d2aea7ebb860d630d21c83b7a3897577a8c2e0f005df05ce933fb93492c1a3
 - repo_url: y-miyazaki/config
   host: github.com
@@ -48,8 +56,10 @@ dependencies:
   - .agents/skills/go-review
   - .agents/skills/go-validation
   - .github/hooks/go-golangci-lint.json
+  - .github/instructions/go.instructions.md
   deployed_file_hashes:
     .github/hooks/go-golangci-lint.json: sha256:5023d21f574b5478520b3308b50d9207c813e42f9a0e38cbcc906db9c0955462
+    .github/instructions/go.instructions.md: sha256:d941102daef01ede943c3837318d1d6b23340a2008252468e4e123450f038de6
   content_hash: sha256:201d709b425587283dbc61cd42c9619de2a00129788f5530891a5fcec358f2ee
 - repo_url: y-miyazaki/config
   host: github.com
@@ -63,9 +73,11 @@ dependencies:
   - .agents/skills/shell-script-validation
   - .github/hooks/shell-script-shellcheck.json
   - .github/hooks/shell-script-shfmt.json
+  - .github/instructions/shell-script.instructions.md
   deployed_file_hashes:
     .github/hooks/shell-script-shellcheck.json: sha256:4e9c4634d6b9e3bce629f4ff0af8cf78c31a92b690cf37b1ff9b85d3bf114a26
     .github/hooks/shell-script-shfmt.json: sha256:50cd9a52cef467c379c986ef4809891ec4bfc5edeceb239948ed69eb1f4cbe47
+    .github/instructions/shell-script.instructions.md: sha256:7cffbe5657c7441b6f542cc8231777cf615217e543298952ed0bf360e4094815
   content_hash: sha256:00bdbbae5a4c44bfc2ead5c32d43197283dbf402ee14acd12deb00f0987ac426
 mcp_servers:
 - aws-documentation-mcp-server

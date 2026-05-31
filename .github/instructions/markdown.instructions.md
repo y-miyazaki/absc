@@ -22,22 +22,15 @@ description: "AI Assistant Instructions for Markdown Documentation"
 
 ## Guidelines
 
-### README.md Structure
-
-- **DOC-01 (MUST)**: Use the following order - inconsistent ordering makes it harder for first-time users to find required information:
-  1. Project Title + Badge
-  2. Description
-  3. Features (concise list)
-  4. Installation/Setup
-  5. Usage/Examples
-  6. Configuration (when needed)
-  7. License/Contributing (when needed)
-
-### Documentation Rules
-
-- **DOC-02 (SHOULD)**: Add a TOC when the document has three or more sections.
-- **DOC-03 (SHOULD)**: Split large documents into logical sections.
-- **DOC-04 (SHOULD)**: Use appropriate image formats and sizes; avoid unnecessarily high resolution.
+### Documentation (DOC)
+- DOC-01 (MUST): README.md Section Order
+  - Check: Does README.md follow the order: Title+Badge → Description → Features → Installation/Setup → Usage/Examples → Configuration → License/Contributing?
+- DOC-02 (SHOULD): Table of Contents
+  - Check: Is a TOC present when the document has three or more H2 sections?
+- DOC-03 (SHOULD): Document Splitting
+  - Check: Are large documents split into logical sections rather than kept as single monolithic files?
+- DOC-04 (SHOULD): Image Optimization
+  - Check: Are images PNG for diagrams and JPEG for photos, kept under 500KB, and sized for readability without excessive resolution?
 
 ### Revision Process
 
@@ -49,7 +42,7 @@ description: "AI Assistant Instructions for Markdown Documentation"
 
 ### Code Modification Guidelines
 
-- After changes, prioritize the validation workflow from [markdown-validation Skill](../../apm_modules/y-miyazaki/config/.apm/packages/common/.apm/skills/markdown-validation/SKILL.md).
+- After changes, prioritize the validation workflow from markdown-validation skill.
 - Use individual checks for broken links and table formatting only during debugging.
 
 ## Testing and Validation
@@ -63,11 +56,11 @@ bash <agent-root>/skills/markdown-validation/scripts/validate.sh
 **Individual execution (debugging)**:
 
 ```bash
-markdownlint docs/
+markdownlint-cli2 "docs/**"
 markdown-link-check README.md
 ```
 
-**Detailed guide**: See [markdown-validation Skill](../../apm_modules/y-miyazaki/config/.apm/packages/common/.apm/skills/markdown-validation/SKILL.md).
+**Detailed guide**: See markdown-validation skill SKILL.md.
 
 ## Security Guidelines
 

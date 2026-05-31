@@ -14,13 +14,12 @@ description: "AI Assistant Instructions for Agent Skills Development"
 
 ### Required Sections
 
-- **S-01 (MUST)**: Define the following six sections as H2 headings in this exact order - missing sections break execution determinism:
+- **S-01 (MUST)**: Define the following five sections as H2 headings in this exact order - missing sections break execution determinism:
   1. Input
   2. Output Specification
   3. Execution Scope
   4. Reference Files Guide
   5. Workflow
-  6. Best Practices
 
 ### YAML Frontmatter
 
@@ -83,14 +82,14 @@ description: "AI Assistant Instructions for Agent Skills Development"
 ## Guidelines
 
 ### Pattern Checks (P)
-
 - P-01 (SHOULD): Design Pattern Compliance
   - Check: Does SKILL.md define a deterministic execution pattern with explicit flow, boundaries, and references?
 - P-02 (SHOULD): Output Contract Compliance
   - Check: Does the skill define a structured output contract across Output Specification and common-output-format.md without contradiction?
+- P-03 (SHOULD): Context Gathering Before Output
+  - Check: For skills that generate or modify content, does the Workflow include an explicit step to read relevant source material before writing?
 
 ### Quality Checks (Q)
-
 - Q-01 (SHOULD): Output is Truly Structured
   - Check: Is the output format definition implementable and parseable (JSON schema / Markdown structure explicitly defined with example)?
 - Q-02 (SHOULD): Scope Boundaries
@@ -105,15 +104,18 @@ description: "AI Assistant Instructions for Agent Skills Development"
   - Check: Are all instructions imperative and explicit with concrete conditions (no vague "appropriately", "depending on context", "reasonable")?
 - Q-09 (SHOULD): Token Hard Gate
   - Check: Does the review include `waza check` evidence and confirm Token Budget is 500 tokens or less?
+- Q-10 (SHOULD): Error Handling Completeness
+  - Check: Does the Workflow define failure modes with explicit severity (recoverable/fatal/blocking) and action for each?
+- Q-11 (SHOULD): Input Parameter Consistency
+  - Check: Are parameters marked "required" truly required (no default fallback), and parameters with defaults marked as optional?
 - BP-03 (SHOULD): Token Efficiency
   - Check: Does SKILL.md avoid content that Claude already knows, minimizing redundancy with frontmatter and reference files?
 - BP-04 (SHOULD): Anti-Overtrimming Guardrail
   - Check: If token reduction is applied, are behavior-defining instructions preserved?
 
 ### Structural Checks (S)
-
 - S-01 (MUST): Structural Completeness
-  - Check: Does SKILL.md have all 6 required sections at ## heading level?
+  - Check: Does SKILL.md have all 5 required sections at ## heading level?
 - S-02 (MUST): YAML Frontmatter Fields
   - Check: Does SKILL.md YAML frontmatter have all required fields (name, description, license) and recommended metadata (author, version)?
 - BP-01 (SHOULD): Description Quality
@@ -129,8 +131,9 @@ description: "AI Assistant Instructions for Agent Skills Development"
 
 ### Code Modification Guidelines
 
-- After changes, prioritize running validate.sh from [agent-skills-review Skill](../../apm_modules/y-miyazaki/config/.apm/packages/common/.apm/skills/agent-skills-review/SKILL.md).
+- After changes, prioritize running validate.sh from agent-skills-review skill.
 - Use individual commands only for debugging.
+
 
 ## Testing and Validation
 
@@ -155,7 +158,7 @@ waza run <skill-name>/eval.yaml
 waza tokens count <skill-name>/SKILL.md
 ```
 
-**Detailed guide**: See [agent-skills-review Skill](../../apm_modules/y-miyazaki/config/.apm/packages/common/.apm/skills/agent-skills-review/SKILL.md).
+**Detailed guide**: See agent-skills-review skill SKILL.md.
 
 ## Security Guidelines
 

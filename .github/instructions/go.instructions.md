@@ -15,24 +15,29 @@ description: "AI Assistant Instructions for Go Development"
 
 | Component | Rule       | Example          |
 | --------- | ---------- | ---------------- |
-| Interface | er suffix  | UserRepository   |
+| Interface (single-method) | -er suffix  | Reader, Closer   |
+| Interface (multi-method)  | role name   | UserRepository   |
 | File name | snake_case | event_handler.go |
 
 ### Core Go Conventions
 
-- **S-01 (MUST)**: Add GoDoc-style comments to public APIs - package, public functions, methods, and structs are in scope.
-- **S-02 (MUST)**: Use lowercase single-word names for packages - this preserves readability and import consistency.
-- **S-03 (MUST)**: Prohibit ignored errors (`_` assignment) - allow exceptions only with explicit rationale.
-- **S-04 (MUST)**: Prefer error wrapping with `fmt.Errorf(... %w ...)` - keep causal tracing available to callers.
+- **S-01 (MUST)**: Add GoDoc-style comments to all exported symbols (packages, functions, methods, types).
+- **S-02 (MUST)**: Use lowercase single-word package names.
+- **S-03 (MUST)**: Handle every returned error explicitly — `_` assignment is prohibited unless justified with a comment.
+- **S-04 (MUST)**: Wrap errors with `fmt.Errorf("context: %w", err)` to preserve causal chain.
+- **S-05 (MUST)**: Accept `context.Context` as the first parameter in all exported functions that perform I/O or may block.
+- **S-06 (MUST)**: Keep interfaces small (1–3 methods) and define them on the consumer side.
+- **S-07 (MUST)**: Design types so their zero value is valid and useful where possible.
+- **S-08 (MUST)**: Pass dependencies as interface arguments in constructors — do not rely on package-level variables.
 
 ### File Declaration Order
 
-- **G-05 (MUST)**: Enforce declaration order within each file - inconsistent order reduces code navigability:
+- **G-05 (MUST)**: Enforce declaration order within each file:
   1. const
   2. var
   3. type（interface → struct）
   4. func（constructor → public methods → private methods → helpers）
-- **G-06 (SHOULD)**: Keep declarations in alphabetical order inside each section where practical. Place `main` first in the function section.
+- **G-06 (MUST)**: Sort declarations alphabetically within each group — this ensures stable diffs and predictable navigation.
 
 ### Unexported Helper Placement
 
@@ -46,10 +51,10 @@ description: "AI Assistant Instructions for Go Development"
 ### Architecture (ARCH)
 - ARCH-01 (SHOULD): Layer Separation
   - Check: Are handler/usecase/repository separated and business/infrastructure layers separated?
-- ARCH-02 (SHOULD): Dependency Injection
-  - Check: Are constructor injection, wire/dig utilization, and interface dependencies present?
-- ARCH-03 (SHOULD): Domain-Driven Design
-  - Check: Are aggregate roots defined, Value Objects utilized, and Repositories abstracted?
+- ARCH-02 (MUST): Dependency Injection
+  - Check: Are dependencies passed via constructor arguments as interfaces rather than accessed as global variables?
+- ARCH-03 (SHOULD): Domain Logic Isolation
+  - Check: Is business logic free from infrastructure concerns (DB, HTTP, external APIs)?
 - ARCH-04 (SHOULD): SOLID Principles
   - Check: Are SRP/OCP/LSP/ISP/DIP applied, interfaces segregated, and abstractions used?
 - ARCH-05 (SHOULD): Appropriate Package Structure
@@ -66,12 +71,12 @@ description: "AI Assistant Instructions for Go Development"
   - Check: Are boundaries clear, loosely coupled, highly cohesive, and public APIs minimized?
 
 ### Code Standards (CODE)
-- CODE-01 (SHOULD): Appropriate Interface Design
-  - Check: Are interface method counts (5+) and consumer-side definitions appropriate?
+- CODE-01 (MUST): Appropriate Interface Design
+  - Check: Are interfaces kept small (1-3 methods) and defined on the consumer side?
 - CODE-02 (SHOULD): API/Package Boundary Design
   - Check: Are there no excessive exports, unclear package name responsibilities, or unused internal/?
 - CODE-03 (SHOULD): Appropriate Struct Design
-  - Check: Are there no public fields, exposed mutexes, or excessive field counts (20+)?
+  - Check: Are fields with invariants unexported and protected by methods? Are mutexes unexported? Are structs with 20+ fields split?
 - CODE-04 (SHOULD): Safe Type Assertions
   - Check: Do type assertions have ok checks (v, ok := i.(string) format)?
 - CODE-05 (SHOULD): Appropriate defer Usage
@@ -93,17 +98,17 @@ description: "AI Assistant Instructions for Go Development"
 - CON-03 (SHOULD): Appropriate buffered/unbuffered channel Selection
   - Check: Is buffered/unbuffered selection appropriate with justified size?
 - CON-04 (SHOULD): Appropriate sync primitives Usage
-  - Check: Are sync.Mutex/RWMutex/WaitGroup/atomic used appropriately?
+  - Check: Are synchronization boundaries and ownership rules clear and consistently applied?
 - CON-05 (SHOULD): for+goroutine Variable Capture Issue
   - Check: Are loop variables not directly referenced in goroutines?
 - CON-06 (SHOULD): data race Detection and Prevention
   - Check: Is go test -race executed and shared memory protected with sync?
 
 ### Context Handling (CTX)
-- CTX-01 (SHOULD): Accept context in public APIs
+- CTX-01 (MUST): Accept context in public APIs
   - Check: Do public functions and methods accept context.Context as first argument?
-- CTX-02 (SHOULD): Avoid context.Background()/TODO() Overuse
-  - Check: Are there no excessive context.Background() uses or lingering context.TODO()?
+- CTX-02 (SHOULD): Avoid context lifecycle ambiguity
+  - Check: Is context origin and propagation path explicit across layer boundaries?
 - CTX-03 (SHOULD): Propagate context to goroutines
   - Check: Is context passed when launching goroutines?
 - CTX-04 (SHOULD): Appropriate cancel Invocation
@@ -128,7 +133,7 @@ description: "AI Assistant Instructions for Go Development"
 ### Documentation (DOC)
 - DOC-01 (SHOULD): Package Documentation Exists
   - Check: Are package doc comments, package purpose, and usage documented?
-- DOC-02 (SHOULD): godoc for Public Functions
+- DOC-02 (MUST): godoc for Public Functions
   - Check: Are all public APIs documented with godoc, arguments, return values, and error conditions specified?
 - DOC-03 (SHOULD): Complex Logic Comments
   - Check: Are Why-focused comments, algorithm explanations, and preconditions documented?
@@ -148,7 +153,7 @@ description: "AI Assistant Instructions for Go Development"
   - Check: Are Keep a Changelog format, semantic versioning, and breaking changes documented?
 
 ### Error Handling (ERR)
-- ERR-01 (SHOULD): Appropriate Error Wrapping
+- ERR-01 (MUST): Appropriate Error Wrapping
   - Check: Are errors wrapped with fmt.Errorf("%w", err) and context information included?
 - ERR-02 (SHOULD): Appropriate Custom Error Definition
   - Check: Are sentinel errors defined and custom errors compatible with errors.Is/As?
@@ -185,7 +190,7 @@ description: "AI Assistant Instructions for Go Development"
 - FUNC-08 (SHOULD): Leverage Higher-Order Functions
   - Check: Are callbacks and function pointers appropriately utilized?
 - FUNC-09 (SHOULD): Appropriate Generics Usage
-  - Check: Are there no interface{} overuse or unnecessary generics?
+  - Check: Are type abstraction boundaries explicit and are generic constraints minimal but sufficient?
 - FUNC-10 (SHOULD): Comprehensive Function Documentation
   - Check: Do all public functions have godoc with argument and return value descriptions?
 
@@ -199,12 +204,12 @@ description: "AI Assistant Instructions for Go Development"
 - G-04 (SHOULD): Appropriate Log Levels
   - Check: Are Debug/Info/Warn/Error levels appropriate and structured logging used?
 - G-05 (MUST): Declaration Order (File Level)
-  - Check: Is order const→var→type (interface→struct)→func (constructor→methods→helpers)?
-- G-06 (SHOULD): Declaration Order (Within Groups)
-  - Check: Is each group sorted A→Z alphabetically (recommended)?
+  - Check: Is order const→var→type (interface→struct)→func (public APIs and helpers grouped consistently)?
+- G-06 (MUST): Declaration Order (Within Groups)
+  - Check: Is each group sorted alphabetically (A→Z) for readability and diff stability?
 - G-07 (SHOULD): Restrict init() Complexity
   - Check: Does init() avoid panics, external I/O, and non-trivial side effects? Is it minimal and deterministic?
-- G-08 (SHOULD): Zero Value Design
+- G-08 (MUST): Zero Value Design
   - Check: Are types designed so their zero value is a valid and useful state where possible?
 - G-09 (SHOULD): Defensive Copy at Boundaries
   - Check: Are slices and maps copied when accepting from or returning to external callers?
@@ -271,7 +276,7 @@ description: "AI Assistant Instructions for Go Development"
 
 ### Code Modification Guidelines
 
-- After changes, prioritize running validate.sh from [go-validation Skill](../../apm_modules/y-miyazaki/config/.apm/packages/go/.apm/skills/go-validation/SKILL.md).
+- After changes, prioritize running validate.sh from go-validation skill.
 - Use individual commands (gofumpt/go vet/go test/golangci-lint) only for debugging.
 
 
@@ -297,7 +302,7 @@ golangci-lint run ./...
 go test -race -cover ./...
 ```
 
-**Detailed guide**: See [go-validation Skill](../../apm_modules/y-miyazaki/config/.apm/packages/go/.apm/skills/go-validation/SKILL.md).
+**Detailed guide**: See go-validation skill SKILL.md.
 
 ## Security Guidelines
 
