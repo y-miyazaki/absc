@@ -19,67 +19,70 @@ const (
 	cacheKeySeparator = "|"
 )
 
-var runCollectorRegistrations = []struct {
-	build      func(runCollectorDeps) runCollector
-	targetKind string
-}{
-	{
-		targetKind: "batch",
-		build: func(deps runCollectorDeps) runCollector {
-			return newBatchCollector(deps.batchSvc, deps.ctSvc, deps.caches)
+var (
+	// runCollectorRegistrations defines the available run collectors and their associated target kinds.
+	runCollectorRegistrations = []struct {
+		build      func(runCollectorDeps) runCollector
+		targetKind string
+	}{
+		{
+			targetKind: "batch",
+			build: func(deps runCollectorDeps) runCollector {
+				return newBatchCollector(deps.batchSvc, deps.ctSvc, deps.caches)
+			},
 		},
-	},
-	{
-		targetKind: "ec2",
-		build: func(deps runCollectorDeps) runCollector {
-			return newEC2Collector(deps.ctSvc, deps.caches)
+		{
+			targetKind: "ec2",
+			build: func(deps runCollectorDeps) runCollector {
+				return newEC2Collector(deps.ctSvc, deps.caches)
+			},
 		},
-	},
-	{
-		targetKind: "ecs",
-		build: func(deps runCollectorDeps) runCollector {
-			return newECSCollector(deps.ecsSvc, deps.ctSvc, deps.caches)
+		{
+			targetKind: "ecs",
+			build: func(deps runCollectorDeps) runCollector {
+				return newECSCollector(deps.ecsSvc, deps.ctSvc, deps.caches)
+			},
 		},
-	},
-	{
-		targetKind: "glue",
-		build: func(deps runCollectorDeps) runCollector {
-			return newGlueCollector(deps.glueSvc, deps.ctSvc, deps.caches)
+		{
+			targetKind: "glue",
+			build: func(deps runCollectorDeps) runCollector {
+				return newGlueCollector(deps.glueSvc, deps.ctSvc, deps.caches)
+			},
 		},
-	},
-	{
-		targetKind: "lambda",
-		build: func(deps runCollectorDeps) runCollector {
-			return newLambdaCollector(deps.cwlSvc, deps.ctSvc, deps.caches)
+		{
+			targetKind: "lambda",
+			build: func(deps runCollectorDeps) runCollector {
+				return newLambdaCollector(deps.cwlSvc, deps.ctSvc, deps.caches)
+			},
 		},
-	},
-	{
-		targetKind: "rds",
-		build: func(deps runCollectorDeps) runCollector {
-			return newRDSCollector(deps.ctSvc, deps.caches)
+		{
+			targetKind: "rds",
+			build: func(deps runCollectorDeps) runCollector {
+				return newRDSCollector(deps.ctSvc, deps.caches)
+			},
 		},
-	},
-	{
-		targetKind: "stepfunctions",
-		build: func(deps runCollectorDeps) runCollector {
-			return newStepFunctionsCollector(deps.stepSvc, deps.ctSvc, deps.caches)
+		{
+			targetKind: "stepfunctions",
+			build: func(deps runCollectorDeps) runCollector {
+				return newStepFunctionsCollector(deps.stepSvc, deps.ctSvc, deps.caches)
+			},
 		},
-	},
-	{
-		targetKind: "redshift",
-		build: func(deps runCollectorDeps) runCollector {
-			return newRedshiftCollector(deps.ctSvc, deps.caches)
+		{
+			targetKind: "redshift",
+			build: func(deps runCollectorDeps) runCollector {
+				return newRedshiftCollector(deps.ctSvc, deps.caches)
+			},
 		},
-	},
-}
-
-var supportedRunTargetKinds = func() []string {
-	targetKinds := make([]string, 0, len(runCollectorRegistrations))
-	for _, registration := range runCollectorRegistrations {
-		targetKinds = append(targetKinds, registration.targetKind)
 	}
-	return targetKinds
-}()
+	// supportedRunTargetKinds is a list of target kinds for which run collectors are registered.
+	supportedRunTargetKinds = func() []string {
+		targetKinds := make([]string, 0, len(runCollectorRegistrations))
+		for _, registration := range runCollectorRegistrations {
+			targetKinds = append(targetKinds, registration.targetKind)
+		}
+		return targetKinds
+	}()
+)
 
 // Resolver dispatches execution-history lookups to target-specific collectors.
 type Resolver struct {

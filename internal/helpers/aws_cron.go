@@ -51,30 +51,32 @@ const (
 	rateExpressionMinParts  = 2
 )
 
-var awsCronDayAliases = map[string]int{
-	"SUN": awsCronSunday,
-	"MON": awsCronMonday,
-	"TUE": awsCronTuesday,
-	"WED": awsCronWednesday,
-	"THU": awsCronThursday,
-	"FRI": awsCronFriday,
-	"SAT": awsCronSaturday,
-}
+var (
+	awsCronDayAliases = map[string]int{
+		"SUN": awsCronSunday,
+		"MON": awsCronMonday,
+		"TUE": awsCronTuesday,
+		"WED": awsCronWednesday,
+		"THU": awsCronThursday,
+		"FRI": awsCronFriday,
+		"SAT": awsCronSaturday,
+	}
 
-var awsCronMonthAliases = map[string]int{
-	"JAN": awsCronJanuary,
-	"FEB": awsCronFebruary,
-	"MAR": awsCronMarch,
-	"APR": awsCronApril,
-	"MAY": awsCronMay,
-	"JUN": awsCronJune,
-	"JUL": awsCronJuly,
-	"AUG": awsCronAugust,
-	"SEP": awsCronSeptember,
-	"OCT": awsCronOctober,
-	"NOV": awsCronNovember,
-	"DEC": awsCronDecember,
-}
+	awsCronMonthAliases = map[string]int{
+		"JAN": awsCronJanuary,
+		"FEB": awsCronFebruary,
+		"MAR": awsCronMarch,
+		"APR": awsCronApril,
+		"MAY": awsCronMay,
+		"JUN": awsCronJune,
+		"JUL": awsCronJuly,
+		"AUG": awsCronAugust,
+		"SEP": awsCronSeptember,
+		"OCT": awsCronOctober,
+		"NOV": awsCronNovember,
+		"DEC": awsCronDecember,
+	}
+)
 
 // BuildDailySlots expands an AWS cron or rate expression into one day's slot bitmap.
 func BuildDailySlots(expr string, slotMinutes int) []int {

@@ -18,28 +18,31 @@ const (
 	schedulerSDKMarker = ":aws-sdk:"
 )
 
-var serviceLabelByARNService = map[string]string{
-	"batch":    "Batch",
-	"ec2":      "EC2",
-	"ecs":      "ECS",
-	"events":   "EventBridge",
-	"glue":     "Glue",
-	"lambda":   "Lambda",
-	"rds":      "RDS",
-	"redshift": "Redshift",
-	"states":   "Step Functions",
-}
-
-var serviceLabelBySDKService = map[string]string{
-	"batch":    "Batch",
-	"ec2":      "EC2",
-	"ecs":      "ECS",
-	"glue":     "Glue",
-	"lambda":   "Lambda",
-	"rds":      "RDS",
-	"redshift": "Redshift",
-	"sfn":      "Step Functions",
-}
+var (
+	// serviceLabelByARNService maps AWS service identifiers extracted from ARNs to user-friendly labels.
+	serviceLabelByARNService = map[string]string{
+		"batch":    "Batch",
+		"ec2":      "EC2",
+		"ecs":      "ECS",
+		"events":   "EventBridge",
+		"glue":     "Glue",
+		"lambda":   "Lambda",
+		"rds":      "RDS",
+		"redshift": "Redshift",
+		"states":   "Step Functions",
+	}
+	// serviceLabelBySDKService maps AWS service identifiers extracted from EventBridge Scheduler aws-sdk target ARNs to user-friendly labels.
+	serviceLabelBySDKService = map[string]string{
+		"batch":    "Batch",
+		"ec2":      "EC2",
+		"ecs":      "ECS",
+		"glue":     "Glue",
+		"lambda":   "Lambda",
+		"rds":      "RDS",
+		"redshift": "Redshift",
+		"sfn":      "Step Functions",
+	}
+)
 
 // buildSlots maps cron or rate expressions into a fixed per-day slot timeline.
 func buildSlots(expr string) []int {

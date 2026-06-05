@@ -19,34 +19,6 @@ import (
 	"github.com/y-miyazaki/absc/internal/aws/resources/runs"
 )
 
-// SchedulerCollector collects schedules from EventBridge Scheduler in one region.
-type SchedulerCollector struct {
-	batchSvc *batch.Client
-	ctSvc    *cloudtrail.Client
-	cwlSvc   *cloudwatchlogs.Client
-	ec2Svc   *ec2.Client
-	ecsSvc   *ecs.Client
-	glueSvc  *glue.Client
-	svc      *scheduler.Client
-	stepSvc  *sfn.Client
-	region   string
-}
-
-type runTargetResolution struct {
-	runJobName         string
-	runTargetARN       string
-	hints              runs.TargetHints
-	hasBatchParameters bool
-}
-
-// sdkTargetResolver bundles all per-service resolution logic for aws-sdk scheduler targets.
-// runTarget extracts the downstream run target (for run history lookup); nil for terminal resources.
-// displayName extracts the human-readable resource name; nil means fall back to resourceNameFromARN.
-type sdkTargetResolver struct {
-	runTarget   func(string) runTargetResolution
-	displayName func(string, string) (string, bool)
-}
-
 // schedulerSDKResolvers maps an AWS SDK service name (lowercase) to its per-service resolver.
 // Add a new entry here to support additional aws-sdk target services.
 var schedulerSDKResolvers = map[string]sdkTargetResolver{
@@ -190,6 +162,34 @@ var schedulerSDKResolvers = map[string]sdkTargetResolver{
 			return "", false
 		},
 	},
+}
+
+// SchedulerCollector collects schedules from EventBridge Scheduler in one region.
+type SchedulerCollector struct {
+	batchSvc *batch.Client
+	ctSvc    *cloudtrail.Client
+	cwlSvc   *cloudwatchlogs.Client
+	ec2Svc   *ec2.Client
+	ecsSvc   *ecs.Client
+	glueSvc  *glue.Client
+	svc      *scheduler.Client
+	stepSvc  *sfn.Client
+	region   string
+}
+
+type runTargetResolution struct {
+	runJobName         string
+	runTargetARN       string
+	hints              runs.TargetHints
+	hasBatchParameters bool
+}
+
+// sdkTargetResolver bundles all per-service resolution logic for aws-sdk scheduler targets.
+// runTarget extracts the downstream run target (for run history lookup); nil for terminal resources.
+// displayName extracts the human-readable resource name; nil means fall back to resourceNameFromARN.
+type sdkTargetResolver struct {
+	runTarget   func(string) runTargetResolution
+	displayName func(string, string) (string, bool)
 }
 
 // NewSchedulerCollector builds regional clients for EventBridge Scheduler.

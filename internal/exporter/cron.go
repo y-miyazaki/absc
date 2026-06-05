@@ -21,25 +21,10 @@ import (
 )
 
 const (
-	awsCronFieldCount                  = 6
-	defaultDirPermission               = 0o750
-	defaultFilePermission              = 0o600
-	hourLabelStep                      = 1
-	hoursPerDay                        = 24
-	minutesPerSlot                     = 10
-	outputVersion                      = "1.0"
-	runInSlotCategoryNotObservable     = "not_observable_target"
-	runInSlotCategoryNotScheduledToday = "not_scheduled_today"
-	runInSlotCategoryObservable        = "observable"
-	slotIssueCollectedRunsCapped       = "COLLECTED_RUNS_CAPPED"
-	slotIssueNoRunInWindow             = "NO_RUN_IN_WINDOW"
-	slotIssueRunNotAlignedToSlot       = "RUN_NOT_ALIGNED_TO_SLOT"
-	slotMinutes                        = 10
-	slotsPerHour                       = 6
-	slotsPerTimelineDay                = 144
-)
-
-const errorsHTMLTemplate = `<!doctype html>
+	awsCronFieldCount     = 6
+	defaultDirPermission  = 0o750
+	defaultFilePermission = 0o600
+	errorsHTMLTemplate    = `<!doctype html>
 <html lang="en">
 <head>
 	<meta charset="utf-8" />
@@ -76,21 +61,37 @@ const errorsHTMLTemplate = `<!doctype html>
 	{{ end }}
 </body>
 </html>`
+	hourLabelStep                      = 1
+	hoursPerDay                        = 24
+	minutesPerSlot                     = 10
+	outputVersion                      = "1.0"
+	runInSlotCategoryNotObservable     = "not_observable_target"
+	runInSlotCategoryNotScheduledToday = "not_scheduled_today"
+	runInSlotCategoryObservable        = "observable"
+	slotIssueCollectedRunsCapped       = "COLLECTED_RUNS_CAPPED"
+	slotIssueNoRunInWindow             = "NO_RUN_IN_WINDOW"
+	slotIssueRunNotAlignedToSlot       = "RUN_NOT_ALIGNED_TO_SLOT"
+	slotMinutes                        = 10
+	slotsPerHour                       = 6
+	slotsPerTimelineDay                = 144
+)
 
-//go:embed html_template.html
-var htmlTemplate string
+var (
+	//go:embed html_template.html
+	htmlTemplate string
 
-//go:embed assets/icons/*.svg
-var iconAssets embed.FS
+	//go:embed assets/icons/*.svg
+	iconAssets embed.FS
 
-var observableTargetKinds = map[string]struct{}{
-	"batch":         {},
-	"ecs":           {},
-	"glue":          {},
-	"lambda":        {},
-	"redshift":      {},
-	"stepfunctions": {},
-}
+	observableTargetKinds = map[string]struct{}{
+		"batch":         {},
+		"ecs":           {},
+		"glue":          {},
+		"lambda":        {},
+		"redshift":      {},
+		"stepfunctions": {},
+	}
+)
 
 // AlignmentIssue reports a collected run that could not be aligned with an expected slot.
 //

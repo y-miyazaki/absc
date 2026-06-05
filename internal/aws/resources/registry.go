@@ -7,8 +7,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 )
 
-type collectorFactory func(*aws.Config, string) (Collector, error)
-
 var registeredConstructors = map[string]collectorFactory{
 	"eventbridge_rule": func(cfg *aws.Config, region string) (Collector, error) {
 		collector, err := NewEventBridgeCollector(cfg, region)
@@ -25,6 +23,9 @@ var registeredConstructors = map[string]collectorFactory{
 		return collector, nil
 	},
 }
+
+// collectorFactory is a function type that creates a Collector given an AWS config and region.
+type collectorFactory func(*aws.Config, string) (Collector, error)
 
 // initializeCollectors instantiates all registered collectors for a region.
 func initializeCollectors(cfg *aws.Config, region string) ([]Collector, error) {

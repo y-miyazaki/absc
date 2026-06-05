@@ -59,11 +59,6 @@ const (
 	timezoneFlagName           = "timezone"
 )
 
-// Build-time version information injected by GoReleaser via ldflags.
-var (
-	version = "v1.0.16"
-)
-
 var (
 	// errInvalidDaysAgo is returned when a negative day offset is requested.
 	errInvalidDaysAgo = errors.New("days-ago must be >= 0")
@@ -80,10 +75,12 @@ var (
 	newAccountClient    = func(cfg *awssdk.Config) accountInformationAPI { return account.NewFromConfig(*cfg) }
 	newAWSConfig        = awscfg.NewConfig
 	nowFunc             = time.Now
-	writeErrorsHTML     = exporter.WriteErrorsHTML
-	writeHTML           = exporter.WriteHTML
-	writeJSON           = exporter.WriteJSON
-	writeSlotIssuesCSV  = exporter.WriteSlotRunIssuesCSV
+	// Build-time version information injected by GoReleaser via ldflags.
+	version            = "v1.0.16"
+	writeErrorsHTML    = exporter.WriteErrorsHTML
+	writeHTML          = exporter.WriteHTML
+	writeJSON          = exporter.WriteJSON
+	writeSlotIssuesCSV = exporter.WriteSlotRunIssuesCSV
 )
 
 // accountInformationAPI wraps the AWS Account API used to resolve account names.
