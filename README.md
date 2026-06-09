@@ -3,7 +3,7 @@
 ![Go](https://custom-icon-badges.herokuapp.com/badge/Go-00ADD8.svg?logo=Go&logoColor=white)
 ![Apache-2.0](https://custom-icon-badges.herokuapp.com/badge/license-Apache%202.0-8BB80A.svg?logo=law&logoColor=white)
 [![GitHub release](https://img.shields.io/github/release/y-miyazaki/absc.svg)](https://github.com/y-miyazaki/absc/releases/latest)
-[![cd-wd-go-releaser](https://github.com/y-miyazaki/absc/actions/workflows/cd-wd-go-releaser.yaml/badge.svg?branch=master)](https://github.com/y-miyazaki/absc/actions/workflows/cd-wd-go-releaser.yaml)
+[![on-cd-wd-go-releaser](https://github.com/y-miyazaki/absc/actions/workflows/on-cd-wd-go-releaser.yaml/badge.svg)](https://github.com/y-miyazaki/absc/actions/workflows/on-cd-wd-go-releaser.yaml)
 
 ABSC is a command-line tool for collecting AWS cron-style schedules and rendering a schedule timeline viewer as JSON and HTML.
 
