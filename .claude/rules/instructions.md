@@ -1,13 +1,13 @@
 ---
 paths:
-  - "**/instructions/*.instructions.md"
+  - "**/instructions/*.instructions.md,**/.cursor/rules/*.mdc,**/.kiro/steering/*.md,**/.claude/**/*.md"
 ---
 
 # AI Assistant Instructions for Instruction Files
 
 ## Scope
 
-- Scope is limited to creating and updating `**/instructions/*.instructions.md` files.
+- Scope is limited to creating and updating instruction/rule files (`**/instructions/*.instructions.md`, `.cursor/rules/*.mdc`, `.kiro/steering/*.md`, `.claude/**/*.md`).
 
 ## Standards
 
