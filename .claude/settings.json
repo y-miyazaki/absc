@@ -312,16 +312,6 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "command -v lean-ctx >/dev/null 2>&1 || exit 0; lean-ctx hook observe",
-            "timeout": 5
-          }
-        ]
-      },
-      {
         "matcher": "Write",
         "hooks": [
           {
@@ -347,6 +337,16 @@
         ]
       },
       {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v lean-ctx >/dev/null 2>&1 || exit 0; lean-ctx hook observe",
+            "timeout": 5
+          }
+        ]
+      },
+      {
         "matcher": "Write",
         "hooks": [
           {
@@ -358,6 +358,16 @@
       }
     ],
     "PreToolUse": [
+      {
+        "type": "command",
+        "bash": "command -v lean-ctx >/dev/null 2>&1 || exit 0; lean-ctx hook rewrite",
+        "timeoutSec": 15
+      },
+      {
+        "type": "command",
+        "bash": "command -v lean-ctx >/dev/null 2>&1 || exit 0; lean-ctx hook redirect",
+        "timeoutSec": 5
+      },
       {
         "matcher": "Bash|Write",
         "hooks": [
@@ -377,16 +387,6 @@
             "timeout": 5
           }
         ]
-      },
-      {
-        "type": "command",
-        "bash": "command -v lean-ctx >/dev/null 2>&1 || exit 0; lean-ctx hook rewrite",
-        "timeoutSec": 15
-      },
-      {
-        "type": "command",
-        "bash": "command -v lean-ctx >/dev/null 2>&1 || exit 0; lean-ctx hook redirect",
-        "timeoutSec": 5
       },
       {
         "matcher": "Bash|Write",

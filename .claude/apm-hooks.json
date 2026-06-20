@@ -80,6 +80,12 @@
   ],
   "PostToolUse": [
     {
+      "type": "command",
+      "bash": "command -v lean-ctx >/dev/null 2>&1 || exit 0; lean-ctx hook observe",
+      "timeoutSec": 5,
+      "_apm_source": "common"
+    },
+    {
       "matcher": "",
       "hooks": [
         {
@@ -89,12 +95,6 @@
         }
       ],
       "_apm_source": "common-hooks-claude"
-    },
-    {
-      "type": "command",
-      "bash": "command -v lean-ctx >/dev/null 2>&1 || exit 0; lean-ctx hook observe",
-      "timeoutSec": 5,
-      "_apm_source": "common"
     },
     {
       "matcher": "Write",
@@ -109,6 +109,18 @@
     }
   ],
   "PreToolUse": [
+    {
+      "type": "command",
+      "bash": "command -v lean-ctx >/dev/null 2>&1 || exit 0; lean-ctx hook rewrite",
+      "timeoutSec": 15,
+      "_apm_source": "common"
+    },
+    {
+      "type": "command",
+      "bash": "command -v lean-ctx >/dev/null 2>&1 || exit 0; lean-ctx hook redirect",
+      "timeoutSec": 5,
+      "_apm_source": "common"
+    },
     {
       "matcher": "Bash|Write",
       "hooks": [
@@ -130,18 +142,6 @@
         }
       ],
       "_apm_source": "common-hooks-claude"
-    },
-    {
-      "type": "command",
-      "bash": "command -v lean-ctx >/dev/null 2>&1 || exit 0; lean-ctx hook rewrite",
-      "timeoutSec": 15,
-      "_apm_source": "common"
-    },
-    {
-      "type": "command",
-      "bash": "command -v lean-ctx >/dev/null 2>&1 || exit 0; lean-ctx hook redirect",
-      "timeoutSec": 5,
-      "_apm_source": "common"
     }
   ],
   "agentStop": [
