@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-06-14T12:45:20.841168+00:00'
+generated_at: '2026-06-20T04:54:43.037442+00:00'
 apm_version: 0.14.0
 dependencies:
 - repo_url: y-miyazaki/config
@@ -25,6 +25,31 @@ dependencies:
   - .agents/skills/github-pr-body
   - .agents/skills/instructions-review
   - .agents/skills/markdown-validation
+  - .claude/hooks/common/scripts/actionlint.sh
+  - .claude/hooks/common/scripts/ghalint.sh
+  - .claude/hooks/common/scripts/markdown_link_check.sh
+  - .claude/hooks/common/scripts/markdownlint_cli2.sh
+  - .claude/hooks/common/scripts/zizmor.sh
+  - .claude/rules/agent-skills.md
+  - .claude/rules/github-actions-workflow.md
+  - .claude/rules/instructions.md
+  - .claude/rules/markdown.md
+  - .claude/skills/agent-skills-review
+  - .claude/skills/docs-creation
+  - .claude/skills/github-actions-review
+  - .claude/skills/github-actions-validation
+  - .claude/skills/github-pr-body
+  - .claude/skills/instructions-review
+  - .claude/skills/markdown-validation
+  - .cursor/hooks/common/scripts/actionlint.sh
+  - .cursor/hooks/common/scripts/ghalint.sh
+  - .cursor/hooks/common/scripts/markdown_link_check.sh
+  - .cursor/hooks/common/scripts/markdownlint_cli2.sh
+  - .cursor/hooks/common/scripts/zizmor.sh
+  - .cursor/rules/agent-skills.mdc
+  - .cursor/rules/github-actions-workflow.mdc
+  - .cursor/rules/instructions.mdc
+  - .cursor/rules/markdown.mdc
   - .github/hooks/common-github-actions-actionlint.json
   - .github/hooks/common-github-actions-ghalint.json
   - .github/hooks/common-github-actions-zizmor.json
@@ -41,6 +66,24 @@ dependencies:
   - .github/instructions/instructions.instructions.md
   - .github/instructions/markdown.instructions.md
   deployed_file_hashes:
+    .claude/hooks/common/scripts/actionlint.sh: sha256:71832905e459cef0a8aee0e0416d655ff69d9fb1a78624a822a04b9a950f7c5a
+    .claude/hooks/common/scripts/ghalint.sh: sha256:8487d51ca5c1e497b5d84e4eea2abe10fbaea62db2e705c40e46d72f2b2a9932
+    .claude/hooks/common/scripts/markdown_link_check.sh: sha256:e2777627f8c36732928101919cd3be7dda34ba08877e3a4fc81d086b402e7a38
+    .claude/hooks/common/scripts/markdownlint_cli2.sh: sha256:8d7288d49b50f53deefecf6273e74dca9db131a8d7055d89d21c2e5305b1121d
+    .claude/hooks/common/scripts/zizmor.sh: sha256:f0f541d98759f7d287745a52fcf6cfd29335cfe3b4c1a299ee3b7f88bca8994b
+    .claude/rules/agent-skills.md: sha256:2ab75f488d3f7eb87270070bb30154ca858ccb729ca31632f7d61bd847772276
+    .claude/rules/github-actions-workflow.md: sha256:dccbc57d8e2c54d3e9c6e108401fde9aab1f47f993956c398b98cbb86c8c9663
+    .claude/rules/instructions.md: sha256:d98d20f5e864403cec6e94da389b90f8813124bd40815d6c7c1fa391e7ee97ae
+    .claude/rules/markdown.md: sha256:23cd098eca6491deefba11869ba9a2b394e5e0e6714e30932b69bed937861c59
+    .cursor/hooks/common/scripts/actionlint.sh: sha256:71832905e459cef0a8aee0e0416d655ff69d9fb1a78624a822a04b9a950f7c5a
+    .cursor/hooks/common/scripts/ghalint.sh: sha256:8487d51ca5c1e497b5d84e4eea2abe10fbaea62db2e705c40e46d72f2b2a9932
+    .cursor/hooks/common/scripts/markdown_link_check.sh: sha256:e2777627f8c36732928101919cd3be7dda34ba08877e3a4fc81d086b402e7a38
+    .cursor/hooks/common/scripts/markdownlint_cli2.sh: sha256:8d7288d49b50f53deefecf6273e74dca9db131a8d7055d89d21c2e5305b1121d
+    .cursor/hooks/common/scripts/zizmor.sh: sha256:f0f541d98759f7d287745a52fcf6cfd29335cfe3b4c1a299ee3b7f88bca8994b
+    .cursor/rules/agent-skills.mdc: sha256:b1b20cfdb16d1946c5e00c07ad1d0c907aa27cfe751f953d18b4c709d3881615
+    .cursor/rules/github-actions-workflow.mdc: sha256:98b9e4e442ff08956259dbfc32687b821c684ce11984352de27da4af9aece212
+    .cursor/rules/instructions.mdc: sha256:ae1dd18bbe411fb580366454db19eff2211a074e034ed718194270d825e397de
+    .cursor/rules/markdown.mdc: sha256:902555585ceac62f556772e5252e14e83646c78b274bd7326bd3f08468e42fcf
     .github/hooks/common-github-actions-actionlint.json: sha256:2068e936e6b60276ac05a30d8f812042d88967a983eb957bfe84dfe4016d057a
     .github/hooks/common-github-actions-ghalint.json: sha256:dfd51d918de7e0fc3dcef00df925e364cf90eeb2c7e7ee12e3d9ebe2d9464fd7
     .github/hooks/common-github-actions-zizmor.json: sha256:f1b72425236bf9c4391112cad4f73e93625a53953cc3295fca3c6b0478d05e76
@@ -67,10 +110,20 @@ dependencies:
   deployed_files:
   - .agents/skills/go-review
   - .agents/skills/go-validation
+  - .claude/hooks/go/scripts/golangci_lint.sh
+  - .claude/rules/go.md
+  - .claude/skills/go-review
+  - .claude/skills/go-validation
+  - .cursor/hooks/go/scripts/golangci_lint.sh
+  - .cursor/rules/go.mdc
   - .github/hooks/go-golangci-lint.json
   - .github/hooks/scripts/go/scripts/golangci_lint.sh
   - .github/instructions/go.instructions.md
   deployed_file_hashes:
+    .claude/hooks/go/scripts/golangci_lint.sh: sha256:884226ecdabfc7ecc987fe4e6171240f4dbf4227d61a06b98f1868728ba2480c
+    .claude/rules/go.md: sha256:304a7d37d5264d447fe5ef3dd18da31afb065197e5a19e48a934a1d2d19e2d68
+    .cursor/hooks/go/scripts/golangci_lint.sh: sha256:884226ecdabfc7ecc987fe4e6171240f4dbf4227d61a06b98f1868728ba2480c
+    .cursor/rules/go.mdc: sha256:4199cdb28d19a041e510f7b5b9d24ccf8bf173126f40d1c4ed4e58b27042a9a3
     .github/hooks/go-golangci-lint.json: sha256:ca22a5418f86ac6515b439f675c0b98c3d663cddc5579257995471a2a6078d21
     .github/hooks/scripts/go/scripts/golangci_lint.sh: sha256:884226ecdabfc7ecc987fe4e6171240f4dbf4227d61a06b98f1868728ba2480c
     .github/instructions/go.instructions.md: sha256:a5d2c45b51b403729febfb062c3ce2ae9746780043f1e65006378bccaeb146c9
@@ -85,12 +138,26 @@ dependencies:
   deployed_files:
   - .agents/skills/shell-script-review
   - .agents/skills/shell-script-validation
+  - .claude/hooks/shell-script/scripts/shellcheck.sh
+  - .claude/hooks/shell-script/scripts/shfmt.sh
+  - .claude/rules/shell-script.md
+  - .claude/skills/shell-script-review
+  - .claude/skills/shell-script-validation
+  - .cursor/hooks/shell-script/scripts/shellcheck.sh
+  - .cursor/hooks/shell-script/scripts/shfmt.sh
+  - .cursor/rules/shell-script.mdc
   - .github/hooks/scripts/shell-script/scripts/shellcheck.sh
   - .github/hooks/scripts/shell-script/scripts/shfmt.sh
   - .github/hooks/shell-script-shellcheck.json
   - .github/hooks/shell-script-shfmt.json
   - .github/instructions/shell-script.instructions.md
   deployed_file_hashes:
+    .claude/hooks/shell-script/scripts/shellcheck.sh: sha256:f6010e973e22ef3493c2bfb572b16a2dd50fab3326ef04580e5aef3ab07ddbcf
+    .claude/hooks/shell-script/scripts/shfmt.sh: sha256:99a30020d4d29c4cedecf76d05d8becf85284758a7b4834695de02775856e819
+    .claude/rules/shell-script.md: sha256:27b185f1042f36a87124f8fafd211191465ba4934881689685e03d9fac6641e1
+    .cursor/hooks/shell-script/scripts/shellcheck.sh: sha256:f6010e973e22ef3493c2bfb572b16a2dd50fab3326ef04580e5aef3ab07ddbcf
+    .cursor/hooks/shell-script/scripts/shfmt.sh: sha256:99a30020d4d29c4cedecf76d05d8becf85284758a7b4834695de02775856e819
+    .cursor/rules/shell-script.mdc: sha256:ce761cd07d149eff1cd76bf856c78993c2e8cb98ba394b4e7a291da8d291e36b
     .github/hooks/scripts/shell-script/scripts/shellcheck.sh: sha256:f6010e973e22ef3493c2bfb572b16a2dd50fab3326ef04580e5aef3ab07ddbcf
     .github/hooks/scripts/shell-script/scripts/shfmt.sh: sha256:99a30020d4d29c4cedecf76d05d8becf85284758a7b4834695de02775856e819
     .github/hooks/shell-script-shellcheck.json: sha256:f41996681f91a2ee708a16be8661aebc614d4d955cef97c3cb49325cce723a81

@@ -1,0 +1,76 @@
+{
+  "hooks": {
+    "agentStop": [
+      {
+        "type": "command",
+        "bash": "/Users/ymiyazaki/workspace/absc/.cursor/hooks/common/scripts/actionlint.sh",
+        "timeoutSec": 60,
+        "_apm_source": "common"
+      },
+      {
+        "type": "command",
+        "bash": "/Users/ymiyazaki/workspace/absc/.cursor/hooks/common/scripts/ghalint.sh",
+        "timeoutSec": 60,
+        "_apm_source": "common"
+      },
+      {
+        "type": "command",
+        "bash": "/Users/ymiyazaki/workspace/absc/.cursor/hooks/common/scripts/zizmor.sh",
+        "timeoutSec": 60,
+        "_apm_source": "common"
+      },
+      {
+        "type": "command",
+        "bash": "/Users/ymiyazaki/workspace/absc/.cursor/hooks/common/scripts/markdown_link_check.sh",
+        "timeoutSec": 240,
+        "_apm_source": "common"
+      },
+      {
+        "type": "command",
+        "bash": "/Users/ymiyazaki/workspace/absc/.cursor/hooks/common/scripts/markdownlint_cli2.sh",
+        "timeoutSec": 120,
+        "_apm_source": "common"
+      },
+      {
+        "type": "command",
+        "bash": "/Users/ymiyazaki/workspace/absc/.cursor/hooks/go/scripts/golangci_lint.sh",
+        "timeoutSec": 120,
+        "_apm_source": "go"
+      },
+      {
+        "type": "command",
+        "bash": "/Users/ymiyazaki/workspace/absc/.cursor/hooks/shell-script/scripts/shellcheck.sh",
+        "timeoutSec": 120,
+        "_apm_source": "shell-script"
+      },
+      {
+        "type": "command",
+        "bash": "/Users/ymiyazaki/workspace/absc/.cursor/hooks/shell-script/scripts/shfmt.sh",
+        "timeoutSec": 120,
+        "_apm_source": "shell-script"
+      }
+    ],
+    "postToolUse": [
+      {
+        "type": "command",
+        "bash": "command -v lean-ctx >/dev/null 2>&1 || exit 0; lean-ctx hook observe",
+        "timeoutSec": 5,
+        "_apm_source": "common"
+      }
+    ],
+    "preToolUse": [
+      {
+        "type": "command",
+        "bash": "command -v lean-ctx >/dev/null 2>&1 || exit 0; lean-ctx hook rewrite",
+        "timeoutSec": 15,
+        "_apm_source": "common"
+      },
+      {
+        "type": "command",
+        "bash": "command -v lean-ctx >/dev/null 2>&1 || exit 0; lean-ctx hook redirect",
+        "timeoutSec": 5,
+        "_apm_source": "common"
+      }
+    ]
+  }
+}

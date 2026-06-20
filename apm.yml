@@ -3,7 +3,7 @@ version: 1.0.0
 description: agent skills and instructions and mcp
 license: Apache-2.0
 targets:
-  - copilot
+  - claude
 includes: auto
 dependencies:
   apm:
@@ -14,3 +14,6 @@ dependencies:
     # - github.com/y-miyazaki/config/.apm/packages/terraform#v1.1.37
     # - github.com/y-miyazaki/config/.apm/packages/terraform-aws#v1.1.37
   mcp: []
+
+scripts:
+  postinstall: 'jq ''. + {"version": 1}'' .cursor/hooks.json > .cursor/hooks.json.tmp && mv .cursor/hooks.json.tmp .cursor/hooks.json'
