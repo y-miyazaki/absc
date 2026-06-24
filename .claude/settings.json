@@ -322,16 +322,6 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": ".claude/hooks/shell-script-hooks-claude/scripts/shfmt.sh",
-            "timeout": 120
-          }
-        ]
-      },
-      {
         "type": "command",
         "bash": "command -v lean-ctx >/dev/null 2>&1 || exit 0; lean-ctx hook observe",
         "timeoutSec": 5
@@ -343,6 +333,16 @@
             "type": "command",
             "command": "command -v lean-ctx >/dev/null 2>&1 || exit 0; lean-ctx hook observe",
             "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/shell-script-hooks-claude/scripts/shfmt.sh",
+            "timeout": 120
           }
         ]
       },
