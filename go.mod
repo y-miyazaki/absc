@@ -15,7 +15,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/glue v1.143.0
 	github.com/aws/aws-sdk-go-v2/service/scheduler v1.18.6
 	github.com/aws/aws-sdk-go-v2/service/sfn v1.42.2
-	github.com/urfave/cli/v3 v3.9.1
+	github.com/urfave/cli/v3 v3.10.0
 	github.com/y-miyazaki/go-common v0.10.3
 )
 
