@@ -38,6 +38,17 @@
       "hooks": [
         {
           "type": "command",
+          "command": ".claude/hooks/common-hooks-claude/scripts/gitleaks.sh",
+          "timeout": 60
+        }
+      ],
+      "_apm_source": "common-hooks-claude"
+    },
+    {
+      "matcher": "",
+      "hooks": [
+        {
+          "type": "command",
           "command": ".claude/hooks/common-hooks-claude/scripts/markdown_link_check.sh",
           "timeout": 240
         }
@@ -71,17 +82,6 @@
       "hooks": [
         {
           "type": "command",
-          "command": ".claude/hooks/common-hooks-claude/scripts/gitleaks.sh",
-          "timeout": 60
-        }
-      ],
-      "_apm_source": "common-hooks-claude"
-    },
-    {
-      "matcher": "",
-      "hooks": [
-        {
-          "type": "command",
           "command": ".claude/hooks/shell-script-hooks-claude/scripts/shellcheck.sh",
           "timeout": 120
         }
@@ -90,12 +90,6 @@
     }
   ],
   "PostToolUse": [
-    {
-      "type": "command",
-      "bash": "command -v lean-ctx >/dev/null 2>&1 || exit 0; lean-ctx hook observe",
-      "timeoutSec": 5,
-      "_apm_source": "common"
-    },
     {
       "matcher": "",
       "hooks": [
@@ -121,18 +115,6 @@
   ],
   "PreToolUse": [
     {
-      "type": "command",
-      "bash": "command -v lean-ctx >/dev/null 2>&1 || exit 0; lean-ctx hook rewrite",
-      "timeoutSec": 15,
-      "_apm_source": "common"
-    },
-    {
-      "type": "command",
-      "bash": "command -v lean-ctx >/dev/null 2>&1 || exit 0; lean-ctx hook redirect",
-      "timeoutSec": 5,
-      "_apm_source": "common"
-    },
-    {
       "matcher": "Bash|Write",
       "hooks": [
         {
@@ -153,56 +135,6 @@
         }
       ],
       "_apm_source": "common-hooks-claude"
-    }
-  ],
-  "agentStop": [
-    {
-      "type": "command",
-      "bash": "/Users/ymiyazaki/workspace/absc/.claude/hooks/common/scripts/actionlint.sh",
-      "timeoutSec": 60,
-      "_apm_source": "common"
-    },
-    {
-      "type": "command",
-      "bash": "/Users/ymiyazaki/workspace/absc/.claude/hooks/common/scripts/ghalint.sh",
-      "timeoutSec": 60,
-      "_apm_source": "common"
-    },
-    {
-      "type": "command",
-      "bash": "/Users/ymiyazaki/workspace/absc/.claude/hooks/common/scripts/zizmor.sh",
-      "timeoutSec": 60,
-      "_apm_source": "common"
-    },
-    {
-      "type": "command",
-      "bash": "/Users/ymiyazaki/workspace/absc/.claude/hooks/common/scripts/markdown_link_check.sh",
-      "timeoutSec": 240,
-      "_apm_source": "common"
-    },
-    {
-      "type": "command",
-      "bash": "/Users/ymiyazaki/workspace/absc/.claude/hooks/common/scripts/markdownlint_cli2.sh",
-      "timeoutSec": 120,
-      "_apm_source": "common"
-    },
-    {
-      "type": "command",
-      "bash": "/Users/ymiyazaki/workspace/absc/.claude/hooks/go/scripts/golangci_lint.sh",
-      "timeoutSec": 120,
-      "_apm_source": "go"
-    },
-    {
-      "type": "command",
-      "bash": "/Users/ymiyazaki/workspace/absc/.claude/hooks/shell-script/scripts/shellcheck.sh",
-      "timeoutSec": 120,
-      "_apm_source": "shell-script"
-    },
-    {
-      "type": "command",
-      "bash": "/Users/ymiyazaki/workspace/absc/.claude/hooks/shell-script/scripts/shfmt.sh",
-      "timeoutSec": 120,
-      "_apm_source": "shell-script"
     }
   ]
 }
