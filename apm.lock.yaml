@@ -1,20 +1,24 @@
 lockfile_version: '1'
-generated_at: '2026-07-12T13:00:27.770136+00:00'
-apm_version: 0.21.0
+generated_at: '2026-07-12T18:54:21.418145+00:00'
+apm_version: 0.24.1
 dependencies:
 - repo_url: y-miyazaki/config
+  name: config-aws
   host: github.com
-  resolved_commit: 7600459ef9155b734fb641e68bc556f097bcfaeb
-  resolved_ref: v1.8.7
+  resolved_commit: 5a5408053a1d6bf357808590ae74f5ccb8eb31f4
+  resolved_ref: v1.8.9
+  version: 1.0.0
   virtual_path: .apm/packages/aws
   is_virtual: true
   package_type: apm_package
   content_hash: sha256:9fa59787331415e5e16b6a7c9df8245a7e041faf783de6a589c1f3526555c500
   declared_license: Apache-2.0
 - repo_url: y-miyazaki/config
+  name: config-common
   host: github.com
-  resolved_commit: 7600459ef9155b734fb641e68bc556f097bcfaeb
-  resolved_ref: v1.8.7
+  resolved_commit: 5a5408053a1d6bf357808590ae74f5ccb8eb31f4
+  resolved_ref: v1.8.9
+  version: 1.0.0
   virtual_path: .apm/packages/common
   is_virtual: true
   package_type: apm_package
@@ -719,9 +723,11 @@ dependencies:
   content_hash: sha256:9f2b5f152db6286ceea01657f0787851bea8cc5ce2fcab5d8bd9847ea3cdbecb
   declared_license: Apache-2.0
 - repo_url: y-miyazaki/config
+  name: common-hooks-claude
   host: github.com
-  resolved_commit: 7600459ef9155b734fb641e68bc556f097bcfaeb
-  resolved_ref: v1.8.7
+  resolved_commit: 5a5408053a1d6bf357808590ae74f5ccb8eb31f4
+  resolved_ref: v1.8.9
+  version: 1.0.0
   virtual_path: .apm/packages/common-hooks-claude
   is_virtual: true
   package_type: apm_package
@@ -754,9 +760,11 @@ dependencies:
   content_hash: sha256:a0db2caf53757b869ede85d56f0baabcf4983d84f5839be157386b8993438692
   declared_license: Apache-2.0
 - repo_url: y-miyazaki/config
+  name: config-go
   host: github.com
-  resolved_commit: 7600459ef9155b734fb641e68bc556f097bcfaeb
-  resolved_ref: v1.8.7
+  resolved_commit: 5a5408053a1d6bf357808590ae74f5ccb8eb31f4
+  resolved_ref: v1.8.9
+  version: 1.0.0
   virtual_path: .apm/packages/go
   is_virtual: true
   package_type: apm_package
@@ -977,9 +985,11 @@ dependencies:
   content_hash: sha256:eb992ae66db8d3bb391f90347c7e80acdbf8fb699d168bfd46ec5c980f767447
   declared_license: Apache-2.0
 - repo_url: y-miyazaki/config
+  name: go-hooks-claude
   host: github.com
-  resolved_commit: 7600459ef9155b734fb641e68bc556f097bcfaeb
-  resolved_ref: v1.8.7
+  resolved_commit: 5a5408053a1d6bf357808590ae74f5ccb8eb31f4
+  resolved_ref: v1.8.9
+  version: 1.0.0
   virtual_path: .apm/packages/go-hooks-claude
   is_virtual: true
   package_type: apm_package
@@ -992,9 +1002,11 @@ dependencies:
   content_hash: sha256:7a4cbe4b40a36234f41851c5c205b3cf3dae9a4cf4fa3da0fe7bffa0d0e5eef2
   declared_license: Apache-2.0
 - repo_url: y-miyazaki/config
+  name: config-shell-script
   host: github.com
-  resolved_commit: 7600459ef9155b734fb641e68bc556f097bcfaeb
-  resolved_ref: v1.8.7
+  resolved_commit: 5a5408053a1d6bf357808590ae74f5ccb8eb31f4
+  resolved_ref: v1.8.9
+  version: 1.0.0
   virtual_path: .apm/packages/shell-script
   is_virtual: true
   package_type: apm_package
@@ -1207,9 +1219,11 @@ dependencies:
   content_hash: sha256:88b0653290ff8250c5a399b31ab92dcf9ffbcd5b55cbfaf035b5b0bfe58d978b
   declared_license: Apache-2.0
 - repo_url: y-miyazaki/config
+  name: shell-script-hooks-claude
   host: github.com
-  resolved_commit: 7600459ef9155b734fb641e68bc556f097bcfaeb
-  resolved_ref: v1.8.7
+  resolved_commit: 5a5408053a1d6bf357808590ae74f5ccb8eb31f4
+  resolved_ref: v1.8.9
+  version: 1.0.0
   virtual_path: .apm/packages/shell-script-hooks-claude
   is_virtual: true
   package_type: apm_package
@@ -1316,3 +1330,14 @@ mcp_configs:
     - mcp
     registry: false
     command: lean-ctx
+mcp_config_provenance:
+  aws-documentation-mcp-server: config-aws
+  aws-knowledge-mcp-server: config-aws
+  aws-mcp: config-aws
+  aws-pricing-mcp-server: config-aws
+  awslabs-aws-api-mcp-server: config-aws
+  codebase-memory-mcp: config-common
+  context7: config-common
+  fetch: config-common
+  github: config-common
+  lean-ctx: config-common
