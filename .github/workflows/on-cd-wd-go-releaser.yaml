@@ -52,7 +52,7 @@ jobs:
   release:
     name: Release ABSC
     needs: detect-go-version
-    uses: y-miyazaki/config/.github/workflows/cd-go-releaser.yaml@f6417a973be4e65076f589738f1c7776e8fe9926 # v1.8.72
+    uses: y-miyazaki/config/.github/workflows/cd-go-releaser.yaml@c0501cf11737a931ff309d4079cebfaf796e7890 # v1.8.76
     with:
       component: absc
       create_tag: ${{ inputs.create_tag }}
