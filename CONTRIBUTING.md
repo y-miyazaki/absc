@@ -303,11 +303,13 @@ goreleaser release --clean
 #### Version Numbering
 
 Follow [Semantic Versioning](https://semver.org/):
+
 - **MAJOR**: Incompatible API changes
 - **MINOR**: New features (backward compatible)
 - **PATCH**: Bug fixes (backward compatible)
 
 Examples:
+
 - `v1.0.16` - Stable release
 - `v1.1.0-beta.1` - Beta release
 - `v1.1.0-rc.1` - Release candidate

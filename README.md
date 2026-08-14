@@ -29,7 +29,7 @@ ABSC generates an interactive HTML viewer that allows you to browse collected sc
 
 ![HTML Viewer Overview](docs/image/html-viewer-overview.png)
 
-*Interactive HTML viewer showing AWS cron schedules and recent executions*
+_Interactive HTML viewer showing AWS cron schedules and recent executions_
 
 ## Table of Contents
 
@@ -287,28 +287,13 @@ For normal ABSC usage, it is safer to start with a single base policy like this:
     {
       "Sid": "ReadScheduleDefinitionsAndAccountMetadata",
       "Effect": "Allow",
-      "Action": [
-        "account:GetAccountInformation",
-        "sts:GetCallerIdentity",
-        "events:ListRules",
-        "events:ListTargetsByRule",
-        "scheduler:ListSchedules",
-        "scheduler:GetSchedule"
-      ],
+      "Action": ["account:GetAccountInformation", "sts:GetCallerIdentity", "events:ListRules", "events:ListTargetsByRule", "scheduler:ListSchedules", "scheduler:GetSchedule"],
       "Resource": "*"
     },
     {
       "Sid": "ReadExecutionHistoryForSupportedTargets",
       "Effect": "Allow",
-      "Action": [
-        "states:ListExecutions",
-        "batch:ListJobs",
-        "ecs:ListTasks",
-        "ecs:DescribeTasks",
-        "cloudtrail:LookupEvents",
-        "glue:GetJobRuns",
-        "logs:FilterLogEvents"
-      ],
+      "Action": ["states:ListExecutions", "batch:ListJobs", "ecs:ListTasks", "ecs:DescribeTasks", "cloudtrail:LookupEvents", "glue:GetJobRuns", "logs:FilterLogEvents"],
       "Resource": "*"
     }
   ]
@@ -326,15 +311,7 @@ If you prefer to separate permissions, the run-enrichment statement is:
     {
       "Sid": "ReadExecutionHistoryForSupportedTargets",
       "Effect": "Allow",
-      "Action": [
-        "states:ListExecutions",
-        "batch:ListJobs",
-        "ecs:ListTasks",
-        "ecs:DescribeTasks",
-        "cloudtrail:LookupEvents",
-        "glue:GetJobRuns",
-        "logs:FilterLogEvents"
-      ],
+      "Action": ["states:ListExecutions", "batch:ListJobs", "ecs:ListTasks", "ecs:DescribeTasks", "cloudtrail:LookupEvents", "glue:GetJobRuns", "logs:FilterLogEvents"],
       "Resource": "*"
     }
   ]
@@ -378,7 +355,7 @@ name: Collect AWS schedules
 
 on:
   schedule:
-    - cron: '0 0 * * *'
+    - cron: "0 0 * * *"
 
 jobs:
   collect:
@@ -391,7 +368,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.26.2'
+          go-version: "1.26.2"
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
