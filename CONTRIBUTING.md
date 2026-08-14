@@ -203,7 +203,7 @@ git push origin feature/your-feature-name
 
 ## Adding New Service Collectors
 
-Use [docs/SPECIFICATION.md](docs/SPECIFICATION.md) for product behavior and [docs/MAINTENANCE_NOTES.md](docs/MAINTENANCE_NOTES.md) for collector design rules before adding a new service collector.
+Use [docs/specification.md](docs/specification.md) for product behavior and [docs/maintenance_notes.md](docs/maintenance_notes.md) for collector design rules before adding a new service collector.
 
 ### Quick Overview
 
@@ -211,7 +211,7 @@ Use [docs/SPECIFICATION.md](docs/SPECIFICATION.md) for product behavior and [doc
 2. Add or extend the collector under `internal/aws/resources/runs/` and prefer shared helpers in that package before introducing service-specific parsing.
 3. Register the collector in [internal/aws/resources/runs/resolver.go](internal/aws/resources/runs/resolver.go) and add scheduler hints only when the collector needs them.
 4. Add or update tests for action classification, resource ID extraction, and run parsing.
-5. Update [README.md](README.md), [docs/SPECIFICATION.md](docs/SPECIFICATION.md), and [docs/MAINTENANCE_NOTES.md](docs/MAINTENANCE_NOTES.md) when behavior changes.
+5. Update [README.md](README.md), [docs/specification.md](docs/specification.md), and [docs/maintenance_notes.md](docs/maintenance_notes.md) when behavior changes.
 
 Collector guidance:
 

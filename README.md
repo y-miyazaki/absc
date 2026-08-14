@@ -151,7 +151,7 @@ absc --output-dir /path/to/output
 
 `--days-ago` selects a calendar-day window in the chosen timezone (`0=today`, `1=yesterday`, `2=two days ago`). ABSC always anchors the display and CloudTrail collection window to that day's `00:00:00` and collects exactly one day (`00:00:00` to `24:00:00`).
 
-See [docs/SPECIFICATION.md](docs/SPECIFICATION.md) for the exact timeline window model.
+See [docs/specification.md](docs/specification.md) for the exact timeline window model.
 
 ### Command-Line Options
 
