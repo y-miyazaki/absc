@@ -22,22 +22,33 @@
     "aws-documentation-mcp-server": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["awslabs.aws-documentation-mcp-server==1.1.29"]
+      "args": [
+        "awslabs.aws-documentation-mcp-server==1.1.30"
+      ]
     },
     "aws-pricing-mcp-server": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["awslabs.aws-pricing-mcp-server==1.0.33"]
+      "args": [
+        "awslabs.aws-pricing-mcp-server==1.0.34"
+      ]
     },
     "context7": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@upstash/context7-mcp@3.2.5"]
+      "args": [
+        "-y",
+        "@upstash/context7-mcp@4.0.0"
+      ]
     },
     "fetch": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["--with", "mcp>=1.28,<2", "mcp-server-fetch==2026.7.10"]
+      "args": [
+        "--with",
+        "mcp>=1.28,<2",
+        "mcp-server-fetch==2026.7.10"
+      ]
     },
     "github": {
       "type": "stdio",
@@ -55,7 +66,10 @@
     "lean-ctx": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "lean-ctx-bin@3.9.17"]
+      "args": [
+        "-y",
+        "lean-ctx-bin@3.9.18"
+      ]
     }
   }
 }
