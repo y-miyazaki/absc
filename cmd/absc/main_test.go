@@ -1,16 +1,21 @@
+//revive:disable:comments-density reason: table-driven tests are self-explanatory via subtest names.
 package main
 
 import (
 	"context"
 	"errors"
 	"log/slog"
+	"os"
 	"strings"
 	"testing"
+	"time"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/account"
 	"github.com/urfave/cli/v3"
 
+	"github.com/y-miyazaki/absc/internal/aws/resources"
+	"github.com/y-miyazaki/absc/internal/exporter"
 	"github.com/y-miyazaki/go-common/pkg/logger"
 )
 
@@ -30,37 +35,23 @@ func testLogger() *logger.SlogLogger {
 	return logger.NewSlogLogger(&logger.SlogConfig{Level: slog.LevelError, Format: "text"})
 }
 
-func newTestCommand(t *testing.T, values map[string]string) (*cli.Command, context.Context) {
-	t.Helper()
-
-	cmd := newApp(testLogger())
-	// Note: In v3, Command flags are parsed during Run()
-	// For testing runCommand directly, we need to build the command
-	// such that String(), Int(), Bool(), Duration() methods work correctly
-	// This is a limitation of v3 - we recommend testing via Command.Run()
-
-	return cmd, context.Background()
-}
-
-// newMockCommand creates a mock command for testing by simulating CLI arguments
+// newMockCommand creates a parsed CLI command for testing by simulating CLI arguments.
 func newMockCommand(t *testing.T, values map[string]string) *cli.Command {
 	t.Helper()
 
-	// Build arguments from values using proper flag syntax
-	args := []string{}
+	args := make([]string, 0, len(values))
 	for key, value := range values {
-		// Handle boolean flags
 		if key == accountNameFlagName || key == includeNonSlotRunsFlagName {
 			if value == "true" {
 				args = append(args, "--"+key)
 			}
-		} else if value != "" {
-			// Use "=" syntax for v3 flag values
+			continue
+		}
+		if value != "" {
 			args = append(args, "--"+key+"="+value)
 		}
 	}
 
-	// Create a new command with all necessary flags
 	cmd := &cli.Command{
 		Name: "test",
 		Flags: []cli.Flag{
@@ -92,7 +83,6 @@ func newMockCommand(t *testing.T, values map[string]string) *cli.Command {
 		},
 	}
 
-	// Run to parse flags - we need to capture the parsed cmd
 	var parsedCmd *cli.Command
 	testCmd := &cli.Command{
 		Name:  "test",
@@ -103,13 +93,13 @@ func newMockCommand(t *testing.T, values map[string]string) *cli.Command {
 		},
 	}
 
-	_ = testCmd.Run(context.Background(), args)
-
-	// Return the parsed command or the original if parsing failed
-	if parsedCmd != nil {
-		return parsedCmd
+	if err := testCmd.Run(context.Background(), append([]string{"test"}, args...)); err != nil {
+		t.Fatalf("testCmd.Run() error = %v", err)
 	}
-	return cmd
+	if parsedCmd == nil {
+		t.Fatal("parsedCmd = nil, want parsed command")
+	}
+	return parsedCmd
 }
 
 func restoreCommandDeps() func() {
@@ -142,7 +132,24 @@ func restoreCommandDeps() func() {
 	}
 }
 
+func TestNewApp(t *testing.T) {
+	t.Parallel()
+
+	app := newApp(testLogger())
+	if got, want := app.Name, "absc"; got != want {
+		t.Fatalf("app.Name = %q, want %q", got, want)
+	}
+	if got, want := app.Version, version; got != want {
+		t.Fatalf("app.Version = %q, want %q", got, want)
+	}
+	if app.Action == nil {
+		t.Fatal("app.Action = nil, want non-nil")
+	}
+}
+
 func TestParseRegions(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name  string
 		input string
@@ -153,15 +160,13 @@ func TestParseRegions(t *testing.T) {
 			input: " ap-northeast-1,us-east-1,ap-northeast-1 ,, us-east-1 ",
 			want:  []string{"ap-northeast-1", "us-east-1"},
 		},
-		{
-			name:  "empty input",
-			input: " , , ",
-			want:  nil,
-		},
+		{name: "empty input", input: " , , ", want: nil},
 	}
 
-	for _, tt := range tests {
+	for i := range tests {
+		tt := tests[i]
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := parseRegions(tt.input)
 			if len(got) != len(tt.want) {
 				t.Fatalf("parseRegions() length = %d, want %d", len(got), len(tt.want))
@@ -176,91 +181,86 @@ func TestParseRegions(t *testing.T) {
 }
 
 func TestRegionArg(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
-		name string
-		args []string
-		want string
+		name   string
+		values map[string]string
+		want   string
 	}{
 		{
 			name: "prefers deprecated regions flag when set",
-			args: []string{"--" + regionsFlagName + "=us-east-1", "--" + regionFlagName + "=ap-northeast-1"},
+			values: map[string]string{
+				regionsFlagName: "us-east-1",
+				regionFlagName:  "ap-northeast-1",
+			},
 			want: "us-east-1",
 		},
 		{
-			name: "uses region flag",
-			args: []string{"--" + regionFlagName + "=eu-west-1"},
-			want: "eu-west-1",
+			name:   "uses region flag",
+			values: map[string]string{regionFlagName: "eu-west-1"},
+			want:   "eu-west-1",
 		},
-		{
-			name: "falls back to default",
-			args: []string{},
-			want: defaultRegion,
-		},
+		{name: "falls back to default", values: map[string]string{}, want: defaultRegion},
 	}
 
-	for _, tt := range tests {
+	for i := range tests {
+		tt := tests[i]
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.name != "falls back to default" {
-				t.Skip("urfave/cli/v3 flag parsing in tests requires different approach")
-			}
-			var got string
-			cmd := &cli.Command{
-				Name: "test",
-				Flags: []cli.Flag{
-					&cli.StringFlag{
-						Name:    regionFlagName,
-						Aliases: []string{regionShortAlias},
-						Sources: cli.EnvVars("AWS_DEFAULT_REGION"),
-						Value:   defaultRegion,
-					},
-					&cli.StringFlag{
-						Name:   regionsFlagName,
-						Hidden: true,
-					},
-				},
-				Action: func(_ context.Context, cmd *cli.Command) error {
-					got = regionArg(cmd)
-					return nil
-				},
-			}
-			_ = cmd.Run(context.Background(), tt.args)
-			if got != tt.want {
+			t.Parallel()
+			cmd := newMockCommand(t, tt.values)
+			if got := regionArg(cmd); got != tt.want {
 				t.Fatalf("regionArg() = %q, want %q", got, tt.want)
 			}
 		})
 	}
 }
 
+func TestTimelineWindowStart(t *testing.T) {
+	t.Parallel()
+
+	loc := time.FixedZone("JST", 9*3600)
+	now := time.Date(2026, 3, 19, 15, 30, 0, 0, loc)
+
+	tests := []struct {
+		name     string
+		daysAgo  int
+		wantDate time.Time
+	}{
+		{name: "today", daysAgo: 0, wantDate: time.Date(2026, 3, 19, 0, 0, 0, 0, loc)},
+		{name: "yesterday", daysAgo: 1, wantDate: time.Date(2026, 3, 18, 0, 0, 0, 0, loc)},
+	}
+
+	for i := range tests {
+		tt := tests[i]
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := timelineWindowStart(now, tt.daysAgo, loc)
+			if !got.Equal(tt.wantDate) {
+				t.Fatalf("timelineWindowStart() = %v, want %v", got, tt.wantDate)
+			}
+		})
+	}
+}
+
 func TestAccountIDFromARN(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		arn  string
 		want string
 	}{
-		{
-			name: "valid ARN",
-			arn:  "arn:aws:iam::123456789012:role/Admin",
-			want: "123456789012",
-		},
-		{
-			name: "empty account in ARN",
-			arn:  "arn:aws:iam:::role/Admin",
-			want: "unknown",
-		},
-		{
-			name: "invalid ARN format",
-			arn:  "invalid",
-			want: "unknown",
-		},
-		{
-			name: "empty string",
-			arn:  "",
-			want: "unknown",
-		},
+		{name: "valid ARN", arn: "arn:aws:iam::123456789012:role/Admin", want: "123456789012"},
+		{name: "empty account in ARN", arn: "arn:aws:iam:::role/Admin", want: "unknown"},
+		{name: "invalid ARN format", arn: "invalid", want: "unknown"},
+		{name: "empty string", arn: "", want: "unknown"},
 	}
 
-	for _, tt := range tests {
+	for i := range tests {
+		tt := tests[i]
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := accountIDFromARN(tt.arn); got != tt.want {
 				t.Fatalf("accountIDFromARN() = %q, want %q", got, tt.want)
 			}
@@ -269,55 +269,88 @@ func TestAccountIDFromARN(t *testing.T) {
 }
 
 func TestFetchAccountName(t *testing.T) {
-	defer restoreCommandDeps()()
+	t.Run("success", func(t *testing.T) {
+		defer restoreCommandDeps()()
 
-	newAccountClient = func(_ *awssdk.Config) accountInformationAPI {
-		return stubAccountClient{
-			getAccountInformation: func(_ context.Context, in *account.GetAccountInformationInput, _ ...func(*account.Options)) (*account.GetAccountInformationOutput, error) {
-				if got := awssdk.ToString(in.AccountId); got != "123456789012" {
-					t.Fatalf("account id = %q, want %q", got, "123456789012")
-				}
-				return &account.GetAccountInformationOutput{AccountName: awssdk.String("sandbox")}, nil
-			},
+		newAccountClient = func(_ *awssdk.Config) accountInformationAPI {
+			return stubAccountClient{
+				getAccountInformation: func(_ context.Context, in *account.GetAccountInformationInput, _ ...func(*account.Options)) (*account.GetAccountInformationOutput, error) {
+					if got := awssdk.ToString(in.AccountId); got != "123456789012" {
+						t.Fatalf("account id = %q, want %q", got, "123456789012")
+					}
+					return &account.GetAccountInformationOutput{AccountName: awssdk.String("sandbox")}, nil
+				},
+			}
 		}
-	}
 
-	got, err := fetchAccountName(context.Background(), &awssdk.Config{}, "123456789012")
-	if err != nil {
-		t.Fatalf("fetchAccountName() error = %v", err)
-	}
-	if got != "sandbox" {
-		t.Fatalf("fetchAccountName() = %q, want %q", got, "sandbox")
-	}
-}
-
-func TestFetchAccountName_Error(t *testing.T) {
-	defer restoreCommandDeps()()
-
-	newAccountClient = func(_ *awssdk.Config) accountInformationAPI {
-		return stubAccountClient{
-			getAccountInformation: func(context.Context, *account.GetAccountInformationInput, ...func(*account.Options)) (*account.GetAccountInformationOutput, error) {
-				return nil, errors.New("boom")
-			},
+		got, err := fetchAccountName(context.Background(), &awssdk.Config{}, "123456789012")
+		if err != nil {
+			t.Fatalf("fetchAccountName() error = %v", err)
 		}
-	}
+		if got != "sandbox" {
+			t.Fatalf("fetchAccountName() = %q, want %q", got, "sandbox")
+		}
+	})
 
-	_, err := fetchAccountName(context.Background(), &awssdk.Config{}, "123456789012")
-	if err == nil || !strings.Contains(err.Error(), "get account information") {
-		t.Fatalf("fetchAccountName() error = %v, want wrapped error", err)
-	}
+	t.Run("api error", func(t *testing.T) {
+		defer restoreCommandDeps()()
+
+		newAccountClient = func(_ *awssdk.Config) accountInformationAPI {
+			return stubAccountClient{
+				getAccountInformation: func(context.Context, *account.GetAccountInformationInput, ...func(*account.Options)) (*account.GetAccountInformationOutput, error) {
+					return nil, errors.New("boom")
+				},
+			}
+		}
+
+		_, err := fetchAccountName(context.Background(), &awssdk.Config{}, "123456789012")
+		if err == nil || !strings.Contains(err.Error(), "get account information") {
+			t.Fatalf("fetchAccountName() error = %v, want wrapped error", err)
+		}
+	})
 }
 
-func TestRunCommand_MaxResultsValidation(t *testing.T) {
-	t.Skip("urfave/cli/v3 flag parsing in tests requires different approach")
-}
+func TestRunCommand_Validation(t *testing.T) {
+	t.Parallel()
 
-func TestRunCommand_DaysAgoValidation(t *testing.T) {
-	t.Skip("urfave/cli/v3 flag parsing in tests requires different approach")
+	tests := []struct {
+		name    string
+		values  map[string]string
+		wantErr error
+	}{
+		{
+			name:    "max results below minimum",
+			values:  map[string]string{maxResultsFlagName: "0"},
+			wantErr: errInvalidMaxResults,
+		},
+		{
+			name:    "negative days ago",
+			values:  map[string]string{daysAgoFlagName: "-1"},
+			wantErr: errInvalidDaysAgo,
+		},
+	}
+
+	for i := range tests {
+		tt := tests[i]
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			cmd := newMockCommand(t, tt.values)
+			err := runCommand(context.Background(), cmd, testLogger())
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("runCommand() error = %v, want %v", err, tt.wantErr)
+			}
+		})
+	}
 }
 
 func TestRunCommand_InvalidTimezone(t *testing.T) {
-	t.Skip("urfave/cli/v3 flag parsing in tests requires different approach")
+	t.Parallel()
+
+	cmd := newMockCommand(t, map[string]string{timezoneFlagName: "Not/A/Timezone"})
+	err := runCommand(context.Background(), cmd, testLogger())
+	if err == nil || !strings.Contains(err.Error(), "failed to load timezone") {
+		t.Fatalf("runCommand() error = %v, want timezone error", err)
+	}
 }
 
 func TestRunCommand_AWSConfigError(t *testing.T) {
@@ -327,34 +360,92 @@ func TestRunCommand_AWSConfigError(t *testing.T) {
 		return awssdk.Config{}, errors.New("config error")
 	}
 
-	var testErr error
-	cmd := &cli.Command{
-		Name: "test",
-		Flags: []cli.Flag{
-			&cli.StringFlag{Name: profileFlagName, Sources: cli.EnvVars("AWS_PROFILE", "AWS_DEFAULT_PROFILE")},
-			&cli.StringFlag{Name: regionFlagName, Value: defaultRegion},
-			&cli.StringFlag{Name: regionsFlagName, Hidden: true},
-			&cli.StringFlag{Name: timezoneFlagName, Value: defaultTimezone},
-			&cli.StringFlag{Name: outputDirFlagName, Value: defaultOutputDir},
-			&cli.IntFlag{Name: daysAgoFlagName, Value: defaultDaysAgo},
-			&cli.IntFlag{Name: maxConcurrencyFlagName, Value: defaultMaxConcurrency},
-			&cli.IntFlag{Name: maxResultsFlagName, Value: defaultMaxResults},
-			&cli.BoolFlag{Name: includeNonSlotRunsFlagName, Value: false},
-			&cli.BoolFlag{Name: accountNameFlagName, Value: false},
-			&cli.DurationFlag{Name: timeoutFlagName, Value: defaultTimeout},
-		},
-		Action: func(ctx context.Context, c *cli.Command) error {
-			testErr = runCommand(ctx, c, testLogger())
-			return nil
-		},
+	cmd := newMockCommand(t, map[string]string{})
+	err := runCommand(context.Background(), cmd, testLogger())
+	if err == nil || !strings.Contains(err.Error(), "failed to initialize aws config") {
+		t.Fatalf("runCommand() error = %v, want config error", err)
+	}
+}
+
+func TestRunCommand_CredentialsError(t *testing.T) {
+	defer restoreCommandDeps()()
+
+	newAWSConfig = func(context.Context, string, string) (awssdk.Config, error) {
+		return awssdk.Config{Region: defaultRegion}, nil
+	}
+	checkAWSCredentials = func(context.Context, *awssdk.Config) (string, error) {
+		return "", errors.New("no credentials")
 	}
 
-	_ = cmd.Run(context.Background(), []string{})
-	if testErr == nil || !strings.Contains(testErr.Error(), "failed to initialize aws config") {
-		t.Fatalf("runCommand() error = %v, want config error", testErr)
+	cmd := newMockCommand(t, map[string]string{})
+	err := runCommand(context.Background(), cmd, testLogger())
+	if err == nil || !strings.Contains(err.Error(), "aws credentials check failed") {
+		t.Fatalf("runCommand() error = %v, want credentials error", err)
 	}
 }
 
 func TestRunCommand_Success(t *testing.T) {
-	t.Skip("urfave/cli/v3 flag parsing in tests requires different approach")
+	defer restoreCommandDeps()()
+
+	outDir := t.TempDir()
+	fixedNow := time.Date(2026, 3, 19, 10, 0, 0, 0, time.UTC)
+	nowFunc = func() time.Time { return fixedNow }
+	newAWSConfig = func(context.Context, string, string) (awssdk.Config, error) {
+		return awssdk.Config{Region: defaultRegion}, nil
+	}
+	checkAWSCredentials = func(context.Context, *awssdk.Config) (string, error) {
+		return "arn:aws:iam::123456789012:root", nil
+	}
+	collectSchedules = func(context.Context, *awssdk.Config, resources.CollectOptions) ([]resources.Schedule, []resources.ErrorRecord) {
+		return nil, nil
+	}
+	buildOutput = func(accountID string, _ time.Time, _ time.Time, _ *time.Location, _ []resources.Schedule, _ []resources.ErrorRecord, _ exporter.BuildOutputOptions) exporter.Output {
+		return exporter.Output{AccountID: accountID}
+	}
+	mkdirAll = func(string, os.FileMode) error { return nil }
+	writeJSON = func(string, *exporter.Output) error { return nil }
+	writeHTML = func(string, *exporter.Output) error { return nil }
+	writeErrorsHTML = func(string, *exporter.Output) error { return nil }
+	writeSlotIssuesCSV = func(string, *exporter.Output) error { return nil }
+
+	cmd := newMockCommand(t, map[string]string{outputDirFlagName: outDir})
+	if err := runCommand(context.Background(), cmd, testLogger()); err != nil {
+		t.Fatalf("runCommand() error = %v", err)
+	}
+}
+
+func TestRunCommand_AccountNameLookupFailureContinues(t *testing.T) {
+	defer restoreCommandDeps()()
+
+	outDir := t.TempDir()
+	fixedNow := time.Date(2026, 3, 19, 10, 0, 0, 0, time.UTC)
+	nowFunc = func() time.Time { return fixedNow }
+	newAWSConfig = func(context.Context, string, string) (awssdk.Config, error) {
+		return awssdk.Config{Region: defaultRegion}, nil
+	}
+	checkAWSCredentials = func(context.Context, *awssdk.Config) (string, error) {
+		return "arn:aws:iam::123456789012:root", nil
+	}
+	getAccountName = func(context.Context, *awssdk.Config, string) (string, error) {
+		return "", errors.New("account lookup failed")
+	}
+	collectSchedules = func(context.Context, *awssdk.Config, resources.CollectOptions) ([]resources.Schedule, []resources.ErrorRecord) {
+		return nil, nil
+	}
+	buildOutput = func(accountID string, _ time.Time, _ time.Time, _ *time.Location, _ []resources.Schedule, _ []resources.ErrorRecord, _ exporter.BuildOutputOptions) exporter.Output {
+		return exporter.Output{AccountID: accountID}
+	}
+	mkdirAll = func(string, os.FileMode) error { return nil }
+	writeJSON = func(string, *exporter.Output) error { return nil }
+	writeHTML = func(string, *exporter.Output) error { return nil }
+	writeErrorsHTML = func(string, *exporter.Output) error { return nil }
+	writeSlotIssuesCSV = func(string, *exporter.Output) error { return nil }
+
+	cmd := newMockCommand(t, map[string]string{
+		outputDirFlagName:  outDir,
+		accountNameFlagName: "true",
+	})
+	if err := runCommand(context.Background(), cmd, testLogger()); err != nil {
+		t.Fatalf("runCommand() error = %v", err)
+	}
 }

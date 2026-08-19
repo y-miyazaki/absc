@@ -8,20 +8,26 @@ import (
 func TestAwsSDKServiceFromARN(t *testing.T) {
 	t.Parallel()
 
-	cases := []struct {
+	tests := []struct {
+		name string
 		arn  string
 		want string
 	}{
-		{"arn:aws:scheduler:::aws-sdk:rds:startDBCluster", "rds"},
-		{"arn:aws:scheduler:::aws-sdk:ec2:startInstances", "ec2"},
-		{"arn:aws:scheduler:::aws-sdk:sfn:startExecution", "sfn"},
-		{"arn:aws:lambda:ap-northeast-1:123456789012:function:my-func", ""},
+		{name: "rds", arn: "arn:aws:scheduler:::aws-sdk:rds:startDBCluster", want: "rds"},
+		{name: "ec2", arn: "arn:aws:scheduler:::aws-sdk:ec2:startInstances", want: "ec2"},
+		{name: "sfn", arn: "arn:aws:scheduler:::aws-sdk:sfn:startExecution", want: "sfn"},
+		{name: "non sdk arn", arn: "arn:aws:lambda:ap-northeast-1:123456789012:function:my-func", want: ""},
 	}
-	for _, tc := range cases {
-		got := awsSDKServiceFromARN(strings.ToLower(tc.arn))
-		if got != tc.want {
-			t.Errorf("awsSDKServiceFromARN(%q) = %q, want %q", tc.arn, got, tc.want)
-		}
+
+	for i := range tests {
+		tt := tests[i]
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := awsSDKServiceFromARN(strings.ToLower(tt.arn))
+			if got != tt.want {
+				t.Fatalf("awsSDKServiceFromARN(%q) = %q, want %q", tt.arn, got, tt.want)
+			}
+		})
 	}
 }
 

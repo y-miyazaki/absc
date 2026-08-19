@@ -41,6 +41,7 @@
       "Bash(go env *)",
       "Bash(go list *)",
       "Bash(go test *)",
+      "Bash(go tool *)",
       "Bash(go version *)",
       "Bash(grep *)",
       "Bash(head *)",

@@ -40,6 +40,7 @@
     "go env",
     "go list",
     "go test",
+    "go tool",
     "go version",
     "gofmt",
     "grep",

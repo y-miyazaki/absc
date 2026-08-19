@@ -1,7 +1,10 @@
 //revive:disable:comments-density reason: table-driven tests are self-explanatory via subtest names.
 package resources
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestBuildSlots_CronWraparoundHourRange(t *testing.T) {
 	t.Parallel()
@@ -98,6 +101,62 @@ func TestDetectTargetService(t *testing.T) {
 				t.Fatalf("detectTargetService(%q) = %q, want %q", tt.arn, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestParseCronField(t *testing.T) {
+	t.Parallel()
+
+	got := parseCronField("0-2", 0, 5)
+	want := []int{0, 1, 2}
+	if len(got) != len(want) {
+		t.Fatalf("len(parseCronField()) = %d, want %d", len(got), len(want))
+	}
+	for idx := range want {
+		if got[idx] != want[idx] {
+			t.Fatalf("parseCronField()[%d] = %d, want %d", idx, got[idx], want[idx])
+		}
+	}
+}
+
+func TestSafeInt32(t *testing.T) {
+	t.Parallel()
+
+	if got, want := safeInt32(42), int32(42); got != want {
+		t.Fatalf("safeInt32(42) = %d, want %d", got, want)
+	}
+	if got, want := safeInt32(-1), int32(0); got != want {
+		t.Fatalf("safeInt32(-1) = %d, want %d", got, want)
+	}
+}
+
+func TestFromMillisHelpers(t *testing.T) {
+	t.Parallel()
+
+	if got := fromMillis(0); !got.IsZero() {
+		t.Fatalf("fromMillis(0) = %v, want zero", got)
+	}
+
+	v := int64(1713571200000)
+	if got := fromMillisPtr(&v); got.IsZero() {
+		t.Fatal("fromMillisPtr() = zero, want non-zero")
+	}
+	if got := fromMillisPtr(nil); !got.IsZero() {
+		t.Fatalf("fromMillisPtr(nil) = %v, want zero", got)
+	}
+}
+
+func TestFormatRFC3339Helpers(t *testing.T) {
+	t.Parallel()
+
+	zero := formatRFC3339UTC(time.Time{})
+	if zero != "" {
+		t.Fatalf("formatRFC3339UTC(zero) = %q, want empty", zero)
+	}
+
+	nanoZero := formatRFC3339NanoUTC(time.Time{})
+	if nanoZero != "" {
+		t.Fatalf("formatRFC3339NanoUTC(zero) = %q, want empty", nanoZero)
 	}
 }
 

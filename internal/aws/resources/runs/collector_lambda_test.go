@@ -1,6 +1,13 @@
 package runs
 
-import "testing"
+import (
+	"testing"
+	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
+	resourcescore "github.com/y-miyazaki/absc/internal/aws/resources/core"
+)
 
 func TestLambdaRunStatus(t *testing.T) {
 	t.Parallel()
@@ -155,7 +162,7 @@ func TestLambdaCollector_DeduplicationByRequestID(t *testing.T) {
 	runsByID[eventID] = 2 // Second occurrence (overwrites)
 
 	if len(runsByID) != 1 {
-		t.Errorf("expected 1 unique run after dedup by RequestID, got %d", len(runsByID))
+		t.Fatalf("expected 1 unique run after dedup by RequestID, got %d", len(runsByID))
 	}
 }
 
@@ -201,7 +208,7 @@ func TestLambdaCollector_FunctionNameExtraction(t *testing.T) {
 			t.Parallel()
 			got := collector.functionName(tt.functionTarget)
 			if got != tt.want {
-				t.Errorf("functionName(%q) = %q, want %q", tt.functionTarget, got, tt.want)
+				t.Fatalf("functionName(%q) = %q, want %q", tt.functionTarget, got, tt.want)
 			}
 		})
 	}
@@ -240,5 +247,53 @@ func TestLambdaCloudTrailResourceIDs(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestLambdaEventIDOrTime(t *testing.T) {
+	t.Parallel()
+
+	collector := &lambdaCollector{}
+	eventID := "request-id"
+	if got, want := collector.eventIDOrTime(&eventID, time.Time{}), "request-id"; got != want {
+		t.Fatalf("eventIDOrTime() = %q, want %q", got, want)
+	}
+
+	ts := time.Date(2026, 3, 19, 0, 0, 0, 0, time.UTC)
+	if got, want := collector.eventIDOrTime(nil, ts), "2026-03-19T00:00:00Z"; got != want {
+		t.Fatalf("eventIDOrTime() = %q, want %q", got, want)
+	}
+}
+
+func TestLambdaRunsFromCloudTrailEvent(t *testing.T) {
+	t.Parallel()
+
+	eventTime := time.Date(2026, 3, 24, 2, 0, 0, 0, time.UTC)
+	event := cloudtrailtypes.Event{
+		EventName: aws.String("Invoke"),
+		EventTime: aws.Time(eventTime),
+		CloudTrailEvent: aws.String(`{
+			"eventID":"lambda-invoke-event",
+			"requestParameters":{"functionName":"my-function"}
+		}`),
+	}
+
+	runs := (&lambdaCollector{}).runsFromCloudTrailEvent(&event, eventTime.Add(-time.Minute))
+	if got, want := len(runs), 1; got != want {
+		t.Fatalf("len(runs) = %d, want %d", got, want)
+	}
+	if got, want := runs[0].run.SourceService, "cloudtrail"; got != want {
+		t.Fatalf("source_service = %q, want %q", got, want)
+	}
+}
+
+func TestLambdaRunSortTime(t *testing.T) {
+	t.Parallel()
+
+	collector := &lambdaCollector{}
+	earlier := resourcescore.Run{StartAt: "2026-03-18T00:00:00Z"}
+	later := resourcescore.Run{StartAt: "2026-03-18T01:00:00Z"}
+	if !collector.runSortTime(&later).After(collector.runSortTime(&earlier)) {
+		t.Fatal("runSortTime() did not order later run after earlier run")
 	}
 }

@@ -124,3 +124,57 @@ func TestNormalizeTaskDefinitionARN(t *testing.T) {
 		t.Fatalf("normalizeTaskDefinitionARN() = %q, want %q", got, want)
 	}
 }
+
+func TestECSCloudTrailRequired(t *testing.T) {
+	t.Parallel()
+
+	collector := &ecsCollector{}
+	since := time.Date(2026, 3, 18, 0, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name string
+		now  time.Time
+		want bool
+	}{
+		{name: "recent window uses api", now: since.Add(2 * time.Hour), want: false},
+		{name: "old window uses cloudtrail", now: since.Add(48 * time.Hour), want: true},
+	}
+
+	for i := range tests {
+		tt := tests[i]
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := collector.cloudTrailRequired(since, tt.now); got != tt.want {
+				t.Fatalf("cloudTrailRequired() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestECSCloudTrailResourceIDs(t *testing.T) {
+	t.Parallel()
+
+	collector := &ecsCollector{}
+	clusterARN := "arn:aws:ecs:ap-northeast-1:123:cluster/prd-cluster"
+	hints := &TargetHints{
+		ECSService:           "prd-api",
+		ECSTaskDefinitionARN: "arn:aws:ecs:ap-northeast-1:123:task-definition/prd-api:31",
+	}
+
+	got := collector.cloudTrailResourceIDs(clusterARN, hints)
+	want := []string{
+		clusterARN,
+		"prd-cluster",
+		"prd-api",
+		"arn:aws:ecs:ap-northeast-1:123:task-definition/prd-api:31",
+		"arn:aws:ecs:ap-northeast-1:123:task-definition/prd-api",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("len(resourceIDs) = %d, want %d", len(got), len(want))
+	}
+	for idx := range want {
+		if got[idx] != want[idx] {
+			t.Fatalf("resourceIDs[%d] = %q, want %q", idx, got[idx], want[idx])
+		}
+	}
+}
