@@ -8,6 +8,7 @@ description: "AI Assistant Instructions for Go Development"
 ## Scope
 
 - Scope is limited to implementing, testing, and validating Go source code (`*.go`).
+- Test authoring conventions live in companion Go Test rules (stem `go-test`); companion `applyTo` is `**/*.go` so pairing applies when editing source files (G-05).
 
 ## Standards
 
@@ -256,10 +257,12 @@ description: "AI Assistant Instructions for Go Development"
 
 - TEST-01 (SHOULD): Table-Driven Tests
   - Check: Are []struct format table-driven tests, subtests, and edge cases covered?
-- TEST-02 (SHOULD): testify Usage and Test Design
-  - Check: Are assert/require appropriately used, testable API designed, and time/rand injected?
-- TEST-03 (SHOULD): Appropriate Mock Usage
-  - Check: Are gomock/testify mock used, interfaces segregated, and dependency injection present?
+- TEST-02 (SHOULD): Test Design and Determinism
+  - Check: Is the API designed for testability, and are time/rand injected rather than called directly?
+- TEST-03 (SHOULD): External Dependencies Through Consumer Interfaces
+  - Check: Are external dependencies stubbed or mocked through small consumer-side interfaces with dependency injection?
+- TEST-STYLE (SHOULD): Consistent Test Authorship Within Package
+  - Check: Within a package, is one assertion/mock style used without mixing stdlib, testify, and go-cmp? Do new tests match sibling *_test.go layout?
 - TEST-04 (SHOULD): Separate Test Helpers
   - Check: Are testing_test.go separated, common helper functions, and fixture management present?
 - TEST-05 (SHOULD): Benchmark Tests

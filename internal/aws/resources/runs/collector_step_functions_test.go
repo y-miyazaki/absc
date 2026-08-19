@@ -42,8 +42,8 @@ func TestStepFunctionsCollector_IsThrottlingError(t *testing.T) {
 	collector := &stepFunctionsCollector{}
 
 	tests := []struct {
-		name string
 		err  error
+		name string
 		want bool
 	}{
 		{name: "nil", err: nil, want: false},

@@ -1,3 +1,4 @@
+//revive:disable:comments-density reason: table-driven tests are self-explanatory via subtest names.
 package runs
 
 import "testing"
@@ -17,12 +18,16 @@ func TestIsMeasurableAction(t *testing.T) {
 		{name: "ecs run task", targetKind: "ecs", targetAction: "ecs:runTask", want: true},
 		{name: "ecs other action", targetKind: "ecs", targetAction: "ecs:updateService", want: false},
 		{name: "glue start job run", targetKind: "glue", targetAction: "glue:startJobRun", want: true},
+		{name: "glue other action", targetKind: "glue", targetAction: "glue:updateJob", want: false},
+		{name: "batch submit job", targetKind: "batch", targetAction: "batch:submitJob", want: true},
+		{name: "batch other action", targetKind: "batch", targetAction: "batch:updateJobQueue", want: false},
 		{name: "stepfunctions start execution", targetKind: "stepfunctions", targetAction: "sfn:startExecution", want: true},
 		{name: "stepfunctions other action", targetKind: "stepfunctions", targetAction: "sfn:updateStateMachine", want: false},
 		{name: "unknown kind", targetKind: "unknown", targetAction: "unknown:doThing", want: false},
 	}
 
-	for _, tt := range tests {
+	for i := range tests {
+		tt := tests[i]
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			if got := isMeasurableAction(tt.targetKind, tt.targetAction); got != tt.want {
@@ -46,7 +51,8 @@ func TestCloudTrailRequestedStatus(t *testing.T) {
 		{name: "fallback", eventName: "TagResource", want: "ACTION_REQUESTED"},
 	}
 
-	for _, tt := range tests {
+	for i := range tests {
+		tt := tests[i]
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			if got := cloudTrailRequestedStatus(tt.eventName); got != tt.want {

@@ -1,6 +1,11 @@
+//revive:disable:comments-density reason: table-driven tests are self-explanatory via subtest names.
 package runs
 
-import "testing"
+import (
+	"context"
+	"testing"
+	"time"
+)
 
 func TestCloudTrailEventName(t *testing.T) {
 	t.Parallel()
@@ -15,13 +20,37 @@ func TestCloudTrailEventName(t *testing.T) {
 		{name: "invalid", targetAction: "", want: ""},
 	}
 
-	for _, tt := range tests {
+	for i := range tests {
+		tt := tests[i]
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			if got := cloudTrailEventName(tt.targetAction); got != tt.want {
 				t.Fatalf("cloudTrailEventName(%q) = %q, want %q", tt.targetAction, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestLookupCloudTrailEvents_NilClientOrEmptyName(t *testing.T) {
+	t.Parallel()
+
+	since := time.Date(2026, 3, 24, 0, 0, 0, 0, time.UTC)
+	caches := newRunCollectorCaches()
+
+	events, err := lookupCloudTrailEvents(context.Background(), nil, "StartJobRun", since, time.Time{}, caches)
+	if err != nil {
+		t.Fatalf("nil client error = %v", err)
+	}
+	if events != nil {
+		t.Fatalf("nil client events = %v, want nil", events)
+	}
+
+	events, err = lookupCloudTrailEvents(context.Background(), nil, "   ", since, time.Time{}, caches)
+	if err != nil {
+		t.Fatalf("empty event name error = %v", err)
+	}
+	if events != nil {
+		t.Fatalf("empty event name events = %v, want nil", events)
 	}
 }
 
