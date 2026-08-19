@@ -76,7 +76,7 @@ var (
 	newAWSConfig        = awscfg.NewConfig
 	nowFunc             = time.Now
 	// Build-time version information injected by GoReleaser via ldflags.
-	version            = "v1.0.16"
+	version            = "v1.0.19"
 	writeErrorsHTML    = exporter.WriteErrorsHTML
 	writeHTML          = exporter.WriteHTML
 	writeJSON          = exporter.WriteJSON
