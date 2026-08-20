@@ -79,7 +79,7 @@ Use this checklist to avoid partial implementations when introducing a new sched
 3. **Scheduler resolver**: add/extend service entry in `schedulerSDKResolvers` in [internal/aws/resources/scheduler.go](../internal/aws/resources/scheduler.go) (`runTarget` and `displayName`).
 4. **Target classification**: update kind/service/action detection in [internal/aws/resources/utils.go](../internal/aws/resources/utils.go) so schedules are routed to the right collector.
 5. **Exporter display/linking**: add UI behavior and console URL mapping in [internal/exporter/html_template.html](../internal/exporter/html_template.html) when required.
-6. **Tests**: add coverage for resolver/displayName and kind/action detection in [internal/aws/resources/scheduler_target_name_test.go](../internal/aws/resources/scheduler_target_name_test.go) and [internal/aws/resources/utils_test.go](../internal/aws/resources/utils_test.go).
+6. **Tests**: add coverage for resolver/displayName and kind/action detection in [internal/aws/resources/scheduler_test.go](../internal/aws/resources/scheduler_test.go) and [internal/aws/resources/utils_test.go](../internal/aws/resources/utils_test.go).
 7. **Runtime verification**: run collection and confirm expected schedules have non-zero `runs` in `output/<account>/schedules/schedules.json`.
 
 ## Recent Runs Refactoring (EC2/RDS/Redshift)
