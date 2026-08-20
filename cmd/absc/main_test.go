@@ -223,9 +223,9 @@ func TestTimelineWindowStart(t *testing.T) {
 	now := time.Date(2026, 3, 19, 15, 30, 0, 0, loc)
 
 	tests := []struct {
+		wantDate time.Time
 		name     string
 		daysAgo  int
-		wantDate time.Time
 	}{
 		{name: "today", daysAgo: 0, wantDate: time.Date(2026, 3, 19, 0, 0, 0, 0, loc)},
 		{name: "yesterday", daysAgo: 1, wantDate: time.Date(2026, 3, 18, 0, 0, 0, 0, loc)},
@@ -314,9 +314,9 @@ func TestRunCommand_Validation(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		values  map[string]string
 		wantErr error
+		values  map[string]string
+		name    string
 	}{
 		{
 			name:    "max results below minimum",
@@ -399,7 +399,7 @@ func TestRunCommand_Success(t *testing.T) {
 	collectSchedules = func(context.Context, *awssdk.Config, resources.CollectOptions) ([]resources.Schedule, []resources.ErrorRecord) {
 		return nil, nil
 	}
-	buildOutput = func(accountID string, _ time.Time, _ time.Time, _ *time.Location, _ []resources.Schedule, _ []resources.ErrorRecord, _ exporter.BuildOutputOptions) exporter.Output {
+	buildOutput = func(accountID string, _, _ time.Time, _ *time.Location, _ []resources.Schedule, _ []resources.ErrorRecord, _ exporter.BuildOutputOptions) exporter.Output {
 		return exporter.Output{AccountID: accountID}
 	}
 	mkdirAll = func(string, os.FileMode) error { return nil }
@@ -432,7 +432,7 @@ func TestRunCommand_AccountNameLookupFailureContinues(t *testing.T) {
 	collectSchedules = func(context.Context, *awssdk.Config, resources.CollectOptions) ([]resources.Schedule, []resources.ErrorRecord) {
 		return nil, nil
 	}
-	buildOutput = func(accountID string, _ time.Time, _ time.Time, _ *time.Location, _ []resources.Schedule, _ []resources.ErrorRecord, _ exporter.BuildOutputOptions) exporter.Output {
+	buildOutput = func(accountID string, _, _ time.Time, _ *time.Location, _ []resources.Schedule, _ []resources.ErrorRecord, _ exporter.BuildOutputOptions) exporter.Output {
 		return exporter.Output{AccountID: accountID}
 	}
 	mkdirAll = func(string, os.FileMode) error { return nil }
@@ -442,7 +442,7 @@ func TestRunCommand_AccountNameLookupFailureContinues(t *testing.T) {
 	writeSlotIssuesCSV = func(string, *exporter.Output) error { return nil }
 
 	cmd := newMockCommand(t, map[string]string{
-		outputDirFlagName:  outDir,
+		outputDirFlagName:   outDir,
 		accountNameFlagName: "true",
 	})
 	if err := runCommand(context.Background(), cmd, testLogger()); err != nil {

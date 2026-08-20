@@ -9,6 +9,41 @@ import (
 	resourcescore "github.com/y-miyazaki/absc/internal/aws/resources/core"
 )
 
+const (
+	// Shared time component constants for test fixtures.
+	testYear   = 2026
+	testMonth  = 3
+	testDay    = 18
+	testDay19  = 19
+	testDay24  = 24
+	testHour   = 17
+	testHour1  = 1
+	testHour2  = 2
+	testMinute = 0
+	testSecond = 49
+
+	// Pagination fixture limits.
+	testPageLimit1   = 1
+	testPageLimit10  = 10
+	testPageLimit15  = 15
+	testPageLimit25  = 25
+	testPageLimit50  = 50
+	testPageLimit99  = 99
+	testPageLimit100 = 100
+	testPageLimit200 = 200
+	testPageLimit300 = 300
+	testPageLimit400 = 400
+
+	// Common AWS test fixture strings.
+	testRegionUSEast1 = "us-east-1"
+	testSampleJob     = "sample-job"
+	testMyFunction    = "my-function"
+
+	// Fatalf format strings reused across table-driven tests.
+	testFmtLenRuns = "len(runs) = %d, want %d"
+	testFmtStatus  = "status = %q, want %q"
+)
+
 var (
 	errTestUpstreamFailed = errors.New("upstream failed")
 	errTestShouldNotRun   = errors.New("should not run")

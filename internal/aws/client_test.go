@@ -7,30 +7,52 @@ import (
 	"testing"
 )
 
-func TestNewConfig_SetsRegion(t *testing.T) {
+func TestNewConfig(t *testing.T) {
 	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
 
-	region := "ap-northeast-1"
-	cfg, err := NewConfig(context.Background(), region, "")
-	if err != nil {
-		t.Fatalf("NewConfig() error = %v", err)
+	tests := []struct {
+		name        string
+		region      string
+		profile     string
+		wantRegion  string
+		wantErrText string
+		wantErr     bool
+	}{
+		{
+			name:       "sets region",
+			region:     "ap-northeast-1",
+			wantRegion: "ap-northeast-1",
+		},
+		{
+			name:        "invalid profile returns wrapped error",
+			profile:     "this-profile-should-not-exist-123456",
+			wantErr:     true,
+			wantErrText: "failed to load aws config",
+		},
 	}
-	if cfg.Region != region {
-		t.Fatalf("cfg.Region = %q, want %q", cfg.Region, region)
-	}
-}
 
-func TestNewConfig_InvalidProfileReturnsWrappedError(t *testing.T) {
-	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
-
-	_, err := NewConfig(context.Background(), "", "this-profile-should-not-exist-123456")
-	if err == nil {
-		t.Fatal("NewConfig() error = nil, want error")
-	}
-	if !strings.Contains(err.Error(), "failed to load aws config") {
-		t.Fatalf("error message = %q, want prefix %q", err.Error(), "failed to load aws config")
-	}
-	if errors.Unwrap(err) == nil {
-		t.Fatal("expected wrapped error, got nil unwrap")
+	for i := range tests {
+		tt := tests[i]
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := NewConfig(context.Background(), tt.region, tt.profile)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("NewConfig() error = nil, want error")
+				}
+				if !strings.Contains(err.Error(), tt.wantErrText) {
+					t.Fatalf("NewConfig() error = %q, want containing %q", err.Error(), tt.wantErrText)
+				}
+				if errors.Unwrap(err) == nil {
+					t.Fatal("NewConfig() unwrap = nil, want wrapped error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("NewConfig() error = %v", err)
+			}
+			if cfg.Region != tt.wantRegion {
+				t.Fatalf("cfg.Region = %q, want %q", cfg.Region, tt.wantRegion)
+			}
+		})
 	}
 }

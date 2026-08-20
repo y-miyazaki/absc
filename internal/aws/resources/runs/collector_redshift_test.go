@@ -1,3 +1,4 @@
+//revive:disable:comments-density reason: table-driven tests are self-explanatory via subtest names.
 package runs
 
 import (
@@ -11,16 +12,29 @@ import (
 func TestRedshiftCollector_Service(t *testing.T) {
 	t.Parallel()
 
-	collector := &redshiftCollector{}
-	if got, want := collector.Service(), "redshift"; got != want {
-		t.Fatalf("Service() = %q, want %q", got, want)
+	tests := []struct {
+		name      string
+		collector *redshiftCollector
+		want      string
+	}{
+		{name: "redshift", collector: &redshiftCollector{}, want: "redshift"},
+	}
+
+	for i := range tests {
+		tt := tests[i]
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := tt.collector.Service(); got != tt.want {
+				t.Fatalf("Service() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 
 func TestRedshiftCollector_RunsFromEvent(t *testing.T) {
 	t.Parallel()
 
-	eventTime := time.Date(2026, 3, 18, 17, 0, 49, 0, time.UTC)
+	eventTime := time.Date(testYear, testMonth, testDay, testHour, testMinute, testSecond, 0, time.UTC)
 	event := cloudtrailtypes.Event{
 		CloudTrailEvent: aws.String(`{
 			"eventID":"redshift-event-id",
@@ -36,7 +50,7 @@ func TestRedshiftCollector_RunsFromEvent(t *testing.T) {
 	runs := collector.runsFromEvent(&event, eventTime.Add(-time.Minute))
 
 	if got, want := len(runs), 1; got != want {
-		t.Fatalf("len(runs) = %d, want %d", got, want)
+		t.Fatalf(testFmtLenRuns, got, want)
 	}
 	if got, want := runs[0].resourceIDs[0], "prd-redshift-cluster"; got != want {
 		t.Fatalf("resource id = %q, want %q", got, want)
@@ -45,6 +59,6 @@ func TestRedshiftCollector_RunsFromEvent(t *testing.T) {
 		t.Fatalf("run_id = %q, want %q", got, want)
 	}
 	if got, want := runs[0].run.Status, "STOP_REQUESTED"; got != want {
-		t.Fatalf("status = %q, want %q", got, want)
+		t.Fatalf(testFmtStatus, got, want)
 	}
 }

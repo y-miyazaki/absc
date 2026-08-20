@@ -1,3 +1,4 @@
+//revive:disable:comments-density reason: table-driven tests are self-explanatory via subtest names.
 package runs
 
 import (
@@ -13,9 +14,22 @@ import (
 func TestStepFunctionsCollector_Service(t *testing.T) {
 	t.Parallel()
 
-	collector := &stepFunctionsCollector{}
-	if got, want := collector.Service(), "stepfunctions"; got != want {
-		t.Fatalf("Service() = %q, want %q", got, want)
+	tests := []struct {
+		name      string
+		collector *stepFunctionsCollector
+		want      string
+	}{
+		{name: "stepfunctions", collector: &stepFunctionsCollector{}, want: "stepfunctions"},
+	}
+
+	for i := range tests {
+		tt := tests[i]
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := tt.collector.Service(); got != tt.want {
+				t.Fatalf("Service() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 
@@ -65,7 +79,7 @@ func TestStepFunctionsCollector_IsThrottlingError(t *testing.T) {
 func TestStepFunctionsCollector_RunsFromCloudTrailEvent(t *testing.T) {
 	t.Parallel()
 
-	eventTime := time.Date(2026, 3, 24, 2, 0, 0, 0, time.UTC)
+	eventTime := time.Date(testYear, testMonth, testDay24, testHour2, 0, 0, 0, time.UTC)
 	event := cloudtrailtypes.Event{
 		EventName: aws.String("StartExecution"),
 		EventTime: aws.Time(eventTime),
@@ -82,13 +96,13 @@ func TestStepFunctionsCollector_RunsFromCloudTrailEvent(t *testing.T) {
 	runs := collector.runsFromCloudTrailEvent(&event, eventTime.Add(-time.Minute))
 
 	if got, want := len(runs), 1; got != want {
-		t.Fatalf("len(runs) = %d, want %d", got, want)
+		t.Fatalf(testFmtLenRuns, got, want)
 	}
 	if got, want := runs[0].run.RunID, "sfn-start-event"; got != want {
 		t.Fatalf("run_id = %q, want %q", got, want)
 	}
 	if got, want := runs[0].run.Status, "START_REQUESTED"; got != want {
-		t.Fatalf("status = %q, want %q", got, want)
+		t.Fatalf(testFmtStatus, got, want)
 	}
 	if got, want := runs[0].resourceIDs[0], "arn:aws:states:ap-northeast-1:123456789012:stateMachine:sample-sm"; got != want {
 		t.Fatalf("resourceIDs[0] = %q, want %q", got, want)

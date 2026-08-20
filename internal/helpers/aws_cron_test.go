@@ -12,8 +12,8 @@ func TestBuildDailySlots(t *testing.T) {
 	tests := []struct {
 		name       string
 		expr       string
-		slotMinute int
 		wantOnes   []int
+		slotMinute int
 		wantCount  int
 	}{
 		{name: "cron expression", expr: "cron(0 1 * * ? *)", slotMinute: 10, wantOnes: []int{6}, wantCount: 1},
@@ -53,9 +53,9 @@ func TestMatchAWSCronExpression(t *testing.T) {
 	tuesday := monday.Add(24 * time.Hour)
 
 	tests := []struct {
+		candidate time.Time
 		name      string
 		fields    []string
-		candidate time.Time
 		want      bool
 	}{
 		{name: "invalid field count", fields: []string{"0"}, candidate: monday, want: false},
@@ -82,12 +82,12 @@ func TestMatchCronField(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
+		aliases  map[string]int
 		name     string
 		field    string
 		value    int
 		minValue int
 		maxValue int
-		aliases  map[string]int
 		want     bool
 	}{
 		{name: "empty false", field: "", value: 1, minValue: 0, maxValue: 59, want: false},
@@ -163,9 +163,9 @@ func TestParseCronField(t *testing.T) {
 	tests := []struct {
 		name     string
 		field    string
+		want     []int
 		minValue int
 		maxValue int
-		want     []int
 	}{
 		{name: "wildcard", field: "*", minValue: 1, maxValue: 3, want: []int{1, 2, 3}},
 		{name: "list", field: "1,3,2", minValue: 1, maxValue: 3, want: []int{1, 2, 3}},

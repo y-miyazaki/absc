@@ -6,42 +6,46 @@ import (
 	"time"
 )
 
-func TestBuildSlots_CronWraparoundHourRange(t *testing.T) {
+func TestBuildSlots(t *testing.T) {
 	t.Parallel()
 
-	slots := buildSlots("cron(0 21-2 * * ? *)")
-
-	for _, idx := range []int{0, 6, 12, 126, 132, 138} {
-		if slots[idx] != 1 {
-			t.Fatalf("slots[%d] = %d, want 1", idx, slots[idx])
-		}
+	tests := []struct {
+		name     string
+		cronExpr string
+		wantOn   []int
+		wantOff  []int
+	}{
+		{
+			name:     "cron wraparound hour range",
+			cronExpr: "cron(0 21-2 * * ? *)",
+			wantOn:   []int{0, 6, 12, 126, 132, 138},
+			wantOff:  []int{18},
+		},
+		{
+			name:     "cron wraparound minute step range",
+			cronExpr: "cron(50-10/10 0 * * ? *)",
+			wantOn:   []int{0, 1, 5},
+			wantOff:  []int{2},
+		},
 	}
-	if slots[18] != 0 {
-		t.Fatalf("slots[18] = %d, want 0", slots[18])
-	}
-}
 
-func TestBuildSlots_CronWraparoundMinuteStepRange(t *testing.T) {
-	t.Parallel()
+	for i := range tests {
+		tt := tests[i]
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	slots := buildSlots("cron(50-10/10 0 * * ? *)")
-
-	for _, idx := range []int{0, 1, 5} {
-		if slots[idx] != 1 {
-			t.Fatalf("slots[%d] = %d, want 1", idx, slots[idx])
-		}
-	}
-	if slots[2] != 0 {
-		t.Fatalf("slots[2] = %d, want 0", slots[2])
-	}
-}
-
-func TestDetectTargetKind_AwsSDKRedshift(t *testing.T) {
-	t.Parallel()
-
-	got := detectTargetKind("arn:aws:scheduler:::aws-sdk:redshift:pauseCluster", false)
-	if got != "redshift" {
-		t.Fatalf("target kind = %q, want %q", got, "redshift")
+			slots := buildSlots(tt.cronExpr)
+			for _, idx := range tt.wantOn {
+				if slots[idx] != 1 {
+					t.Fatalf("buildSlots(%q) slots[%d] = %d, want 1", tt.cronExpr, idx, slots[idx])
+				}
+			}
+			for _, idx := range tt.wantOff {
+				if slots[idx] != 0 {
+					t.Fatalf("buildSlots(%q) slots[%d] = %d, want 0", tt.cronExpr, idx, slots[idx])
+				}
+			}
+		})
 	}
 }
 
@@ -59,6 +63,7 @@ func TestDetectTargetKind(t *testing.T) {
 		{name: "aws-sdk glue", arn: "arn:aws:scheduler:::aws-sdk:glue:startJobRun", want: "glue"},
 		{name: "aws-sdk lambda", arn: "arn:aws:scheduler:::aws-sdk:lambda:invoke", want: "lambda"},
 		{name: "aws-sdk ecs", arn: "arn:aws:scheduler:::aws-sdk:ecs:runTask", want: "ecs"},
+		{name: "aws-sdk redshift", arn: "arn:aws:scheduler:::aws-sdk:redshift:pauseCluster", want: "redshift"},
 		{name: "direct state machine", arn: "arn:aws:states:ap-northeast-1:123456789012:stateMachine:sample", want: "stepfunctions"},
 		{name: "direct glue job", arn: "arn:aws:glue:ap-northeast-1:123456789012:job/sample-job", want: "glue"},
 		{name: "batch parameters flag", arn: "arn:aws:events:ap-northeast-1:123456789012:rule/sample", batchParametersPresent: true, want: "batch"},
@@ -122,41 +127,90 @@ func TestParseCronField(t *testing.T) {
 func TestSafeInt32(t *testing.T) {
 	t.Parallel()
 
-	if got, want := safeInt32(42), int32(42); got != want {
-		t.Fatalf("safeInt32(42) = %d, want %d", got, want)
+	tests := []struct {
+		name  string
+		input int
+		want  int32
+	}{
+		{name: "positive", input: 42, want: 42},
+		{name: "negative", input: -1, want: 0},
 	}
-	if got, want := safeInt32(-1), int32(0); got != want {
-		t.Fatalf("safeInt32(-1) = %d, want %d", got, want)
+
+	for i := range tests {
+		tt := tests[i]
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := safeInt32(tt.input); got != tt.want {
+				t.Fatalf("safeInt32(%d) = %d, want %d", tt.input, got, tt.want)
+			}
+		})
 	}
 }
 
 func TestFromMillisHelpers(t *testing.T) {
 	t.Parallel()
 
-	if got := fromMillis(0); !got.IsZero() {
-		t.Fatalf("fromMillis(0) = %v, want zero", got)
+	v := int64(1713571200000)
+	tests := []struct {
+		millisPtr *int64
+		name      string
+		millis    int64
+		wantZero  bool
+	}{
+		{name: "zero millis", millis: 0, wantZero: true},
+		{name: "with pointer", millisPtr: &v, wantZero: false},
+		{name: "nil pointer", millisPtr: nil, wantZero: true},
 	}
 
-	v := int64(1713571200000)
-	if got := fromMillisPtr(&v); got.IsZero() {
-		t.Fatal("fromMillisPtr() = zero, want non-zero")
-	}
-	if got := fromMillisPtr(nil); !got.IsZero() {
-		t.Fatalf("fromMillisPtr(nil) = %v, want zero", got)
+	for i := range tests {
+		tt := tests[i]
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var got time.Time
+			switch tt.name {
+			case "zero millis":
+				got = fromMillis(tt.millis)
+			default:
+				got = fromMillisPtr(tt.millisPtr)
+			}
+
+			if tt.wantZero && !got.IsZero() {
+				t.Fatalf("fromMillis helper = %v, want zero", got)
+			}
+			if !tt.wantZero && got.IsZero() {
+				t.Fatal("fromMillis helper = zero, want non-zero")
+			}
+		})
 	}
 }
 
 func TestFormatRFC3339Helpers(t *testing.T) {
 	t.Parallel()
 
-	zero := formatRFC3339UTC(time.Time{})
-	if zero != "" {
-		t.Fatalf("formatRFC3339UTC(zero) = %q, want empty", zero)
+	tests := []struct {
+		name    string
+		useNano bool
+	}{
+		{name: "UTC zero", useNano: false},
+		{name: "nano UTC zero", useNano: true},
 	}
 
-	nanoZero := formatRFC3339NanoUTC(time.Time{})
-	if nanoZero != "" {
-		t.Fatalf("formatRFC3339NanoUTC(zero) = %q, want empty", nanoZero)
+	for i := range tests {
+		tt := tests[i]
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var got string
+			if tt.useNano {
+				got = formatRFC3339NanoUTC(time.Time{})
+			} else {
+				got = formatRFC3339UTC(time.Time{})
+			}
+			if got != "" {
+				t.Fatalf("format helper(zero) = %q, want empty", got)
+			}
+		})
 	}
 }
 

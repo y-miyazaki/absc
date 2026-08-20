@@ -7,34 +7,47 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 )
 
-func TestRegisteredConstructors(t *testing.T) {
+func TestRegistry(t *testing.T) {
 	t.Parallel()
 
-	want := []string{"eventbridge_rule", "eventbridge_scheduler"}
-	if got, wantLen := len(registeredConstructors), len(want); got != wantLen {
-		t.Fatalf("len(registeredConstructors) = %d, want %d", got, wantLen)
+	tests := []struct {
+		name string
+	}{
+		{name: "registered constructors"},
+		{name: "initialize collectors"},
 	}
-	for _, name := range want {
-		if _, ok := registeredConstructors[name]; !ok {
-			t.Fatalf("registeredConstructors missing %q", name)
-		}
-	}
-}
 
-func TestInitializeCollectors(t *testing.T) {
-	t.Parallel()
+	for i := range tests {
+		tt := tests[i]
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	cfg := &aws.Config{Region: "ap-northeast-1"}
-	collectors, err := initializeCollectors(cfg, "us-east-1")
-	if err != nil {
-		t.Fatalf("initializeCollectors() error = %v", err)
-	}
-	if got, want := len(collectors), len(registeredConstructors); got != want {
-		t.Fatalf("len(collectors) = %d, want %d", got, want)
-	}
-	for _, collector := range collectors {
-		if collector.Name() == "" {
-			t.Fatal("collector.Name() = empty, want non-empty")
-		}
+			switch tt.name {
+			case "registered constructors":
+				want := []string{"eventbridge_rule", "eventbridge_scheduler"}
+				if got, wantLen := len(registeredConstructors), len(want); got != wantLen {
+					t.Fatalf("len(registeredConstructors) = %d, want %d", got, wantLen)
+				}
+				for _, name := range want {
+					if _, ok := registeredConstructors[name]; !ok {
+						t.Fatalf("registeredConstructors missing %q", name)
+					}
+				}
+			case "initialize collectors":
+				cfg := &aws.Config{Region: "ap-northeast-1"}
+				collectors, err := initializeCollectors(cfg, "us-east-1")
+				if err != nil {
+					t.Fatalf("initializeCollectors() error = %v", err)
+				}
+				if got, want := len(collectors), len(registeredConstructors); got != want {
+					t.Fatalf("len(collectors) = %d, want %d", got, want)
+				}
+				for _, collector := range collectors {
+					if collector.Name() == "" {
+						t.Fatal("collector.Name() = empty, want non-empty")
+					}
+				}
+			}
+		})
 	}
 }

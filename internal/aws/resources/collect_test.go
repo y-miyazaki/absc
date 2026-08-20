@@ -8,45 +8,63 @@ import (
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 )
 
-func TestCollect_EmptyRegions(t *testing.T) {
+func TestCollect(t *testing.T) {
 	t.Parallel()
 
-	schedules, errs := Collect(context.Background(), &awssdk.Config{}, CollectOptions{})
-	if len(schedules) != 0 {
-		t.Fatalf("len(schedules) = %d, want 0", len(schedules))
+	tests := []struct {
+		name           string
+		opts           CollectOptions
+		wantSchedules  int
+		wantErrRecords int
+		checkNonNil    bool
+	}{
+		{
+			name:           "empty regions",
+			opts:           CollectOptions{},
+			wantSchedules:  0,
+			wantErrRecords: 0,
+		},
+		{
+			name: "default concurrency",
+			opts: CollectOptions{
+				Regions: []string{"ap-northeast-1"},
+			},
+			checkNonNil: true,
+		},
+		{
+			name: "multiple regions",
+			opts: CollectOptions{
+				Regions:        []string{"ap-northeast-1", "us-east-1"},
+				MaxConcurrency: 1,
+			},
+			checkNonNil: true,
+		},
 	}
-	if len(errs) != 0 {
-		t.Fatalf("len(errs) = %d, want 0", len(errs))
+
+	for i := range tests {
+		tt := tests[i]
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+
+			schedules, errs := Collect(ctx, &awssdk.Config{Region: "ap-northeast-1"}, tt.opts)
+			if tt.checkNonNil {
+				if schedules == nil {
+					t.Fatal("Collect() schedules = nil, want non-nil slice")
+				}
+				if errs == nil {
+					t.Fatal("Collect() errs = nil, want non-nil slice")
+				}
+			} else {
+				if len(schedules) != tt.wantSchedules {
+					t.Fatalf("len(schedules) = %d, want %d", len(schedules), tt.wantSchedules)
+				}
+				if len(errs) != tt.wantErrRecords {
+					t.Fatalf("len(errs) = %d, want %d", len(errs), tt.wantErrRecords)
+				}
+			}
+		})
 	}
-}
-
-func TestCollect_DefaultConcurrency(t *testing.T) {
-	t.Parallel()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	schedules, errs := Collect(ctx, &awssdk.Config{Region: "ap-northeast-1"}, CollectOptions{
-		Regions: []string{"ap-northeast-1"},
-	})
-	if schedules == nil {
-		t.Fatal("schedules = nil, want non-nil slice")
-	}
-	_ = errs
-}
-
-func TestCollect_MultipleRegions(t *testing.T) {
-	t.Parallel()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	schedules, errs := Collect(ctx, &awssdk.Config{Region: "ap-northeast-1"}, CollectOptions{
-		Regions:        []string{"ap-northeast-1", "us-east-1"},
-		MaxConcurrency: 1,
-	})
-	if schedules == nil {
-		t.Fatal("schedules = nil, want non-nil slice")
-	}
-	_ = errs
 }

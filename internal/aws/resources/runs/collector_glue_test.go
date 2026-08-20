@@ -13,9 +13,22 @@ import (
 func TestGlueCollector_Service(t *testing.T) {
 	t.Parallel()
 
-	collector := &glueCollector{}
-	if got, want := collector.Service(), "glue"; got != want {
-		t.Fatalf("Service() = %q, want %q", got, want)
+	tests := []struct {
+		name      string
+		collector *glueCollector
+		want      string
+	}{
+		{name: "glue", collector: &glueCollector{}, want: "glue"},
+	}
+
+	for i := range tests {
+		tt := tests[i]
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := tt.collector.Service(); got != tt.want {
+				t.Fatalf("Service() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 
@@ -29,12 +42,12 @@ func TestGlueCollector_CloudTrailResourceIDs(t *testing.T) {
 		t.Fatalf("cloudTrailResourceIDs(empty) = %v, want nil", got)
 	}
 
-	if got, want := collector.cloudTrailResourceIDs("sample-job"), []string{"sample-job"}; !reflect.DeepEqual(got, want) {
+	if got, want := collector.cloudTrailResourceIDs(testSampleJob), []string{testSampleJob}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("cloudTrailResourceIDs(name) = %v, want %v", got, want)
 	}
 
 	got := collector.cloudTrailResourceIDs(jobARN)
-	want := []string{jobARN, "sample-job"}
+	want := []string{jobARN, testSampleJob}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("cloudTrailResourceIDs(%q) = %v, want %v", jobARN, got, want)
 	}
@@ -43,7 +56,7 @@ func TestGlueCollector_CloudTrailResourceIDs(t *testing.T) {
 func TestGlueCollector_RunsFromCloudTrailEvent(t *testing.T) {
 	t.Parallel()
 
-	eventTime := time.Date(2026, 3, 24, 2, 0, 0, 0, time.UTC)
+	eventTime := time.Date(testYear, testMonth, testDay24, testHour2, 0, 0, 0, time.UTC)
 	event := cloudtrailtypes.Event{
 		EventName: aws.String("StartJobRun"),
 		EventTime: aws.Time(eventTime),
@@ -59,15 +72,15 @@ func TestGlueCollector_RunsFromCloudTrailEvent(t *testing.T) {
 	runs := collector.runsFromCloudTrailEvent(&event, eventTime.Add(-time.Minute))
 
 	if got, want := len(runs), 1; got != want {
-		t.Fatalf("len(runs) = %d, want %d", got, want)
+		t.Fatalf(testFmtLenRuns, got, want)
 	}
 	if got, want := runs[0].run.RunID, "glue-start-event"; got != want {
 		t.Fatalf("run_id = %q, want %q", got, want)
 	}
 	if got, want := runs[0].run.Status, "START_REQUESTED"; got != want {
-		t.Fatalf("status = %q, want %q", got, want)
+		t.Fatalf(testFmtStatus, got, want)
 	}
-	if got, want := runs[0].resourceIDs[0], "sample-job"; got != want {
+	if got, want := runs[0].resourceIDs[0], testSampleJob; got != want {
 		t.Fatalf("resourceIDs[0] = %q, want %q", got, want)
 	}
 }

@@ -63,6 +63,7 @@
     "readlink",
     "realpath",
     "rg",
+    "sed -n",
     "sort",
     "stat",
     "strings",

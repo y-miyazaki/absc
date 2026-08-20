@@ -1,3 +1,4 @@
+//revive:disable:comments-density reason: table-driven tests are self-explanatory via subtest names.
 package runs
 
 import (
@@ -8,6 +9,15 @@ import (
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	resourcescore "github.com/y-miyazaki/absc/internal/aws/resources/core"
 )
+
+func TestLambdaCollector_Service(t *testing.T) {
+	t.Parallel()
+
+	collector := &lambdaCollector{}
+	if got, want := collector.Service(), "lambda"; got != want {
+		t.Fatalf("Service() = %q, want %q", got, want)
+	}
+}
 
 func TestLambdaRunStatus(t *testing.T) {
 	t.Parallel()
@@ -177,17 +187,17 @@ func TestLambdaCollector_FunctionNameExtraction(t *testing.T) {
 		{
 			name:           "arn_format",
 			functionTarget: "arn:aws:lambda:us-east-1:123456789012:function:my-function",
-			want:           "my-function",
+			want:           testMyFunction,
 		},
 		{
 			name:           "arn_with_version",
 			functionTarget: "arn:aws:lambda:us-east-1:123456789012:function:my-function:1",
-			want:           "my-function",
+			want:           testMyFunction,
 		},
 		{
 			name:           "simple_name",
-			functionTarget: "my-function",
-			want:           "my-function",
+			functionTarget: testMyFunction,
+			want:           testMyFunction,
 		},
 		{
 			name:           "empty",
@@ -225,12 +235,12 @@ func TestLambdaCloudTrailResourceIDs(t *testing.T) {
 		{
 			name:           "arn target includes arn and name",
 			functionTarget: "arn:aws:lambda:ap-northeast-1:123456789012:function:my-function",
-			want:           []string{"arn:aws:lambda:ap-northeast-1:123456789012:function:my-function", "my-function"},
+			want:           []string{"arn:aws:lambda:ap-northeast-1:123456789012:function:my-function", testMyFunction},
 		},
 		{
 			name:           "name target includes only name",
-			functionTarget: "my-function",
-			want:           []string{"my-function"},
+			functionTarget: testMyFunction,
+			want:           []string{testMyFunction},
 		},
 	}
 
@@ -259,7 +269,7 @@ func TestLambdaEventIDOrTime(t *testing.T) {
 		t.Fatalf("eventIDOrTime() = %q, want %q", got, want)
 	}
 
-	ts := time.Date(2026, 3, 19, 0, 0, 0, 0, time.UTC)
+	ts := time.Date(testYear, testMonth, testDay19, 0, 0, 0, 0, time.UTC)
 	if got, want := collector.eventIDOrTime(nil, ts), "2026-03-19T00:00:00Z"; got != want {
 		t.Fatalf("eventIDOrTime() = %q, want %q", got, want)
 	}
@@ -268,7 +278,7 @@ func TestLambdaEventIDOrTime(t *testing.T) {
 func TestLambdaRunsFromCloudTrailEvent(t *testing.T) {
 	t.Parallel()
 
-	eventTime := time.Date(2026, 3, 24, 2, 0, 0, 0, time.UTC)
+	eventTime := time.Date(testYear, testMonth, testDay24, testHour2, 0, 0, 0, time.UTC)
 	event := cloudtrailtypes.Event{
 		EventName: aws.String("Invoke"),
 		EventTime: aws.Time(eventTime),
@@ -280,7 +290,7 @@ func TestLambdaRunsFromCloudTrailEvent(t *testing.T) {
 
 	runs := (&lambdaCollector{}).runsFromCloudTrailEvent(&event, eventTime.Add(-time.Minute))
 	if got, want := len(runs), 1; got != want {
-		t.Fatalf("len(runs) = %d, want %d", got, want)
+		t.Fatalf(testFmtLenRuns, got, want)
 	}
 	if got, want := runs[0].run.SourceService, "cloudtrail"; got != want {
 		t.Fatalf("source_service = %q, want %q", got, want)

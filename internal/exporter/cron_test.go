@@ -1,6 +1,11 @@
+//revive:disable:comments-density reason: table-driven tests are self-explanatory via subtest names.
+
 package exporter
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -796,4 +801,96 @@ func activeSlotCount(slots []int) int {
 		}
 	}
 	return count
+}
+
+func sampleOutput() *Output {
+	return &Output{
+		Version:     outputVersion,
+		GeneratedAt: time.Date(2026, 3, 19, 10, 0, 0, 0, time.UTC).Format(time.RFC3339),
+		AccountID:   "123456789012",
+		Timezone:    "UTC",
+		Window: Window{
+			Start:      "2026-03-18T00:00:00Z",
+			End:        "2026-03-19T00:00:00Z",
+			HourLabels: []string{"00:00"},
+			SlotLabels: []string{"00:00 - 00:10"},
+		},
+		Schedules: []Schedule{{
+			ID:            "schedule-1",
+			ScheduleName:  "sample",
+			Region:        "ap-northeast-1",
+			TargetService: "Lambda",
+			SlotRunIssues: []SlotRunIssue{{
+				SlotIndex: 3,
+				SlotLabel: "00:30 - 00:40",
+				Reason:    slotIssueNoRunInWindow,
+			}},
+		}},
+		Errors: []ErrRecord{{
+			Service: "eventbridge_rule",
+			Region:  "ap-northeast-1",
+			Message: "sample error",
+		}},
+	}
+}
+
+func TestWriteOutput(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		filename     string
+		writeFn      func(string, *Output) error
+		writeFnName  string
+		wantContains string
+	}{
+		{
+			name:         "json",
+			filename:     "schedules.json",
+			writeFn:      WriteJSON,
+			writeFnName:  "WriteJSON",
+			wantContains: `"account_id": "123456789012"`,
+		},
+		{
+			name:         "errors html",
+			filename:     "errors.html",
+			writeFn:      WriteErrorsHTML,
+			writeFnName:  "WriteErrorsHTML",
+			wantContains: "sample error",
+		},
+		{
+			name:         "html",
+			filename:     "index.html",
+			writeFn:      WriteHTML,
+			writeFnName:  "WriteHTML",
+			wantContains: "ABSC Cron Timeline",
+		},
+		{
+			name:         "slot run issues csv",
+			filename:     "slot_run_issues.csv",
+			writeFn:      WriteSlotRunIssuesCSV,
+			writeFnName:  "WriteSlotRunIssuesCSV",
+			wantContains: "NO_RUN_IN_WINDOW",
+		},
+	}
+
+	for i := range tests {
+		tt := tests[i]
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			dir := t.TempDir()
+			path := filepath.Join(dir, tt.filename)
+			if err := tt.writeFn(path, sampleOutput()); err != nil {
+				t.Fatalf("%s() error = %v", tt.writeFnName, err)
+			}
+			body, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatalf("ReadFile() error = %v", err)
+			}
+			if !strings.Contains(string(body), tt.wantContains) {
+				t.Fatalf("%s() body missing %q: %s", tt.writeFnName, tt.wantContains, body)
+			}
+		})
+	}
 }

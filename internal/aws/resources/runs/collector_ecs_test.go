@@ -1,3 +1,4 @@
+//revive:disable:comments-density reason: table-driven tests are self-explanatory via subtest names.
 package runs
 
 import (
@@ -9,10 +10,19 @@ import (
 	resourcescore "github.com/y-miyazaki/absc/internal/aws/resources/core"
 )
 
+func TestECSCollector_Service(t *testing.T) {
+	t.Parallel()
+
+	collector := &ecsCollector{}
+	if got, want := collector.Service(), "ecs"; got != want {
+		t.Fatalf("Service() = %q, want %q", got, want)
+	}
+}
+
 func TestECSCloudTrailRunsFromEvent(t *testing.T) {
 	t.Parallel()
 
-	eventTime := time.Date(2026, 3, 18, 17, 0, 49, 0, time.UTC)
+	eventTime := time.Date(testYear, testMonth, testDay, testHour, testMinute, testSecond, 0, time.UTC)
 	event := cloudtrailtypes.Event{
 		CloudTrailEvent: aws.String(`{
 			"eventID":"0c2ac9ce-51d2-4d55-bf47-aab1402cfc54",
@@ -41,7 +51,7 @@ func TestECSCloudTrailRunsFromEvent(t *testing.T) {
 	runs := collector.cloudTrailRunsFromEvent(&event, eventTime.Add(-time.Minute))
 
 	if got, want := len(runs), 1; got != want {
-		t.Fatalf("len(runs) = %d, want %d", got, want)
+		t.Fatalf(testFmtLenRuns, got, want)
 	}
 	if got, want := runs[0].callerARN, "arn:aws:iam::582064665348:role/prd-recommend-batch-st-cw-role"; got != want {
 		t.Fatalf("callerARN = %q, want %q", got, want)
@@ -53,7 +63,7 @@ func TestECSCloudTrailRunsFromEvent(t *testing.T) {
 		t.Fatalf("run_id = %q, want %q", got, want)
 	}
 	if got, want := runs[0].run.Status, ecsRunStatusStarted; got != want {
-		t.Fatalf("status = %q, want %q", got, want)
+		t.Fatalf(testFmtStatus, got, want)
 	}
 	if got, want := runs[0].run.StartAt, "2026-03-18T17:00:49Z"; got != want {
 		t.Fatalf("start_at = %q, want %q", got, want)
@@ -85,7 +95,7 @@ func TestFilterECSCloudTrailRuns(t *testing.T) {
 		ECSTaskDefinitionARN: "arn:aws:ecs:ap-northeast-1:582064665348:task-definition/prd-recommend-batch-td",
 	}
 	collector := &ecsCollector{}
-	filtered := collector.filterCloudTrailRuns(allRuns, "arn:aws:ecs:ap-northeast-1:582064665348:cluster/prd-recommend-cluster", hints, 10)
+	filtered := collector.filterCloudTrailRuns(allRuns, "arn:aws:ecs:ap-northeast-1:582064665348:cluster/prd-recommend-cluster", hints, testPageLimit10)
 
 	if got, want := len(filtered), 1; got != want {
 		t.Fatalf("len(filtered) = %d, want %d", got, want)
@@ -102,7 +112,7 @@ func TestMergeECSRunsPrefersDetailedRuns(t *testing.T) {
 	merged := collector.mergeRuns(
 		[]resourcescore.Run{{RunID: "same-task", StartAt: "2026-03-18T17:00:55Z", EndAt: "2026-03-18T17:05:00Z", Status: "STOPPED", SourceService: "ecs"}},
 		[]resourcescore.Run{{RunID: "same-task", StartAt: "2026-03-18T17:00:49Z", Status: ecsRunStatusStarted, SourceService: "cloudtrail"}},
-		10,
+		testPageLimit10,
 	)
 
 	if got, want := len(merged), 1; got != want {
@@ -129,11 +139,11 @@ func TestECSCloudTrailRequired(t *testing.T) {
 	t.Parallel()
 
 	collector := &ecsCollector{}
-	since := time.Date(2026, 3, 18, 0, 0, 0, 0, time.UTC)
+	since := time.Date(testYear, testMonth, testDay, 0, 0, 0, 0, time.UTC)
 
 	tests := []struct {
-		name string
 		now  time.Time
+		name string
 		want bool
 	}{
 		{name: "recent window uses api", now: since.Add(2 * time.Hour), want: false},

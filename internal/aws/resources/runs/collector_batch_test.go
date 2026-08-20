@@ -13,9 +13,22 @@ import (
 func TestBatchCollector_Service(t *testing.T) {
 	t.Parallel()
 
-	collector := &batchCollector{}
-	if got, want := collector.Service(), "batch"; got != want {
-		t.Fatalf("Service() = %q, want %q", got, want)
+	tests := []struct {
+		name      string
+		collector *batchCollector
+		want      string
+	}{
+		{name: "batch", collector: &batchCollector{}, want: "batch"},
+	}
+
+	for i := range tests {
+		tt := tests[i]
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := tt.collector.Service(); got != tt.want {
+				t.Fatalf("Service() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 
@@ -25,8 +38,8 @@ func TestBatchCollector_CloudTrailResourceIDs(t *testing.T) {
 	collector := &batchCollector{}
 	queueARN := "arn:aws:batch:ap-northeast-1:123456789012:job-queue/sample-queue"
 
-	got := collector.cloudTrailResourceIDs(queueARN, "sample-job")
-	want := []string{queueARN, "sample-queue", "sample-job"}
+	got := collector.cloudTrailResourceIDs(queueARN, testSampleJob)
+	want := []string{queueARN, "sample-queue", testSampleJob}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("cloudTrailResourceIDs() = %v, want %v", got, want)
 	}
@@ -40,7 +53,7 @@ func TestBatchCollector_CloudTrailResourceIDs(t *testing.T) {
 func TestBatchCollector_RunsFromCloudTrailEvent(t *testing.T) {
 	t.Parallel()
 
-	eventTime := time.Date(2026, 3, 24, 2, 0, 0, 0, time.UTC)
+	eventTime := time.Date(testYear, testMonth, testDay24, testHour2, 0, 0, 0, time.UTC)
 	event := cloudtrailtypes.Event{
 		EventName: aws.String("SubmitJob"),
 		EventTime: aws.Time(eventTime),
@@ -57,18 +70,18 @@ func TestBatchCollector_RunsFromCloudTrailEvent(t *testing.T) {
 	runs := collector.runsFromCloudTrailEvent(&event, eventTime.Add(-time.Minute))
 
 	if got, want := len(runs), 1; got != want {
-		t.Fatalf("len(runs) = %d, want %d", got, want)
+		t.Fatalf(testFmtLenRuns, got, want)
 	}
 	if got, want := runs[0].run.RunID, "batch-submit-event"; got != want {
 		t.Fatalf("run_id = %q, want %q", got, want)
 	}
 	if got, want := runs[0].run.Status, "ACTION_REQUESTED"; got != want {
-		t.Fatalf("status = %q, want %q", got, want)
+		t.Fatalf(testFmtStatus, got, want)
 	}
 	if got, want := runs[0].resourceIDs[0], "sample-queue"; got != want {
 		t.Fatalf("resourceIDs[0] = %q, want %q", got, want)
 	}
-	if got, want := runs[0].resourceIDs[1], "sample-job"; got != want {
+	if got, want := runs[0].resourceIDs[1], testSampleJob; got != want {
 		t.Fatalf("resourceIDs[1] = %q, want %q", got, want)
 	}
 }

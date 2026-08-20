@@ -12,7 +12,7 @@ import (
 func TestEC2CloudTrailRunsFromEvent(t *testing.T) {
 	t.Parallel()
 
-	eventTime := time.Date(2026, 3, 18, 17, 0, 49, 0, time.UTC)
+	eventTime := time.Date(testYear, testMonth, testDay, testHour, testMinute, testSecond, 0, time.UTC)
 
 	tests := []struct {
 		name       string
@@ -68,13 +68,13 @@ func TestEC2CloudTrailRunsFromEvent(t *testing.T) {
 			t.Parallel()
 			runs := collector.runsFromEvent(&tt.event, since)
 			if got, want := len(runs), 1; got != want {
-				t.Fatalf("len(runs) = %d, want %d", got, want)
+				t.Fatalf(testFmtLenRuns, got, want)
 			}
 			if got, want := len(runs[0].resourceIDs), tt.wantIDs; got != want {
 				t.Fatalf("len(resourceIDs) = %d, want %d", got, want)
 			}
 			if got, want := runs[0].run.Status, tt.wantStatus; got != want {
-				t.Fatalf("status = %q, want %q", got, want)
+				t.Fatalf(testFmtStatus, got, want)
 			}
 			if tt.wantRunID != "" {
 				if got, want := runs[0].run.RunID, tt.wantRunID; got != want {
@@ -88,63 +88,83 @@ func TestEC2CloudTrailRunsFromEvent(t *testing.T) {
 func TestEC2Collector_Service(t *testing.T) {
 	t.Parallel()
 
-	if got, want := (&ec2Collector{}).Service(), "ec2"; got != want {
-		t.Fatalf("Service() = %q, want %q", got, want)
+	tests := []struct {
+		name      string
+		collector *ec2Collector
+		want      string
+	}{
+		{name: "ec2", collector: &ec2Collector{}, want: "ec2"},
+	}
+
+	for i := range tests {
+		tt := tests[i]
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := tt.collector.Service(); got != tt.want {
+				t.Fatalf("Service() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 
-func TestEC2RunsFromEvent_SkipsBeforeSince(t *testing.T) {
+func TestEC2RunsFromEvent_EdgeCases(t *testing.T) {
 	t.Parallel()
 
-	eventTime := time.Date(2026, 3, 18, 17, 0, 49, 0, time.UTC)
-	event := cloudtrailtypes.Event{
-		CloudTrailEvent: aws.String(`{"eventID":"ec2-event-id","requestParameters":{"instancesSet":{"items":[{"instanceId":"i-0abc123"}]}}}`),
-		EventTime:       aws.Time(eventTime),
-	}
-	runs := (&ec2Collector{}).runsFromEvent(&event, eventTime.Add(time.Minute))
-	if runs != nil {
-		t.Fatalf("runs = %v, want nil", runs)
-	}
-}
+	eventTime := time.Date(testYear, testMonth, testDay, testHour, testMinute, testSecond, 0, time.UTC)
+	collector := &ec2Collector{}
 
-func TestEC2RunsFromEvent_InvalidPayload(t *testing.T) {
-	t.Parallel()
-
-	eventTime := time.Date(2026, 3, 18, 17, 0, 49, 0, time.UTC)
-	event := cloudtrailtypes.Event{
-		CloudTrailEvent: aws.String(`{`),
-		EventTime:       aws.Time(eventTime),
+	tests := []struct {
+		since     time.Time
+		name      string
+		payload   string
+		wantStart string
+		wantNil   bool
+	}{
+		{
+			name:    "skips before since",
+			payload: `{"eventID":"ec2-event-id","requestParameters":{"instancesSet":{"items":[{"instanceId":"i-0abc123"}]}}}`,
+			since:   eventTime.Add(time.Minute),
+			wantNil: true,
+		},
+		{
+			name:    "invalid payload",
+			payload: `{`,
+			since:   eventTime.Add(-time.Minute),
+			wantNil: true,
+		},
+		{
+			name:    "empty resource ids",
+			payload: `{"eventID":"ec2-event-id","requestParameters":{"instancesSet":{"items":[]}}}`,
+			since:   eventTime.Add(-time.Minute),
+			wantNil: true,
+		},
+		{
+			name:      "start at format",
+			payload:   `{"eventID":"ec2-event-id","requestParameters":{"instancesSet":{"items":[{"instanceId":"i-0abc123"}]}}}`,
+			since:     eventTime.Add(-time.Minute),
+			wantStart: "2026-03-18T17:00:49Z",
+		},
 	}
-	runs := (&ec2Collector{}).runsFromEvent(&event, eventTime.Add(-time.Minute))
-	if runs != nil {
-		t.Fatalf("runs = %v, want nil", runs)
-	}
-}
 
-func TestEC2RunsFromEvent_EmptyResourceIDs(t *testing.T) {
-	t.Parallel()
+	for i := range tests {
+		tt := tests[i]
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	eventTime := time.Date(2026, 3, 18, 17, 0, 49, 0, time.UTC)
-	event := cloudtrailtypes.Event{
-		CloudTrailEvent: aws.String(`{"eventID":"ec2-event-id","requestParameters":{"instancesSet":{"items":[]}}}`),
-		EventTime:       aws.Time(eventTime),
-	}
-	runs := (&ec2Collector{}).runsFromEvent(&event, eventTime.Add(-time.Minute))
-	if runs != nil {
-		t.Fatalf("runs = %v, want nil", runs)
-	}
-}
-
-func TestEC2RunsFromEvent_StartAtFormat(t *testing.T) {
-	t.Parallel()
-
-	eventTime := time.Date(2026, 3, 18, 17, 0, 49, 0, time.UTC)
-	event := cloudtrailtypes.Event{
-		CloudTrailEvent: aws.String(`{"eventID":"ec2-event-id","requestParameters":{"instancesSet":{"items":[{"instanceId":"i-0abc123"}]}}}`),
-		EventTime:       aws.Time(eventTime),
-	}
-	runs := (&ec2Collector{}).runsFromEvent(&event, eventTime.Add(-time.Minute))
-	if got, want := runs[0].run.StartAt, "2026-03-18T17:00:49Z"; got != want {
-		t.Fatalf("start at = %q, want %q", got, want)
+			event := cloudtrailtypes.Event{
+				CloudTrailEvent: aws.String(tt.payload),
+				EventTime:       aws.Time(eventTime),
+			}
+			runs := collector.runsFromEvent(&event, tt.since)
+			if tt.wantNil {
+				if runs != nil {
+					t.Fatalf("runs = %v, want nil", runs)
+				}
+				return
+			}
+			if got, want := runs[0].run.StartAt, tt.wantStart; got != want {
+				t.Fatalf("start at = %q, want %q", got, want)
+			}
+		})
 	}
 }

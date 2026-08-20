@@ -63,6 +63,7 @@
       "Shell(readlink)",
       "Shell(realpath)",
       "Shell(rg)",
+      "Shell(sed -n)",
       "Shell(sort)",
       "Shell(stat)",
       "Shell(strings)",

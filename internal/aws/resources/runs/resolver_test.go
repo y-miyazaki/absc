@@ -1,3 +1,4 @@
+//revive:disable:comments-density reason: table-driven tests are self-explanatory via subtest names.
 package runs
 
 import (
@@ -17,7 +18,7 @@ func TestNewResolver(t *testing.T) {
 	t.Parallel()
 
 	resolver := NewResolver(
-		"us-east-1",
+		testRegionUSEast1,
 		&sfn.Client{},
 		&batch.Client{},
 		&cloudtrail.Client{},
@@ -29,8 +30,8 @@ func TestNewResolver(t *testing.T) {
 	if resolver == nil {
 		t.Fatal("NewResolver returned nil")
 	}
-	if resolver.region != "us-east-1" {
-		t.Errorf("region = %q, want %q", resolver.region, "us-east-1")
+	if resolver.region != testRegionUSEast1 {
+		t.Errorf("region = %q, want %q", resolver.region, testRegionUSEast1)
 	}
 	if len(resolver.collectors) == 0 {
 		t.Fatal("collectors not initialized")
@@ -46,7 +47,7 @@ func TestResolver_PopulateScheduleRuns_UnknownTargetKind(t *testing.T) {
 	t.Parallel()
 
 	resolver := NewResolver(
-		"us-east-1",
+		testRegionUSEast1,
 		&sfn.Client{},
 		&batch.Client{},
 		&cloudtrail.Client{},
@@ -81,7 +82,7 @@ func TestResolver_PopulateScheduleRuns_RunsCapped(t *testing.T) {
 	t.Parallel()
 
 	resolver := NewResolver(
-		"us-east-1",
+		testRegionUSEast1,
 		&sfn.Client{},
 		&batch.Client{},
 		&cloudtrail.Client{},
@@ -116,7 +117,7 @@ func TestResolver_PopulateScheduleRuns_SetRunsCappedFlag(t *testing.T) {
 	t.Parallel()
 
 	resolver := NewResolver(
-		"us-east-1",
+		testRegionUSEast1,
 		&sfn.Client{},
 		&batch.Client{},
 		&cloudtrail.Client{},
