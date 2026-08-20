@@ -16,7 +16,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/scheduler v1.20.5
 	github.com/aws/aws-sdk-go-v2/service/sfn v1.45.5
 	github.com/urfave/cli/v3 v3.10.1
-	github.com/y-miyazaki/go-common v0.10.4
+	github.com/y-miyazaki/go-common v0.11.1
 )
 
 require (
@@ -37,5 +37,5 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.28.0 // indirect
 	golang.org/x/sys v0.46.0 // indirect
-	gorm.io/gorm v1.31.1 // indirect
+	gorm.io/gorm v1.31.2 // indirect
 )
