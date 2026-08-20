@@ -109,6 +109,7 @@ paths:
 - TEST-05 (SHOULD): Isolate integration tests with build tags
 - TEST-06 (SHOULD): Call t.Helper() first in test helpers
 - TEST-07 (SHOULD): Keep one assertion stack per package; match sibling tests
+- TEST-08 (MUST): Prefix every *_test.go filename with the source stem under test
 
 ### Code Modification Guidelines
 
