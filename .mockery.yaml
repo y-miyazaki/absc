@@ -1,0 +1,31 @@
+# Regenerate: mockery (from repo root)
+# gomock template vendored in tools/mockery/ until mockery ships template: gomock.
+
+template: file://tools/mockery/gomock.templ
+template-schema: file://tools/mockery/gomock.templ.schema.json
+
+structname: "Mock{{.InterfaceName}}"
+
+template-data:
+  typed: true
+  no-pkg-comment: true
+  no-source-comment: true
+
+packages:
+  github.com/y-miyazaki/absc/cmd/absc:
+    config:
+      dir: "{{.InterfaceDir}}/mocks"
+      filename: "mock_{{.InterfaceName | snakecase}}.go"
+      pkgname: mocks
+      force-file-write: true
+    interfaces:
+      AccountInformationAPI:
+
+  github.com/y-miyazaki/absc/internal/aws/resources/runs:
+    config:
+      dir: "{{.InterfaceDir}}/mocks"
+      filename: "mock_{{.InterfaceName | snakecase}}.go"
+      pkgname: mocks
+      force-file-write: true
+    interfaces:
+      RunCollector:

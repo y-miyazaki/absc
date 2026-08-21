@@ -22,54 +22,54 @@ const (
 var (
 	// runCollectorRegistrations defines the available run collectors and their associated target kinds.
 	runCollectorRegistrations = []struct {
-		build      func(runCollectorDeps) runCollector
+		build      func(runCollectorDeps) RunCollector
 		targetKind string
 	}{
 		{
 			targetKind: "batch",
-			build: func(deps runCollectorDeps) runCollector {
+			build: func(deps runCollectorDeps) RunCollector {
 				return newBatchCollector(deps.batchSvc, deps.ctSvc, deps.caches)
 			},
 		},
 		{
 			targetKind: "ec2",
-			build: func(deps runCollectorDeps) runCollector {
+			build: func(deps runCollectorDeps) RunCollector {
 				return newEC2Collector(deps.ctSvc, deps.caches)
 			},
 		},
 		{
 			targetKind: "ecs",
-			build: func(deps runCollectorDeps) runCollector {
+			build: func(deps runCollectorDeps) RunCollector {
 				return newECSCollector(deps.ecsSvc, deps.ctSvc, deps.caches)
 			},
 		},
 		{
 			targetKind: "glue",
-			build: func(deps runCollectorDeps) runCollector {
+			build: func(deps runCollectorDeps) RunCollector {
 				return newGlueCollector(deps.glueSvc, deps.ctSvc, deps.caches)
 			},
 		},
 		{
 			targetKind: "lambda",
-			build: func(deps runCollectorDeps) runCollector {
+			build: func(deps runCollectorDeps) RunCollector {
 				return newLambdaCollector(deps.cwlSvc, deps.ctSvc, deps.caches)
 			},
 		},
 		{
 			targetKind: "rds",
-			build: func(deps runCollectorDeps) runCollector {
+			build: func(deps runCollectorDeps) RunCollector {
 				return newRDSCollector(deps.ctSvc, deps.caches)
 			},
 		},
 		{
 			targetKind: "stepfunctions",
-			build: func(deps runCollectorDeps) runCollector {
+			build: func(deps runCollectorDeps) RunCollector {
 				return newStepFunctionsCollector(deps.stepSvc, deps.ctSvc, deps.caches)
 			},
 		},
 		{
 			targetKind: "redshift",
-			build: func(deps runCollectorDeps) runCollector {
+			build: func(deps runCollectorDeps) RunCollector {
 				return newRedshiftCollector(deps.ctSvc, deps.caches)
 			},
 		},
@@ -86,20 +86,12 @@ var (
 
 // Resolver dispatches execution-history lookups to target-specific collectors.
 type Resolver struct {
-	collectors map[string]runCollector
+	collectors map[string]RunCollector
 	region     string
 }
 
-// TargetHints carries service-specific identifiers that help run collectors refine lookups.
-type TargetHints struct {
-	EC2InstanceIDs       []string
-	ECSRoleARN           string
-	ECSService           string
-	ECSStartedBy         string
-	ECSTaskDefinitionARN string
-	RDSResourceIDs       []string
-	RedshiftClusterIDs   []string
-}
+// TargetHints aliases the shared core hint type for run collectors.
+type TargetHints = resourcescore.TargetHints
 
 type runCollectorDeps struct {
 	batchSvc *batch.Client
@@ -131,8 +123,8 @@ func NewResolver(region string, stepSvc *sfn.Client, batchSvc *batch.Client, ctS
 	}
 }
 
-func newCollectors(deps runCollectorDeps) map[string]runCollector {
-	collectors := make(map[string]runCollector, len(supportedRunTargetKinds))
+func newCollectors(deps runCollectorDeps) map[string]RunCollector {
+	collectors := make(map[string]RunCollector, len(supportedRunTargetKinds))
 	for _, registration := range runCollectorRegistrations {
 		collectors[registration.targetKind] = registration.build(deps)
 	}

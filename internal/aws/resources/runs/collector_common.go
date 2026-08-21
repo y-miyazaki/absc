@@ -11,9 +11,12 @@ import (
 	resourcescore "github.com/y-miyazaki/absc/internal/aws/resources/core"
 )
 
-type runCollector interface {
+type RunCollector interface {
+	// Collect returns recent execution runs for one scheduled target.
+	//
 	//nolint:inamedparam // Interface readability is secondary here; implementations carry the parameter names.
-	Collect(context.Context, *resourcescore.Schedule, string, string, TargetHints, resourcescore.CollectOptions) ([]resourcescore.Run, error)
+	Collect(context.Context, *resourcescore.Schedule, string, string, resourcescore.TargetHints, resourcescore.CollectOptions) ([]resourcescore.Run, error)
+	// Service returns the stable service identifier used for cache partitioning.
 	Service() string
 }
 
@@ -47,7 +50,7 @@ func ensureServiceRunCaches(caches *runCollectorCaches, service string) (map[str
 	return runsCache, errCache
 }
 
-func getCachedRunsForCollector(caches *runCollectorCaches, collector runCollector, key, description string, collectFn func() ([]resourcescore.Run, error)) ([]resourcescore.Run, error) {
+func getCachedRunsForCollector(caches *runCollectorCaches, collector RunCollector, key, description string, collectFn func() ([]resourcescore.Run, error)) ([]resourcescore.Run, error) {
 	runsCache, errCache := ensureServiceRunCaches(caches, collector.Service())
 	runs, err := getCachedRuns(runsCache, errCache, key, description, collectFn)
 	if err != nil {

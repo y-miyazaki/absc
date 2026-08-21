@@ -2,11 +2,12 @@
 package runs
 
 import (
-	"context"
 	"errors"
 	"testing"
 
 	resourcescore "github.com/y-miyazaki/absc/internal/aws/resources/core"
+	"github.com/y-miyazaki/absc/internal/aws/resources/runs/mocks"
+	"go.uber.org/mock/gomock"
 )
 
 const (
@@ -48,25 +49,6 @@ var (
 	errTestUpstreamFailed = errors.New("upstream failed")
 	errTestShouldNotRun   = errors.New("should not run")
 )
-
-type stubRunCollector struct {
-	service string
-}
-
-//nolint:gocritic // stub must match runCollector interface signature.
-func (stubRunCollector) Collect(ctx context.Context, schedule *resourcescore.Schedule, targetARN, runJobName string, hints TargetHints, opts resourcescore.CollectOptions) ([]resourcescore.Run, error) {
-	_ = ctx
-	_ = schedule
-	_ = targetARN
-	_ = runJobName
-	_ = hints
-	_ = opts
-	return nil, nil
-}
-
-func (s stubRunCollector) Service() string {
-	return s.service
-}
 
 func TestGetCachedRuns(t *testing.T) {
 	t.Parallel()
@@ -134,10 +116,12 @@ func TestGetCachedRuns(t *testing.T) {
 }
 
 func TestGetCachedRunsForCollector(t *testing.T) {
-	t.Parallel()
+	ctrl := gomock.NewController(t)
+	mockCollector := mocks.NewMockRunCollector(ctrl)
+	mockCollector.EXPECT().Service().Return("glue").Times(2)
 
 	caches := newRunCollectorCaches()
-	collector := stubRunCollector{service: "glue"}
+	collector := mockCollector
 	want := []resourcescore.Run{{RunID: "cached-run"}}
 	calls := 0
 

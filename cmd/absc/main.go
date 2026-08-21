@@ -72,7 +72,7 @@ var (
 	collectSchedules    = resources.Collect
 	getAccountName      = fetchAccountName
 	mkdirAll            = os.MkdirAll
-	newAccountClient    = func(cfg *awssdk.Config) accountInformationAPI { return account.NewFromConfig(*cfg) }
+	newAccountClient    = func(cfg *awssdk.Config) AccountInformationAPI { return account.NewFromConfig(*cfg) }
 	newAWSConfig        = awscfg.NewConfig
 	nowFunc             = time.Now
 	// Build-time version information injected by GoReleaser via ldflags.
@@ -83,8 +83,8 @@ var (
 	writeSlotIssuesCSV = exporter.WriteSlotRunIssuesCSV
 )
 
-// accountInformationAPI wraps the AWS Account API used to resolve account names.
-type accountInformationAPI interface {
+// AccountInformationAPI wraps the AWS Account API used to resolve account names.
+type AccountInformationAPI interface {
 	GetAccountInformation(
 		_ context.Context,
 		_ *account.GetAccountInformationInput,

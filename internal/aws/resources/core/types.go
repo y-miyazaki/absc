@@ -23,6 +23,17 @@ type ErrorRecord struct {
 	Message string
 }
 
+// TargetHints carries service-specific identifiers that help run collectors refine lookups.
+type TargetHints struct {
+	EC2InstanceIDs       []string
+	ECSRoleARN           string
+	ECSService           string
+	ECSStartedBy         string
+	ECSTaskDefinitionARN string
+	RDSResourceIDs       []string
+	RedshiftClusterIDs   []string
+}
+
 // Run represents one collected execution record.
 type Run struct {
 	RunID         string

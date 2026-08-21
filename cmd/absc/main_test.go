@@ -14,22 +14,19 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/account"
 	"github.com/urfave/cli/v3"
 
+	"github.com/y-miyazaki/absc/cmd/absc/mocks"
 	"github.com/y-miyazaki/absc/internal/aws/resources"
 	"github.com/y-miyazaki/absc/internal/exporter"
 	"github.com/y-miyazaki/go-common/pkg/logger"
+	"go.uber.org/mock/gomock"
 )
 
-type stubAccountClient struct {
-	getAccountInformation func(context.Context, *account.GetAccountInformationInput, ...func(*account.Options)) (*account.GetAccountInformationOutput, error)
-}
-
-func (s stubAccountClient) GetAccountInformation(
-	ctx context.Context,
-	in *account.GetAccountInformationInput,
-	optFns ...func(*account.Options),
-) (*account.GetAccountInformationOutput, error) {
-	return s.getAccountInformation(ctx, in, optFns...)
-}
+var (
+	errTestAccountAPI          = errors.New("boom")
+	errTestAccountLookupFailed = errors.New("account lookup failed")
+	errTestConfigError         = errors.New("config error")
+	errTestNoCredentials       = errors.New("no credentials")
+)
 
 func testLogger() *logger.SlogLogger {
 	return logger.NewSlogLogger(&logger.SlogConfig{Level: slog.LevelError, Format: "text"})
@@ -269,45 +266,69 @@ func TestAccountIDFromARN(t *testing.T) {
 }
 
 func TestFetchAccountName(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		defer restoreCommandDeps()()
+	t.Parallel()
 
-		newAccountClient = func(_ *awssdk.Config) accountInformationAPI {
-			return stubAccountClient{
-				getAccountInformation: func(_ context.Context, in *account.GetAccountInformationInput, _ ...func(*account.Options)) (*account.GetAccountInformationOutput, error) {
-					if got := awssdk.ToString(in.AccountId); got != "123456789012" {
-						t.Fatalf("account id = %q, want %q", got, "123456789012")
-					}
-					return &account.GetAccountInformationOutput{AccountName: awssdk.String("sandbox")}, nil
-				},
+	tests := []struct {
+		name       string
+		setupMock  func(*testing.T, *gomock.Controller) AccountInformationAPI
+		want       string
+		wantErrMsg string
+	}{
+		{
+			name: "success",
+			setupMock: func(t *testing.T, ctrl *gomock.Controller) AccountInformationAPI {
+				mockClient := mocks.NewMockAccountInformationAPI(ctrl)
+				mockClient.EXPECT().
+					GetAccountInformation(gomock.Any(), gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ context.Context, in *account.GetAccountInformationInput, _ ...func(*account.Options)) (*account.GetAccountInformationOutput, error) {
+						if got := awssdk.ToString(in.AccountId); got != "123456789012" {
+							t.Fatalf("account id = %q, want %q", got, "123456789012")
+						}
+						return &account.GetAccountInformationOutput{AccountName: awssdk.String("sandbox")}, nil
+					})
+				return mockClient
+			},
+			want: "sandbox",
+		},
+		{
+			name: "api error",
+			setupMock: func(_ *testing.T, ctrl *gomock.Controller) AccountInformationAPI {
+				mockClient := mocks.NewMockAccountInformationAPI(ctrl)
+				mockClient.EXPECT().
+					GetAccountInformation(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil, errTestAccountAPI)
+				return mockClient
+			},
+			wantErrMsg: "get account information",
+		},
+	}
+
+	for i := range tests {
+		tt := tests[i]
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			defer restoreCommandDeps()()
+
+			ctrl := gomock.NewController(t)
+			newAccountClient = func(_ *awssdk.Config) AccountInformationAPI {
+				return tt.setupMock(t, ctrl)
 			}
-		}
 
-		got, err := fetchAccountName(context.Background(), &awssdk.Config{}, "123456789012")
-		if err != nil {
-			t.Fatalf("fetchAccountName() error = %v", err)
-		}
-		if got != "sandbox" {
-			t.Fatalf("fetchAccountName() = %q, want %q", got, "sandbox")
-		}
-	})
-
-	t.Run("api error", func(t *testing.T) {
-		defer restoreCommandDeps()()
-
-		newAccountClient = func(_ *awssdk.Config) accountInformationAPI {
-			return stubAccountClient{
-				getAccountInformation: func(context.Context, *account.GetAccountInformationInput, ...func(*account.Options)) (*account.GetAccountInformationOutput, error) {
-					return nil, errors.New("boom")
-				},
+			got, err := fetchAccountName(context.Background(), &awssdk.Config{}, "123456789012")
+			if tt.wantErrMsg != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErrMsg) {
+					t.Fatalf("fetchAccountName() error = %v, want wrapped error containing %q", err, tt.wantErrMsg)
+				}
+				return
 			}
-		}
-
-		_, err := fetchAccountName(context.Background(), &awssdk.Config{}, "123456789012")
-		if err == nil || !strings.Contains(err.Error(), "get account information") {
-			t.Fatalf("fetchAccountName() error = %v, want wrapped error", err)
-		}
-	})
+			if err != nil {
+				t.Fatalf("fetchAccountName() error = %v", err)
+			}
+			if got != tt.want {
+				t.Fatalf("fetchAccountName() = %q, want %q", got, tt.want)
+			}
+		})
+	}
 }
 
 func TestRunCommand_Validation(t *testing.T) {
@@ -357,7 +378,7 @@ func TestRunCommand_AWSConfigError(t *testing.T) {
 	defer restoreCommandDeps()()
 
 	newAWSConfig = func(context.Context, string, string) (awssdk.Config, error) {
-		return awssdk.Config{}, errors.New("config error")
+		return awssdk.Config{}, errTestConfigError
 	}
 
 	cmd := newMockCommand(t, map[string]string{})
@@ -374,7 +395,7 @@ func TestRunCommand_CredentialsError(t *testing.T) {
 		return awssdk.Config{Region: defaultRegion}, nil
 	}
 	checkAWSCredentials = func(context.Context, *awssdk.Config) (string, error) {
-		return "", errors.New("no credentials")
+		return "", errTestNoCredentials
 	}
 
 	cmd := newMockCommand(t, map[string]string{})
@@ -427,7 +448,7 @@ func TestRunCommand_AccountNameLookupFailureContinues(t *testing.T) {
 		return "arn:aws:iam::123456789012:root", nil
 	}
 	getAccountName = func(context.Context, *awssdk.Config, string) (string, error) {
-		return "", errors.New("account lookup failed")
+		return "", errTestAccountLookupFailed
 	}
 	collectSchedules = func(context.Context, *awssdk.Config, resources.CollectOptions) ([]resources.Schedule, []resources.ErrorRecord) {
 		return nil, nil
