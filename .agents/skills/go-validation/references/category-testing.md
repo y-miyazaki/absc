@@ -218,25 +218,43 @@ func TestMyService(t *testing.T) {
 }
 ```
 
-### Optional: mockery + gomock (package-adopted mocks only)
+### Optional: testify/mock (package-adopted testify only)
 
-Prefer when call order, count, or argument matching is the behavior under test. Generate mocks with mockery targeting gomock output; keep consumer interfaces small (1–3 methods). Do not mix with testify in the same package.
+Use only when the package already uses testify. Do not mix with the default stdlib plus go-cmp stack.
 
 ```go
-import "go.uber.org/mock/gomock"
+import (
+    "github.com/stretchr/testify/mock"
+)
 
+type MockDataStore struct {
+    mock.Mock
+}
+
+func (m *MockDataStore) Get(key string) (string, error) {
+    args := m.Called(key)
+    return args.String(0), args.Error(1)
+}
+
+func (m *MockDataStore) Set(key, value string) error {
+    args := m.Called(key, value)
+    return args.Error(0)
+}
+
+// Usage in test
 func TestWithMock(t *testing.T) {
-    t.Parallel()
+    mockStore := new(MockDataStore)
 
-    ctrl := gomock.NewController(t)
-    mockStore := NewMockStore(ctrl)
-    mockStore.EXPECT().Get(gomock.Any(), "key1").Return("value1", nil)
-    mockStore.EXPECT().Set(gomock.Any(), "key2", "value2").Return(nil)
+    // Set expectations
+    mockStore.On("Get", "key1").Return("value1", nil)
+    mockStore.On("Set", "key2", "value2").Return(nil)
 
+    // Test code
     service := NewService(mockStore)
-    if err := service.DoSomething(); err != nil {
-        t.Fatalf("DoSomething() error = %v", err)
-    }
+    err := service.DoSomething()
+
+    require.NoError(t, err)
+    mockStore.AssertExpectations(t)
 }
 ```
 
