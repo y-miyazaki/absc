@@ -1,6 +1,6 @@
 module github.com/y-miyazaki/absc
 
-go 1.26.5
+go 1.26.8
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.44.0
