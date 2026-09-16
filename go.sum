@@ -20,12 +20,12 @@ github.com/aws/aws-sdk-go-v2/service/account v1.40.0 h1:F1YWp6HO5B4BCchGUIDzP43N
 github.com/aws/aws-sdk-go-v2/service/account v1.40.0/go.mod h1:rWOoRJsYjzXX1m5QKAXqoa10yIZT/FvmgSd7vfCgn9Q=
 github.com/aws/aws-sdk-go-v2/service/batch v1.74.0 h1:LTPXlivKDHTioNpyKv18fcyxnhEBDmqutThyt9sprzQ=
 github.com/aws/aws-sdk-go-v2/service/batch v1.74.0/go.mod h1:GWZfjK4LbVjIxPZ6GOavjcrsgNwtSo2Q0/9SbFJQUU8=
-github.com/aws/aws-sdk-go-v2/service/cloudtrail v1.63.0 h1:ZE2yqB11dtwimKlUtvEzPlRq33EPSKeRa6AyfVkXsLI=
-github.com/aws/aws-sdk-go-v2/service/cloudtrail v1.63.0/go.mod h1:A7FeS2nVL0S2dEsC8bQnxuaDpi8iEhwYzOvVpW+tic4=
+github.com/aws/aws-sdk-go-v2/service/cloudtrail v1.64.0 h1:bNM0u9b3hgN4XqtjP/EFy8TU7djFZ656wgt/FtMOumM=
+github.com/aws/aws-sdk-go-v2/service/cloudtrail v1.64.0/go.mod h1:A7FeS2nVL0S2dEsC8bQnxuaDpi8iEhwYzOvVpW+tic4=
 github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.86.0 h1:yNLrmQvtLjjhSgQ70FiqN36rGP+kMX1evs8hEkDsFtc=
 github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.86.0/go.mod h1:DE1u38p6ehmEEELWR94qEN+N2aAH0ZmBKsYcYb7yBo0=
-github.com/aws/aws-sdk-go-v2/service/ec2 v1.329.0 h1:diNdfHw/832G8QYVQ6uz5kwOC0pCAZNnn+Gvz0UXPag=
-github.com/aws/aws-sdk-go-v2/service/ec2 v1.329.0/go.mod h1:mILEu29lo7lpbpkBIy4BtVFoHPLyM/ngOKYCZHEqciM=
+github.com/aws/aws-sdk-go-v2/service/ec2 v1.330.0 h1:ylZ+z8KERco0FRq9WbiK7Nbbv6bGqUYMjNQ9SXhkYIE=
+github.com/aws/aws-sdk-go-v2/service/ec2 v1.330.0/go.mod h1:mILEu29lo7lpbpkBIy4BtVFoHPLyM/ngOKYCZHEqciM=
 github.com/aws/aws-sdk-go-v2/service/ecs v1.96.0 h1:kAOWRGbOwkvD+IQLOklSNSVY6pF2nGCmemBHG4iRLNk=
 github.com/aws/aws-sdk-go-v2/service/ecs v1.96.0/go.mod h1:djHxMBR2H6gax8sZIXbRic+c5O6NQKm/r7NU2kezbZk=
 github.com/aws/aws-sdk-go-v2/service/eventbridge v1.53.0 h1:KTKk9rDHs6zvL99VYQjKFFBDQnHi+My5g83eHuxAv40=
