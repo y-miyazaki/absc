@@ -6,11 +6,11 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.47.0
 	github.com/aws/aws-sdk-go-v2/config v1.33.4
 	github.com/aws/aws-sdk-go-v2/service/account v1.41.0
-	github.com/aws/aws-sdk-go-v2/service/batch v1.75.0
+	github.com/aws/aws-sdk-go-v2/service/batch v1.76.0
 	github.com/aws/aws-sdk-go-v2/service/cloudtrail v1.65.0
 	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.87.0
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.331.0
-	github.com/aws/aws-sdk-go-v2/service/ecs v1.97.0
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.332.0
+	github.com/aws/aws-sdk-go-v2/service/ecs v1.98.0
 	github.com/aws/aws-sdk-go-v2/service/eventbridge v1.54.0
 	github.com/aws/aws-sdk-go-v2/service/glue v1.158.0
 	github.com/aws/aws-sdk-go-v2/service/scheduler v1.25.0
