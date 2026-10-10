@@ -5,14 +5,14 @@ go 1.26.8
 require (
 	github.com/aws/aws-sdk-go-v2 v1.47.1
 	github.com/aws/aws-sdk-go-v2/config v1.33.6
-	github.com/aws/aws-sdk-go-v2/service/account v1.41.1
-	github.com/aws/aws-sdk-go-v2/service/batch v1.77.1
+	github.com/aws/aws-sdk-go-v2/service/account v1.42.0
+	github.com/aws/aws-sdk-go-v2/service/batch v1.78.0
 	github.com/aws/aws-sdk-go-v2/service/cloudtrail v1.65.1
-	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.88.1
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.336.1
-	github.com/aws/aws-sdk-go-v2/service/ecs v1.99.1
+	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.89.0
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.338.1
+	github.com/aws/aws-sdk-go-v2/service/ecs v1.100.0
 	github.com/aws/aws-sdk-go-v2/service/eventbridge v1.55.0
-	github.com/aws/aws-sdk-go-v2/service/glue v1.164.0
+	github.com/aws/aws-sdk-go-v2/service/glue v1.167.0
 	github.com/aws/aws-sdk-go-v2/service/scheduler v1.25.1
 	github.com/aws/aws-sdk-go-v2/service/sfn v1.51.1
 	github.com/urfave/cli/v3 v3.13.0
