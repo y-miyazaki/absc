@@ -71,6 +71,7 @@ const (
 	slotIssueCollectedRunsCapped       = "COLLECTED_RUNS_CAPPED"
 	slotIssueNoRunInWindow             = "NO_RUN_IN_WINDOW"
 	slotIssueRunNotAlignedToSlot       = "RUN_NOT_ALIGNED_TO_SLOT"
+	slotLabelTimeLayout                = "15:04"
 	slotMinutes                        = 10
 	slotsPerHour                       = 6
 	slotsPerTimelineDay                = 144
@@ -348,6 +349,134 @@ func BuildOutputWithOptions(accountID string, now, since time.Time, loc *time.Lo
 	return out
 }
 
+// WriteErrorsHTML writes the error report page for a rendered output document.
+func WriteErrorsHTML(path string, out *Output) (retErr error) {
+	tpl, err := template.New("errors").Parse(errorsHTMLTemplate)
+	if err != nil {
+		return fmt.Errorf("parse errors html template: %w", err)
+	}
+
+	cleanPath := filepath.Clean(path)
+	f, err := os.Create(cleanPath) // #nosec G304 -- validated application output path
+	if err != nil {
+		return fmt.Errorf("create errors html file: %w", err)
+	}
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil && retErr == nil {
+			retErr = fmt.Errorf("close errors html file: %w", closeErr)
+		}
+	}()
+
+	if execErr := tpl.Execute(f, out); execErr != nil {
+		return fmt.Errorf("render errors html file: %w", execErr)
+	}
+
+	return nil
+}
+
+// WriteHTML writes the interactive HTML timeline for a rendered output document.
+func WriteHTML(path string, out *Output) (retErr error) {
+	//nolint:errchkjson // Keep explicit error handling to satisfy the project rule that errors must not be ignored.
+	b, err := json.Marshal(out)
+	if err != nil {
+		return fmt.Errorf("marshal html payload: %w", err)
+	}
+
+	html := htmlTemplate
+	html = strings.ReplaceAll(html, "@@INDEX_TITLE@@", "ABSC Cron Timeline")
+	html = strings.ReplaceAll(html, "@@PAYLOAD@@", string(b))
+
+	cleanPath := filepath.Clean(path)
+	f, err := os.Create(cleanPath) // #nosec G304 -- validated application output path
+	if err != nil {
+		return fmt.Errorf("create html file: %w", err)
+	}
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil && retErr == nil {
+			retErr = fmt.Errorf("close html file: %w", closeErr)
+		}
+	}()
+
+	if _, writeErr := f.WriteString(html); writeErr != nil {
+		return fmt.Errorf("write html file: %w", writeErr)
+	}
+
+	if iconErr := writeIconAssets(filepath.Dir(cleanPath)); iconErr != nil {
+		return fmt.Errorf("write html assets: %w", iconErr)
+	}
+
+	return nil
+}
+
+// WriteJSON writes the JSON representation of a rendered output document.
+func WriteJSON(path string, out *Output) (retErr error) {
+	cleanPath := filepath.Clean(path)
+	f, err := os.Create(cleanPath) // #nosec G304 -- validated application output path
+	if err != nil {
+		return fmt.Errorf("create json file: %w", err)
+	}
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil && retErr == nil {
+			retErr = fmt.Errorf("close json file: %w", closeErr)
+		}
+	}()
+
+	enc := json.NewEncoder(f)
+	enc.SetIndent("", "  ")
+	if encodeErr := enc.Encode(out); encodeErr != nil {
+		return fmt.Errorf("encode json: %w", encodeErr)
+	}
+	return nil
+}
+
+// WriteSlotRunIssuesCSV writes slot/run mismatch diagnostics as CSV.
+func WriteSlotRunIssuesCSV(path string, out *Output) (retErr error) {
+	cleanPath := filepath.Clean(path)
+	f, err := os.Create(cleanPath) // #nosec G304 -- validated application output path
+	if err != nil {
+		return fmt.Errorf("create slot run issues csv file: %w", err)
+	}
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil && retErr == nil {
+			retErr = fmt.Errorf("close slot run issues csv file: %w", closeErr)
+		}
+	}()
+
+	w := csv.NewWriter(f)
+	defer w.Flush()
+
+	header := []string{"schedule_id", "schedule_name", "region", "target_service", "slot_index", "slot_label", "reason", "runs_capped"}
+	if writeErr := w.Write(header); writeErr != nil {
+		return fmt.Errorf("write csv header: %w", writeErr)
+	}
+
+	for i := range out.Schedules {
+		s := out.Schedules[i]
+		for j := range s.SlotRunIssues {
+			issue := s.SlotRunIssues[j]
+			row := []string{
+				s.ID,
+				s.ScheduleName,
+				s.Region,
+				s.TargetService,
+				strconv.Itoa(issue.SlotIndex),
+				issue.SlotLabel,
+				issue.Reason,
+				strconv.FormatBool(s.RunsCapped),
+			}
+			if writeErr := w.Write(row); writeErr != nil {
+				return fmt.Errorf("write csv row: %w", writeErr)
+			}
+		}
+	}
+
+	if flushErr := w.Error(); flushErr != nil {
+		return fmt.Errorf("flush csv writer: %w", flushErr)
+	}
+
+	return nil
+}
+
 func buildSlotRunIssues(slots []int, runs []Run, windowStart time.Time, reason string) []SlotRunIssue {
 	if len(slots) != slotsPerTimelineDay {
 		return nil
@@ -418,7 +547,7 @@ func hasActiveSlot(slots []int) bool {
 func buildSlotLabel(windowStart time.Time, slotIndex int) string {
 	start := windowStart.Add(time.Duration(slotIndex*slotMinutes) * time.Minute)
 	end := start.Add(time.Duration(slotMinutes) * time.Minute)
-	return start.Format("15:04") + " - " + end.Format("15:04")
+	return start.Format(slotLabelTimeLayout) + " - " + end.Format(slotLabelTimeLayout)
 }
 
 func slotHasRunOverlap(slotIndex int, runs []Run, windowStart time.Time) bool {
@@ -457,7 +586,7 @@ func buildSlotLabels(dayStart time.Time) []string {
 	for i := range slotsPerTimelineDay {
 		start := dayStart.Add(time.Duration(i*slotMinutes) * time.Minute)
 		end := start.Add(time.Duration(slotMinutes) * time.Minute)
-		labels = append(labels, start.Format("15:04")+" - "+end.Format("15:04"))
+		labels = append(labels, start.Format(slotLabelTimeLayout)+" - "+end.Format(slotLabelTimeLayout))
 	}
 	return labels
 }
@@ -592,134 +721,6 @@ func scheduleTimezoneLabel(exprTZ string, reference time.Time) string {
 
 func formatUTCOffset(offsetSeconds int) string {
 	return helpers.FormatUTCOffset(offsetSeconds)
-}
-
-// WriteErrorsHTML writes the error report page for a rendered output document.
-func WriteErrorsHTML(path string, out *Output) (retErr error) {
-	tpl, err := template.New("errors").Parse(errorsHTMLTemplate)
-	if err != nil {
-		return fmt.Errorf("parse errors html template: %w", err)
-	}
-
-	cleanPath := filepath.Clean(path)
-	f, err := os.Create(cleanPath) // #nosec G304 -- validated application output path
-	if err != nil {
-		return fmt.Errorf("create errors html file: %w", err)
-	}
-	defer func() {
-		if closeErr := f.Close(); closeErr != nil && retErr == nil {
-			retErr = fmt.Errorf("close errors html file: %w", closeErr)
-		}
-	}()
-
-	if execErr := tpl.Execute(f, out); execErr != nil {
-		return fmt.Errorf("render errors html file: %w", execErr)
-	}
-
-	return nil
-}
-
-// WriteHTML writes the interactive HTML timeline for a rendered output document.
-func WriteHTML(path string, out *Output) (retErr error) {
-	//nolint:errchkjson // Keep explicit error handling to satisfy the project rule that errors must not be ignored.
-	b, err := json.Marshal(out)
-	if err != nil {
-		return fmt.Errorf("marshal html payload: %w", err)
-	}
-
-	html := htmlTemplate
-	html = strings.ReplaceAll(html, "@@INDEX_TITLE@@", "ABSC Cron Timeline")
-	html = strings.ReplaceAll(html, "@@PAYLOAD@@", string(b))
-
-	cleanPath := filepath.Clean(path)
-	f, err := os.Create(cleanPath) // #nosec G304 -- validated application output path
-	if err != nil {
-		return fmt.Errorf("create html file: %w", err)
-	}
-	defer func() {
-		if closeErr := f.Close(); closeErr != nil && retErr == nil {
-			retErr = fmt.Errorf("close html file: %w", closeErr)
-		}
-	}()
-
-	if _, writeErr := f.WriteString(html); writeErr != nil {
-		return fmt.Errorf("write html file: %w", writeErr)
-	}
-
-	if iconErr := writeIconAssets(filepath.Dir(cleanPath)); iconErr != nil {
-		return fmt.Errorf("write html assets: %w", iconErr)
-	}
-
-	return nil
-}
-
-// WriteJSON writes the JSON representation of a rendered output document.
-func WriteJSON(path string, out *Output) (retErr error) {
-	cleanPath := filepath.Clean(path)
-	f, err := os.Create(cleanPath) // #nosec G304 -- validated application output path
-	if err != nil {
-		return fmt.Errorf("create json file: %w", err)
-	}
-	defer func() {
-		if closeErr := f.Close(); closeErr != nil && retErr == nil {
-			retErr = fmt.Errorf("close json file: %w", closeErr)
-		}
-	}()
-
-	enc := json.NewEncoder(f)
-	enc.SetIndent("", "  ")
-	if encodeErr := enc.Encode(out); encodeErr != nil {
-		return fmt.Errorf("encode json: %w", encodeErr)
-	}
-	return nil
-}
-
-// WriteSlotRunIssuesCSV writes slot/run mismatch diagnostics as CSV.
-func WriteSlotRunIssuesCSV(path string, out *Output) (retErr error) {
-	cleanPath := filepath.Clean(path)
-	f, err := os.Create(cleanPath) // #nosec G304 -- validated application output path
-	if err != nil {
-		return fmt.Errorf("create slot run issues csv file: %w", err)
-	}
-	defer func() {
-		if closeErr := f.Close(); closeErr != nil && retErr == nil {
-			retErr = fmt.Errorf("close slot run issues csv file: %w", closeErr)
-		}
-	}()
-
-	w := csv.NewWriter(f)
-	defer w.Flush()
-
-	header := []string{"schedule_id", "schedule_name", "region", "target_service", "slot_index", "slot_label", "reason", "runs_capped"}
-	if writeErr := w.Write(header); writeErr != nil {
-		return fmt.Errorf("write csv header: %w", writeErr)
-	}
-
-	for i := range out.Schedules {
-		s := out.Schedules[i]
-		for j := range s.SlotRunIssues {
-			issue := s.SlotRunIssues[j]
-			row := []string{
-				s.ID,
-				s.ScheduleName,
-				s.Region,
-				s.TargetService,
-				strconv.Itoa(issue.SlotIndex),
-				issue.SlotLabel,
-				issue.Reason,
-				strconv.FormatBool(s.RunsCapped),
-			}
-			if writeErr := w.Write(row); writeErr != nil {
-				return fmt.Errorf("write csv row: %w", writeErr)
-			}
-		}
-	}
-
-	if flushErr := w.Error(); flushErr != nil {
-		return fmt.Errorf("flush csv writer: %w", flushErr)
-	}
-
-	return nil
 }
 
 func writeIconAssets(baseDir string) error {

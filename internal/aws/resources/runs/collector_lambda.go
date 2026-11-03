@@ -25,6 +25,7 @@ const (
 	lambdaFilterPatternPlatformReport = "\"platform.report\""
 	lambdaFilterPatternReportLine     = "\"REPORT RequestId\""
 	lambdaFloatBitSize                = 64
+	lambdaMillisecondsPerSecond       = 1000.0
 	lambdaPatternFetchMultiplier      = 2
 	lambdaPlatformReportType          = "platform.report"
 	lambdaSplitParts                  = 2
@@ -172,7 +173,7 @@ func (c *lambdaCollector) durationSec(message string) int64 {
 		if report.Record.Metrics.DurationMs <= 0 {
 			return 0
 		}
-		return int64(math.Ceil(report.Record.Metrics.DurationMs / 1000.0))
+		return int64(math.Ceil(report.Record.Metrics.DurationMs / lambdaMillisecondsPerSecond))
 	}
 	match := lambdaDurationPattern.FindStringSubmatch(message)
 	if len(match) < lambdaSplitParts {
@@ -182,7 +183,7 @@ func (c *lambdaCollector) durationSec(message string) int64 {
 	if err != nil || milliseconds <= 0 {
 		return 0
 	}
-	return int64(math.Ceil(milliseconds / 1000.0))
+	return int64(math.Ceil(milliseconds / lambdaMillisecondsPerSecond))
 }
 
 func (*lambdaCollector) eventIDOrTime(eventID *string, timestamp time.Time) string {

@@ -19,6 +19,8 @@ import (
 	"github.com/y-miyazaki/absc/internal/aws/resources/runs"
 )
 
+const serviceEventBridgeRule = "eventbridge_rule"
+
 // EventBridgeCollector collects scheduled EventBridge rules in one region.
 type EventBridgeCollector struct {
 	batchSvc *batch.Client
@@ -57,7 +59,7 @@ func (c *EventBridgeCollector) Collect(ctx context.Context, opts CollectOptions)
 	for {
 		page, err := c.svc.ListRules(ctx, &eventbridge.ListRulesInput{NextToken: nextToken})
 		if err != nil {
-			errs = append(errs, ErrorRecord{Service: "eventbridge_rule", Region: c.region, Message: err.Error()})
+			errs = append(errs, ErrorRecord{Service: serviceEventBridgeRule, Region: c.region, Message: err.Error()})
 			return schedules, errs
 		}
 		for ruleIndex := range page.Rules {
@@ -79,7 +81,7 @@ func (c *EventBridgeCollector) Collect(ctx context.Context, opts CollectOptions)
 			for {
 				targets, listTargetsErr := c.svc.ListTargetsByRule(ctx, &eventbridge.ListTargetsByRuleInput{Rule: r.Name, NextToken: targetsToken})
 				if listTargetsErr != nil {
-					errs = append(errs, ErrorRecord{Service: "eventbridge_rule", Region: c.region, Message: listTargetsErr.Error()})
+					errs = append(errs, ErrorRecord{Service: serviceEventBridgeRule, Region: c.region, Message: listTargetsErr.Error()})
 					allTargets = nil
 					break
 				}
@@ -97,7 +99,7 @@ func (c *EventBridgeCollector) Collect(ctx context.Context, opts CollectOptions)
 				// so this collector intentionally leaves NextInvocationAt empty.
 				schedules = append(schedules, Schedule{
 					ID:                 fmt.Sprintf("eventbridge_rule:%s:%s:no-target", c.region, aws.ToString(r.Name)),
-					Service:            "eventbridge_rule",
+					Service:            serviceEventBridgeRule,
 					Description:        aws.ToString(r.Description),
 					ScheduleName:       aws.ToString(r.Name),
 					ScheduleExpression: expr,
@@ -129,7 +131,7 @@ func (c *EventBridgeCollector) Collect(ctx context.Context, opts CollectOptions)
 				// so this collector intentionally leaves NextInvocationAt empty.
 				s := Schedule{
 					ID:                 fmt.Sprintf("eventbridge_rule:%s:%s:%d", c.region, aws.ToString(r.Name), i),
-					Service:            "eventbridge_rule",
+					Service:            serviceEventBridgeRule,
 					Description:        aws.ToString(r.Description),
 					ScheduleName:       aws.ToString(r.Name),
 					ScheduleExpression: expr,
@@ -170,7 +172,7 @@ func (c *EventBridgeCollector) Collect(ctx context.Context, opts CollectOptions)
 
 // Name returns the collector identifier.
 func (*EventBridgeCollector) Name() string {
-	return "eventbridge_rule"
+	return serviceEventBridgeRule
 }
 
 // eventPatternSourceLabel extracts source values from an EventPattern JSON.

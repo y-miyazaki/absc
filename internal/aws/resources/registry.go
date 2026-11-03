@@ -8,14 +8,14 @@ import (
 )
 
 var registeredConstructors = map[string]collectorFactory{
-	"eventbridge_rule": func(cfg *aws.Config, region string) (Collector, error) {
+	serviceEventBridgeRule: func(cfg *aws.Config, region string) (Collector, error) {
 		collector, err := NewEventBridgeCollector(cfg, region)
 		if err != nil {
 			return nil, fmt.Errorf("new eventbridge collector: %w", err)
 		}
 		return collector, nil
 	},
-	"eventbridge_scheduler": func(cfg *aws.Config, region string) (Collector, error) {
+	serviceEventBridgeScheduler: func(cfg *aws.Config, region string) (Collector, error) {
 		collector, err := NewSchedulerCollector(cfg, region)
 		if err != nil {
 			return nil, fmt.Errorf("new scheduler collector: %w", err)

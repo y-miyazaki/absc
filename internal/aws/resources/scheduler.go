@@ -19,6 +19,8 @@ import (
 	"github.com/y-miyazaki/absc/internal/aws/resources/runs"
 )
 
+const serviceEventBridgeScheduler = "eventbridge_scheduler"
+
 // schedulerSDKResolvers maps an AWS SDK service name (lowercase) to its per-service resolver.
 // Add a new entry here to support additional aws-sdk target services.
 var schedulerSDKResolvers = map[string]sdkTargetResolver{
@@ -220,14 +222,14 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 	for p.HasMorePages() {
 		page, err := p.NextPage(ctx)
 		if err != nil {
-			errs = append(errs, ErrorRecord{Service: "eventbridge_scheduler", Region: c.region, Message: err.Error()})
+			errs = append(errs, ErrorRecord{Service: serviceEventBridgeScheduler, Region: c.region, Message: err.Error()})
 			return schedules, errs
 		}
 		for scheduleIndex := range page.Schedules {
 			sum := page.Schedules[scheduleIndex]
 			detail, getScheduleErr := c.svc.GetSchedule(ctx, &scheduler.GetScheduleInput{Name: sum.Name, GroupName: sum.GroupName})
 			if getScheduleErr != nil {
-				errs = append(errs, ErrorRecord{Service: "eventbridge_scheduler", Region: c.region, Message: getScheduleErr.Error()})
+				errs = append(errs, ErrorRecord{Service: serviceEventBridgeScheduler, Region: c.region, Message: getScheduleErr.Error()})
 				continue
 			}
 			enabled := strings.EqualFold(string(detail.State), "ENABLED")
@@ -273,7 +275,7 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 				scheduleExpr := aws.ToString(detail.ScheduleExpression)
 				s := Schedule{
 					ID:                         fmt.Sprintf("eventbridge_scheduler:%s:%s", c.region, aws.ToString(detail.Name)),
-					Service:                    "eventbridge_scheduler",
+					Service:                    serviceEventBridgeScheduler,
 					Description:                aws.ToString(detail.Description),
 					ScheduleGroupName:          aws.ToString(detail.GroupName),
 					ScheduleName:               aws.ToString(detail.Name),
@@ -307,7 +309,7 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 			scheduleExpr := aws.ToString(detail.ScheduleExpression)
 			s := Schedule{
 				ID:                         fmt.Sprintf("eventbridge_scheduler:%s:%s", c.region, aws.ToString(detail.Name)),
-				Service:                    "eventbridge_scheduler",
+				Service:                    serviceEventBridgeScheduler,
 				Description:                aws.ToString(detail.Description),
 				ScheduleGroupName:          aws.ToString(detail.GroupName),
 				ScheduleName:               aws.ToString(detail.Name),
@@ -338,7 +340,7 @@ func (c *SchedulerCollector) Collect(ctx context.Context, opts CollectOptions) (
 
 // Name returns the collector identifier.
 func (*SchedulerCollector) Name() string {
-	return "eventbridge_scheduler"
+	return serviceEventBridgeScheduler
 }
 
 // awsSDKServiceFromARN extracts the service name from an aws-sdk scheduler target ARN.

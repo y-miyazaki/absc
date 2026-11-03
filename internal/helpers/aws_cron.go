@@ -15,6 +15,7 @@ const (
 	awsCronDecember         = 12
 	awsCronDayOfMonthMax    = 31
 	awsCronDayOfMonthMin    = 1
+	awsCronDayOfWeekIndex   = 4
 	awsCronFieldCount       = 6
 	awsCronFebruary         = 2
 	awsCronFriday           = 6
@@ -26,6 +27,7 @@ const (
 	awsCronMay              = 5
 	awsCronMinuteMax        = 59
 	awsCronMonday           = 2
+	awsCronMonthIndex       = 3
 	awsCronMonthMax         = 12
 	awsCronMonthMin         = 1
 	awsCronNoSpecific       = "?"
@@ -42,6 +44,7 @@ const (
 	awsCronThursday         = 5
 	awsCronTuesday          = 3
 	awsCronWednesday        = 4
+	awsCronYearIndex        = 5
 	awsCronYearMax          = 2199
 	awsCronYearMin          = 1970
 	dayHours                = 24
@@ -150,15 +153,15 @@ func MatchAWSCronExpression(fields []string, candidate time.Time) bool {
 	if !MatchCronField(fields[1], hour, 0, awsCronHourMax, nil) {
 		return false
 	}
-	if !MatchCronField(fields[3], month, awsCronMonthMin, awsCronMonthMax, awsCronMonthAliases) {
+	if !MatchCronField(fields[awsCronMonthIndex], month, awsCronMonthMin, awsCronMonthMax, awsCronMonthAliases) {
 		return false
 	}
-	if !MatchCronField(fields[5], year, awsCronYearMin, awsCronYearMax, nil) {
+	if !MatchCronField(fields[awsCronYearIndex], year, awsCronYearMin, awsCronYearMax, nil) {
 		return false
 	}
 
 	domField := strings.TrimSpace(fields[2])
-	dowField := strings.TrimSpace(fields[4])
+	dowField := strings.TrimSpace(fields[awsCronDayOfWeekIndex])
 	domMatch := MatchCronField(domField, dayOfMonth, awsCronDayOfMonthMin, awsCronDayOfMonthMax, nil)
 	dowMatch := MatchCronField(dowField, dayOfWeek, awsCronSunday, awsCronSaturday, awsCronDayAliases)
 	if domField == awsCronNoSpecific {
