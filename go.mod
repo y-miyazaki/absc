@@ -9,7 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/batch v1.78.6
 	github.com/aws/aws-sdk-go-v2/service/cloudtrail v1.65.7
 	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.90.3
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.342.0
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.343.0
 	github.com/aws/aws-sdk-go-v2/service/ecs v1.103.0
 	github.com/aws/aws-sdk-go-v2/service/eventbridge v1.55.6
 	github.com/aws/aws-sdk-go-v2/service/glue v1.172.1
