@@ -10,16 +10,6 @@ on:
         required: false
         type: boolean
         default: true
-      draft:
-        description: "Create a draft release"
-        required: false
-        type: boolean
-        default: false
-      prerelease:
-        description: "Mark as prerelease"
-        required: false
-        type: boolean
-        default: false
       version:
         description: "Release version (e.g. v1.0.0, v1.0.0-beta.1). Must start with 'v' and follow semantic versioning."
         required: true
@@ -52,14 +42,12 @@ jobs:
   release:
     name: Release ABSC
     needs: detect-go-version
-    uses: y-miyazaki/config/.github/workflows/cd-go-releaser.yaml@619efea37d6fc3a47939f63d7c38d8f838f5241d # v1.9.16
+    uses: y-miyazaki/config/.github/workflows/cd-go-releaser.yaml@2f0b609a7456baed06979fcc05639ac6be38242e # v1.10.0
     with:
       component: absc
       create_tag: ${{ inputs.create_tag }}
-      draft: ${{ inputs.draft }}
       go_project_path: "."
       go_version: ${{ needs.detect-go-version.outputs.go-version }}
-      prerelease: ${{ inputs.prerelease == true && 'true' || 'auto' }}
       version: ${{ inputs.version }}
     permissions:
       contents: write
